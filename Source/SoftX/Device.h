@@ -33,15 +33,19 @@ public:
 
     // –исует полноэкранный четырЄхугольник, выполн€€ пиксельный шейдер дл€ каждого пиксел€
 	void DrawFullScreenQuad();
-
     void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
 
     float4 ClipToScreen(const float4& clipPos) const;
+    void DrawPoint(int x, int y, float z, const float4& color);
+	void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
 	void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
 	void RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
 
     void SetCullMode(CullMode mode) { m_cullMode = mode; }
     CullMode GetCullMode() const { return m_cullMode; }
+
+    void SetFillMode(FillMode mode) { m_fillMode = mode; }
+    FillMode GetFillMode() const { return m_fillMode; }
 
     // ¬ключение/выключение тайлового рендера
 	void EnableTiledRendering(bool enable) { m_tiledRendering = enable; };
@@ -78,6 +82,7 @@ private:
     std::vector<uint32_t> m_indexBuffer;
 
     CullMode m_cullMode;
+	FillMode m_fillMode;
 
 	bool m_tiledRendering;
 	int m_tileSize;

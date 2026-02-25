@@ -181,10 +181,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		{
 			DestroyWindow(hWnd);
 		}
-		// Здесь можно добавить переключение режимов по клавишам
-		if (wParam == 'T')
-		{
-		}
+		if (wParam == '1') g_pDevice->SetFillMode(FillMode::Point);
+		if (wParam == '2') g_pDevice->SetFillMode(FillMode::Wireframe);
+		if (wParam == '3') g_pDevice->SetFillMode(FillMode::Solid);
 		return 0;
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);

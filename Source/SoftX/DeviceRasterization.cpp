@@ -1,5 +1,47 @@
 #include "Device.h"
 
+void Device::DrawPoint(int x, int y, float z, const float4& color)
+{
+	if (x < 0 || x >= m_currentRT->width() || y < 0 || y >= m_currentRT->height())
+		return;
+	int idx = y * m_currentRT->width() + x;
+	if (z < m_depthBuffer.at(idx))
+	{
+		m_depthBuffer.at(idx) = z;
+		m_currentRT->set_pixel(int2(x, y), color);
+	}
+}
+
+void Device::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
+{
+	// ÷елочисленный алгоритм Ѕрезенхема с интерпол€цией глубины
+	int dx = abs(x1 - x0);
+	int dy = -abs(y1 - y0);
+	int sx = (x0 < x1) ? 1 : -1;
+	int sy = (y0 < y1) ? 1 : -1;
+	int err = dx + dy;
+	int steps = std::max(dx, -dy);
+	float zStep = (steps > 0) ? (z1 - z0) / steps : 0.0f;
+	float z = z0;
+	int x = x0, y = y0;
+	for (int i = 0; i <= steps; ++i)
+	{
+		DrawPoint(x, y, z, color);
+		int e2 = 2 * err;
+		if (e2 >= dy)
+		{
+			err += dy;
+			x += sx;
+		}
+		if (e2 <= dx)
+		{
+			err += dx;
+			y += sy;
+		}
+		z += zStep;
+	}
+}
+
 float4 Device::ClipToScreen(const float4& clipPos) const
 {
 	// »звлекаем компоненты с помощью SSE

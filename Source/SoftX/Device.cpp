@@ -10,6 +10,7 @@ Device::Device(const PresentParameters& params)
     , m_constant_buffer(nullptr)
     , m_constant_buffer_size(0)
     , m_cullMode(CullMode::Back)
+	, m_fillMode(FillMode::Solid)
     , m_viewport(0, 0, (float)params.BackBufferSize.x, (float)params.BackBufferSize.y, 0, 1)
 	, m_threadPool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency()))
 {
@@ -74,36 +75,74 @@ void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 		m_triangles.push_back({(int)i0, (int)i1, (int)i2});
 	}
 
-	if (m_tiledRendering)
+	if (m_fillMode == FillMode::Solid)
 	{
-		LARGE_INTEGER freq, t1, t2;
-		QueryPerformanceFrequency(&freq);
+		if (m_tiledRendering)
+		{
+			LARGE_INTEGER freq, t1, t2;
+			QueryPerformanceFrequency(&freq);
 
-		QueryPerformanceCounter(&t1);
-		buildTiles(m_currentRT->width(), m_currentRT->height());
-		QueryPerformanceCounter(&t2);
-		double buildTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
+			QueryPerformanceCounter(&t1);
+			buildTiles(m_currentRT->width(), m_currentRT->height());
+			QueryPerformanceCounter(&t2);
+			double buildTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
 
-		QueryPerformanceCounter(&t1);
-		binTriangles(m_transformedVerts, m_triangles);
-		QueryPerformanceCounter(&t2);
-		double binTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
+			QueryPerformanceCounter(&t1);
+			binTriangles(m_transformedVerts, m_triangles);
+			QueryPerformanceCounter(&t2);
+			double binTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
 
-		QueryPerformanceCounter(&t1);
-		renderTilesMultithreaded();
-		QueryPerformanceCounter(&t2);
-		double renderTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
+			QueryPerformanceCounter(&t1);
+			renderTilesMultithreaded();
+			QueryPerformanceCounter(&t2);
+			double renderTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
 
-		char buf[256];
-		sprintf_s(buf, "Build: %.3f ms, Bin: %.3f ms, Render: %.3f ms\n", buildTime * 1000, binTime * 1000, renderTime * 1000);
-		OutputDebugStringA(buf);
+			char buf[256];
+			sprintf_s(buf, "Build: %.3f ms, Bin: %.3f ms, Render: %.3f ms\n", buildTime * 1000, binTime * 1000,
+					  renderTime * 1000);
+			OutputDebugStringA(buf);
+		}
+		else
+		{
+			// Последовательный рендеринг
+			for (const auto& tri : m_triangles)
+			{
+				RasterizeTriangleSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z]);
+			}
+		}
 	}
-	else
+	else if (m_fillMode == FillMode::Wireframe)
 	{
-		// Последовательный рендеринг
+		// Рисуем рёбра треугольников белым цветом (можно изменить)
+		float4 wireColor(1.0f, 1.0f, 1.0f, 1.0f);
 		for (const auto& tri : m_triangles)
 		{
-			RasterizeTriangleSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z]);
+			const auto& v0 = m_transformedVerts[tri.x];
+			const auto& v1 = m_transformedVerts[tri.y];
+			const auto& v2 = m_transformedVerts[tri.z];
+			DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y), (int)round(v1.Position.x),
+					 (int)round(v1.Position.y), v0.Position.z, v1.Position.z, wireColor);
+			DrawLine((int)round(v1.Position.x), (int)round(v1.Position.y), (int)round(v2.Position.x),
+					 (int)round(v2.Position.y), v1.Position.z, v2.Position.z, wireColor);
+			DrawLine((int)round(v2.Position.x), (int)round(v2.Position.y), (int)round(v0.Position.x),
+					 (int)round(v0.Position.y), v2.Position.z, v0.Position.z, wireColor);
+		}
+	}
+	else if (m_fillMode == FillMode::Point)
+	{
+		// Рисуем вершины (каждую один раз)
+		std::vector<bool> drawn(m_transformedVerts.size(), false);
+		for (const auto& tri : m_triangles)
+		{
+			for (int idx : {tri.x, tri.y, tri.z})
+			{
+				if (!drawn[idx])
+				{
+					drawn[idx] = true;
+					const auto& v = m_transformedVerts[idx];
+					DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
+				}
+			}
 		}
 	}
 }

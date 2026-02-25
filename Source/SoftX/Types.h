@@ -37,6 +37,17 @@ struct Viewport
 	}
 };
 
+struct Tile
+{
+	int2 min;						  // левый верхний угол в пикселях
+	int2 max;						  // правый нижний угол (включительно)
+	std::vector<int> triangleIndices; // индексы треугольников, попадающих в тайл
+
+	Tile(int2 min, int2 max) : min(min), max(max)
+	{
+	}
+};
+
 using PixelShader = std::function<float4(const VertexOutput& Input, const void* ConstantBuffer)>;
 using VertexShader = std::function<VertexOutput(const VertexInput&, const void* ConstantBuffer)>;
 
@@ -47,13 +58,9 @@ enum class CullMode
 	Back   // отсекать тыльные грани (обычно используется)
 };
 
-struct Tile
+enum class FillMode
 {
-	int2 min;						  // левый верхний угол в пикселях
-	int2 max;						  // правый нижний угол (включительно)
-	std::vector<int> triangleIndices; // индексы треугольников, попадающих в тайл
-
-	Tile(int2 min, int2 max) : min(min), max(max)
-	{
-	}
+	Point,	   // только вершины
+	Wireframe, // только рёбра
+	Solid	   // закрашенные треугольники
 };
