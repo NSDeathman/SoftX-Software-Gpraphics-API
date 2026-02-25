@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <cmath>
 #include "Device.h"
+#include "ScopedTimer.h"
 
 bool g_running = true;
 int g_frameCount = 0;
@@ -123,6 +124,11 @@ void CreateCube(std::vector<VertexInput>& vertices, std::vector<uint32_t>& indic
 
 void RenderFrame()
 {
+	static std::vector<TimerRecord> timers;
+	timers.clear(); // очищаем для нового кадра
+
+	ScopedTimer totalTimer("Total", timers);
+
 	// Измеряем время с предыдущего кадра
 	LARGE_INTEGER currentTime;
 	QueryPerformanceCounter(&currentTime);
@@ -152,20 +158,39 @@ void RenderFrame()
 	TransformCB cb;
 	cb.wvp = proj * view * model;
 
-	g_pDevice->Clear(float4(0.2f, 0.2f, 0.2f, 1.0f));
-	g_pDevice->ClearDepth(1.0f);
+	{
+		ScopedTimer t("Clear", timers);
+		g_pDevice->Clear(float4(0.2f, 0.2f, 0.2f, 1.0f));
+		g_pDevice->ClearDepth(1.0f);
+	}
 
-	g_pDevice->EnableTiledRendering(true);
-	g_pDevice->SetTileSize(512);
-	g_pDevice->SetVertexShader(vsTransform);
-	g_pDevice->SetPixelShader(psColor);
-	g_pDevice->SetConstantBuffer(&cb, sizeof(cb));
-	g_pDevice->SetVertexBuffer(vertices);
-	g_pDevice->SetIndexBuffer(indices);
+	{
+		ScopedTimer t("Preparing pipeline", timers);
+		g_pDevice->EnableTiledRendering(true);
+		g_pDevice->SetTileSize(512);
+		g_pDevice->SetVertexShader(vsTransform);
+		g_pDevice->SetPixelShader(psColor);
+		g_pDevice->SetConstantBuffer(&cb, sizeof(cb));
+		g_pDevice->SetVertexBuffer(vertices);
+		g_pDevice->SetIndexBuffer(indices);
+	}
 
-	g_pDevice->DrawIndexed((uint32_t)indices.size(), 0);
+	{
+		ScopedTimer t("DrawIndexed", timers);
+		g_pDevice->DrawIndexed((uint32_t)indices.size(), 0);
+	}
 
-	g_pDevice->Present();
+	{
+		ScopedTimer t("Present", timers);
+		g_pDevice->Present();
+	}
+
+	for (const auto& record : timers)
+	{
+		char buf[256];
+		sprintf_s(buf, "%s: %.3f ms\n", record.name.c_str(), record.elapsedMs);
+		OutputDebugStringA(buf);
+	}
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)

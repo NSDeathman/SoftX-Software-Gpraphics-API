@@ -40,6 +40,9 @@
     <ClInclude Include="ThreadPool.h">
       <Filter>Multithreading</Filter>
     </ClInclude>
+    <ClInclude Include="ScopedTimer.h">
+      <Filter>Performance metering</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Device">
@@ -53,6 +56,9 @@
     </Filter>
     <Filter Include="Multithreading">
       <UniqueIdentifier>{1232e33e-b204-45d6-ac1b-d2b7baf7defd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Performance metering">
+      <UniqueIdentifier>{acae1f24-261d-43ed-b9d9-7fe1d30be2a9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

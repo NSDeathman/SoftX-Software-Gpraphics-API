@@ -165,6 +165,7 @@
     <ClInclude Include="MicroMath.h" />
     <ClInclude Include="RenderTargetInterface.h" />
     <ClInclude Include="RenderTargetTexture.h" />
+    <ClInclude Include="ScopedTimer.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="Types.h" />
