@@ -1,7 +1,7 @@
 #include "Device.h"
 #include <future>
 
-#define DEBUG_TILES
+//#define DEBUG_TILES
 
 void Device::buildTiles(int width, int height)
 {
