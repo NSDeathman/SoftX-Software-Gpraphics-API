@@ -163,6 +163,8 @@
     <ClInclude Include="Device.h" />
     <ClInclude Include="FrameBuffer.h" />
     <ClInclude Include="MicroMath.h" />
+    <ClInclude Include="RenderTargetInterface.h" />
+    <ClInclude Include="RenderTargetTexture.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Types.h" />
   </ItemGroup>

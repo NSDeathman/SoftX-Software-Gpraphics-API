@@ -4,6 +4,7 @@
 #include "Types.h"
 #include "Framebuffer.h"
 #include "DepthBuffer.h"
+#include "RenderTargetTexture.h"
 
 class Device {
 public:
@@ -11,7 +12,7 @@ public:
     ~Device() = default;
 
     // ќчистка заднего буфера цветом
-    void Clear(const float4& color) { m_backBuffer.clear(color); };
+    void Clear(const float4& color) { m_currentRT->clear(color); };
     void ClearDepth(float depth) { m_depthBuffer.clear(depth); };
 
     // ”становка пиксельного шейдера и константного буфера
@@ -23,11 +24,14 @@ public:
     void SetVertexBuffer(const std::vector<VertexInput>& buffer) { m_vertexBuffer = buffer; }
     void SetIndexBuffer(const std::vector<uint32_t>& buffer) { m_indexBuffer = buffer; }
 
+    void SetRenderTarget(IRenderTarget* rt) { m_currentRT = rt ? rt : &m_backBuffer; }
+    IRenderTarget* GetRenderTarget() const { return m_currentRT; }
+
     void SetViewport(const Viewport& vp) { m_viewport = vp; }
     const Viewport& GetViewport() const { return m_viewport; }
 
     // –исует полноэкранный четырЄхугольник, выполн€€ пиксельный шейдер дл€ каждого пиксел€
-    void DrawFullScreenQuad();
+	void DrawFullScreenQuad();
 
     void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
 
@@ -52,6 +56,8 @@ private:
 
     Framebuffer m_backBuffer;
     DepthBuffer m_depthBuffer;
+
+    IRenderTarget* m_currentRT;
 
     Viewport m_viewport;
 
