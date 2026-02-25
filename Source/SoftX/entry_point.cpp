@@ -10,7 +10,7 @@ LARGE_INTEGER g_prevTime;
 float g_deltaTime = 0.016f;
 float g_fps = 0.0f;
 wchar_t g_windowTitle[256] = L"SoftX - FPS: ?";
-int2 Resolution = int2(1920, 1080);
+int2 Resolution = int2(1280, 1024);
 
 void UpdateFPS(HWND hWnd)
 {
