@@ -5,6 +5,7 @@
 #include "Framebuffer.h"
 #include "DepthBuffer.h"
 #include "RenderTargetTexture.h"
+#include "ThreadPool.h"
 
 class Device {
 public:
@@ -36,10 +37,16 @@ public:
     void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
 
     float4 ClipToScreen(const float4& clipPos) const;
-    void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
+	void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
+	void RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
 
     void SetCullMode(CullMode mode) { m_cullMode = mode; }
     CullMode GetCullMode() const { return m_cullMode; }
+
+    // Включение/выключение тайлового рендера
+	void EnableTiledRendering(bool enable) { m_tiledRendering = enable; };
+	void SetTileSize(int tileSize = 64) { m_tileSize = tileSize; };
+    bool IsTiledRenderingEnabled() const { return m_tiledRendering; };
 
     // Презентация: копирует задний буфер в окно
     void Present();
@@ -71,4 +78,20 @@ private:
     std::vector<uint32_t> m_indexBuffer;
 
     CullMode m_cullMode;
+
+	bool m_tiledRendering;
+	int m_tileSize;
+	std::vector<Tile> m_tiles; // список всех тайлов
+	std::vector<VertexOutput> m_transformedVerts; // кеш трансформированных вершин для треугольников
+	std::vector<int3> m_triangles; // индексы вершин для каждого треугольника (i0,i1,i2)
+	std::unique_ptr<ThreadPool> m_threadPool;
+
+	// Методы для тайлового рендера
+	void buildTiles(int width, int height);
+	void binTriangles(const std::vector<VertexOutput>& transformedVerts, const std::vector<int3>& triangles);
+	void renderTilesMultithreaded();
+	void renderTilesSingleThreaded();
+	void RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
+	void RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
+	void renderTile(int tileIndex);
 };

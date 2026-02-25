@@ -46,3 +46,14 @@ enum class CullMode
 	Front, // отсекать лицевые грани
 	Back   // отсекать тыльные грани (обычно используется)
 };
+
+struct Tile
+{
+	int2 min;						  // левый верхний угол в пикселях
+	int2 max;						  // правый нижний угол (включительно)
+	std::vector<int> triangleIndices; // индексы треугольников, попадающих в тайл
+
+	Tile(int2 min, int2 max) : min(min), max(max)
+	{
+	}
+};

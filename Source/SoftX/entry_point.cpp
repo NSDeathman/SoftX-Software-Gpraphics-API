@@ -2,7 +2,37 @@
 #include <cmath>
 #include "Device.h"
 
-const TextureRGBA32F* g_textureToSample = nullptr;
+bool g_running = true;
+int g_frameCount = 0;
+LARGE_INTEGER g_freq;
+LARGE_INTEGER g_lastFPSTime;
+LARGE_INTEGER g_prevTime;
+float g_deltaTime = 0.016f;
+float g_fps = 0.0f;
+wchar_t g_windowTitle[256] = L"SoftX - FPS: ?";
+int2 Resolution = int2(1920, 1080);
+
+void UpdateFPS(HWND hWnd)
+{
+	g_frameCount++;
+
+	LARGE_INTEGER currentTime;
+	QueryPerformanceCounter(&currentTime);
+
+	double elapsed = double(currentTime.QuadPart - g_lastFPSTime.QuadPart) / g_freq.QuadPart;
+	if (elapsed >= 1.0)
+	{
+		g_fps = g_frameCount / (float)elapsed;
+
+		// Формируем заголовок
+		swprintf(g_windowTitle, 256, L"SoftX - FPS: %.1f", g_fps);
+		SetWindowTextW(hWnd, g_windowTitle);
+
+		// Сброс
+		g_frameCount = 0;
+		g_lastFPSTime = currentTime;
+	}
+}
 
 std::vector<VertexInput> vertices = {};
 std::vector<uint32_t> indices = {};
@@ -27,11 +57,6 @@ VertexOutput vsTransform(const VertexInput& in, const void* constants)
 float4 psColor(const VertexOutput& in, const void* constants)
 {
 	return in.Color;
-}
-
-float4 psSampleTexture(const VertexOutput& in, const void* constants)
-{
-	return g_textureToSample->sample(in.UV);
 }
 
 void CreateCube(std::vector<VertexInput>& vertices, std::vector<uint32_t>& indices)
@@ -98,55 +123,48 @@ void CreateCube(std::vector<VertexInput>& vertices, std::vector<uint32_t>& indic
 
 void RenderFrame()
 {
+	// Измеряем время с предыдущего кадра
+	LARGE_INTEGER currentTime;
+	QueryPerformanceCounter(&currentTime);
+	g_deltaTime = float(double(currentTime.QuadPart - g_prevTime.QuadPart) / g_freq.QuadPart);
+	g_prevTime = currentTime;
+
+	// Ограничиваем дельту, чтобы избежать рывков при отладке (например, если стояли в брейкпоинте)
+	if (g_deltaTime > 0.1f)
+		g_deltaTime = 0.1f;
+
+	// Обновляем углы с фиксированной угловой скоростью (радиан в секунду)
 	static float angleX = 0.0f;
 	static float angleY = 0.0f;
-	angleX += 0.01f;
-	angleY += 0.02f;
+	angleX += 1.0f * g_deltaTime; // 1 радиан/сек
+	angleY += 2.0f * g_deltaTime; // 2 радиана/сек
 
-	// --- Проход 1: рендерим куб в промежуточную текстуру ---
-	static RenderTargetTexture rt(int2(800, 600)); // создаём один раз
-
-	// Устанавливаем render target = текстура
-	g_pDevice->SetRenderTarget(&rt);
-	g_pDevice->Clear(float4(0.0f, 0.0f, 0.0f, 1.0f)); // чёрный фон для текстуры
-	g_pDevice->ClearDepth(1.0f);
-
-	// Матрицы для куба (вид с другой камеры, чтобы было интереснее)
 	float3 eye(0, 0, -50);
 	float3 target(0, 0, 0);
 	float3 up(0, 1, 0);
+
 	float4x4 view = lookAtLH(eye, target, up);
+
 	float4x4 model = rotationY(angleY) * rotationX(angleX);
-	float aspect = 800.0f / 600.0f;
+	float aspect = (float)g_pDevice->GetPresentParams().BackBufferSize.x / g_pDevice->GetPresentParams().BackBufferSize.y;
 	float4x4 proj = perspectiveLH(DegToRad(67.5f), aspect, 0.1f, 100.0f);
 
 	TransformCB cb;
 	cb.wvp = proj * view * model;
 
+	g_pDevice->Clear(float4(0.2f, 0.2f, 0.2f, 1.0f));
+	g_pDevice->ClearDepth(1.0f);
+
+	g_pDevice->EnableTiledRendering(true);
+	g_pDevice->SetTileSize(512);
 	g_pDevice->SetVertexShader(vsTransform);
 	g_pDevice->SetPixelShader(psColor);
 	g_pDevice->SetConstantBuffer(&cb, sizeof(cb));
 	g_pDevice->SetVertexBuffer(vertices);
 	g_pDevice->SetIndexBuffer(indices);
+
 	g_pDevice->DrawIndexed((uint32_t)indices.size(), 0);
 
-	// --- Проход 2: выводим текстуру на весь экран ---
-	// Возвращаем render target = backbuffer
-	g_pDevice->SetRenderTarget(nullptr);
-	g_pDevice->Clear(float4(0.2f, 0.2f, 0.2f, 1.0f));
-
-	// Устанавливаем текстуру для семплирования
-	g_textureToSample = &rt.texture();
-
-	// Рисуем полноэкранный quad с текстурным шейдером
-	g_pDevice->SetPixelShader(psSampleTexture);
-	g_pDevice->SetConstantBuffer(nullptr, 0); // константы не нужны
-	g_pDevice->DrawFullScreenQuad();
-
-	// Сбрасываем (необязательно)
-	g_textureToSample = nullptr;
-
-	// Выводим результат на экран
 	g_pDevice->Present();
 }
 
@@ -154,23 +172,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
 	{
-	case WM_CREATE:
-		SetTimer(hWnd, 1, 16, NULL); // 60 FPS
-		CreateCube(vertices, indices);
-		return 0;
-	case WM_TIMER: {
-		if (!g_pDevice)
-			break;
-		RenderFrame();
-		return 0;
-	}
 	case WM_DESTROY:
-		KillTimer(hWnd, 1);
+		g_running = false; // сигнал для выхода из цикла
 		PostQuitMessage(0);
 		return 0;
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE)
+		{
 			DestroyWindow(hWnd);
+		}
+		// Здесь можно добавить переключение режимов по клавишам
+		if (wParam == 'T')
+		{
+		}
 		return 0;
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);
@@ -188,12 +202,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 	HWND hWnd = CreateWindowEx(0, CLASS_NAME, L"Software Renderer - Triangle Test",
 							   WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT,
-							   800, 600, nullptr, nullptr, hInstance, nullptr);
+							   Resolution.x, Resolution.y, nullptr, nullptr, hInstance, nullptr);
 	if (!hWnd)
 		return -1;
 
+	QueryPerformanceFrequency(&g_freq);
+	QueryPerformanceFrequency(&g_lastFPSTime);
+	QueryPerformanceCounter(&g_lastFPSTime);
+	QueryPerformanceCounter(&g_prevTime);
+
 	PresentParameters pp;
-	pp.BackBufferSize = int2(800, 600);
+	pp.BackBufferSize = Resolution;
 	pp.hDeviceWindow = hWnd;
 	pp.Windowed = true;
 
@@ -202,11 +221,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 	ShowWindow(hWnd, nCmdShow);
 
+	CreateCube(vertices, indices);
+
+	// --- Активный цикл рендеринга ---
 	MSG msg = {};
-	while (GetMessage(&msg, nullptr, 0, 0))
+	while (g_running)
 	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		// Обрабатываем все накопившиеся сообщения
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		// Рендерим кадр
+		RenderFrame();
+		// Обновляем FPS (можно вызвать внутри RenderFrame или после)
+		UpdateFPS(hWnd);
 	}
 
 	g_pDevice = nullptr;

@@ -166,11 +166,13 @@
     <ClInclude Include="RenderTargetInterface.h" />
     <ClInclude Include="RenderTargetTexture.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="Types.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="DeviceRasterization.cpp" />
+    <ClCompile Include="DeviceTiledRendering.cpp" />
     <ClCompile Include="entry_point.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

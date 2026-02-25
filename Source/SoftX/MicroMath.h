@@ -384,6 +384,15 @@ inline float4 min(const float4& a, const float4& b) { return float4(_mm_min_ps(a
 inline float4 max(const float4& a, const float4& b) { return float4(_mm_max_ps(a.v, b.v)); }
 inline float4 abs(const float4& v) { return float4(_mm_andnot_ps(_mm_set1_ps(-0.0f), v.v)); }
 
+inline float edgeFunction(const float4& a, const float4& b, const float2& c)
+{
+	return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
+}
+inline float edgeFunction(const float4& a, const float4& b, const float4& c)
+{
+	return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
+}
+
 // ==================== float4x4 (Row-major, SSE) ====================
 class alignas(16) float4x4 {
 public:
