@@ -11,6 +11,9 @@
     <ClCompile Include="DeviceTiledRendering.cpp">
       <Filter>Device</Filter>
     </ClCompile>
+    <ClCompile Include="ScopedTimer.cpp">
+      <Filter>Performance metering</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Device.h">

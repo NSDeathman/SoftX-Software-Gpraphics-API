@@ -13,11 +13,30 @@ class DepthBuffer
 	{
 	}
 
-	// Очистка заданным значением глубины (по умолчанию 1.0)
-	void clear(float depth = 1.0f)
+	// Очистка заданным значением глубины
+	void clear(float depth)
 	{
-		std::fill(m_depths.begin(), m_depths.end(), depth);
+		float* data = m_depths.data();
+		size_t count = m_depths.size();
+
+		__m128 depth4 = _mm_set1_ps(depth);
+		size_t i = 0;
+
+		// Потоковая запись (минует кэш) – максимальная скорость,
+		// но требует выравнивания адреса по 16 байт.
+		for (; i + 4 <= count; i += 4)
+		{
+			_mm_stream_ps(data + i, depth4);
+		}
+		_mm_sfence(); // гарантирует видимость записей
+
+		// Остаток (менее 4 элементов)
+		for (; i < count; ++i)
+		{
+			data[i] = depth;
+		}
 	}
+
 
 	// Чтение глубины по координатам
 	float read(int2 coords) const

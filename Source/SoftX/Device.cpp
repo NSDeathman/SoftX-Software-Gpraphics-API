@@ -13,7 +13,30 @@ Device::Device(const PresentParameters& params)
 	, m_fillMode(FillMode::Solid)
     , m_viewport(0, 0, (float)params.BackBufferSize.x, (float)params.BackBufferSize.y, 0, 1)
 	, m_threadPool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency()))
+	, m_tiledRendering(true)
+	, m_tileSize(64)
 {
+}
+
+void Device::renderTileQuad(int tileIndex)
+{
+	const Tile& tile = m_tiles[tileIndex];
+	int w = m_currentRT->width();
+	int h = m_currentRT->height();
+
+	VertexOutput input = {};
+
+	for (int y = tile.min.y; y <= tile.max.y; ++y)
+	{
+		float v = (float)y / (h - 1);
+		for (int x = tile.min.x; x <= tile.max.x; ++x)
+		{
+			float u = (float)x / (w - 1);
+			input.UV = float2(u, v);
+			float4 color = m_pixelShader(input, m_constant_buffer);
+			m_currentRT->set_pixel(int2(x, y), color);
+		}
+	}
 }
 
 void Device::DrawFullScreenQuad()
@@ -24,17 +47,28 @@ void Device::DrawFullScreenQuad()
 	int w = m_currentRT->width();
 	int h = m_currentRT->height();
 
-	VertexOutput Input = {};
+	// Построить тайлы для текущего размера экрана
+	buildTiles(w, h); // использует m_tileSize (например, 64)
 
-	for (int y = 0; y < h; ++y)
-	{
-		for (int x = 0; x < w; ++x)
+	int numTiles = (int)m_tiles.size();
+	std::atomic<int> tileIndex(0);
+
+	auto worker = [this, &tileIndex, numTiles]() {
+		while (true)
 		{
-			Input.UV = float2((float)x / (w - 1), (float)y / (h - 1));
-			float4 color = m_pixelShader(Input, m_constant_buffer);
-			m_currentRT->set_pixel(int2(x, y), color);
+			int idx = tileIndex.fetch_add(1);
+			if (idx >= numTiles)
+				break;
+			renderTileQuad(idx);
 		}
+	};
+
+	int numThreads = (int)m_threadPool->threadCount();
+	for (int i = 0; i < numThreads; ++i)
+	{
+		m_threadPool->enqueue(worker);
 	}
+	m_threadPool->wait();
 }
 
 void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
@@ -79,28 +113,9 @@ void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 	{
 		if (m_tiledRendering)
 		{
-			LARGE_INTEGER freq, t1, t2;
-			QueryPerformanceFrequency(&freq);
-
-			QueryPerformanceCounter(&t1);
 			buildTiles(m_currentRT->width(), m_currentRT->height());
-			QueryPerformanceCounter(&t2);
-			double buildTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
-
-			QueryPerformanceCounter(&t1);
 			binTriangles(m_transformedVerts, m_triangles);
-			QueryPerformanceCounter(&t2);
-			double binTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
-
-			QueryPerformanceCounter(&t1);
 			renderTilesMultithreaded();
-			QueryPerformanceCounter(&t2);
-			double renderTime = double(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
-
-			char buf[256];
-			sprintf_s(buf, "Build: %.3f ms, Bin: %.3f ms, Render: %.3f ms\n", buildTime * 1000, binTime * 1000,
-					  renderTime * 1000);
-			OutputDebugStringA(buf);
 		}
 		else
 		{

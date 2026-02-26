@@ -26,7 +26,18 @@ class Framebuffer : public IRenderTarget
 	// Очистка готовым 32-битным цветом (0xAARRGGBB)
 	void clear(uint32_t color)
 	{
-		std::fill(m_pixels.begin(), m_pixels.end(), color);
+		uint32_t* data = m_pixels.data();
+		size_t count = m_pixels.size();
+		__m128i color4 = _mm_set1_epi32(color);
+		size_t i = 0;
+		for (; i + 4 <= count; i += 4)
+		{
+			_mm_storeu_si128((__m128i*)(data + i), color4);
+		}
+		for (; i < count; ++i)
+		{
+			data[i] = color;
+		}
 	}
 
 	// Установка пикселя по координатам (float4 цвет)

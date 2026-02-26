@@ -1,18 +1,15 @@
 #pragma once
-
 #include <vector>
 #include <string>
 #include <chrono>
-#include <iostream>
+#include <windows.h> // для OutputDebugStringA
 
-// Структура для хранения одного замера
 struct TimerRecord
 {
 	std::string name;
-	double elapsedMs; // время в миллисекундах
+	double elapsedMs;
 };
 
-// Класс таймера с автоматическим замером времени жизни
 class ScopedTimer
 {
   public:
@@ -33,3 +30,26 @@ class ScopedTimer
 	std::vector<TimerRecord>& m_records;
 	std::chrono::high_resolution_clock::time_point m_start;
 };
+
+// Глобальный вектор (объявление, определение в одном cpp)
+extern std::vector<TimerRecord> g_timers;
+
+// Макросы
+#define CONCAT_(a, b) a##b
+#define CONCAT(a, b) CONCAT_(a, b)
+
+#ifdef _MSC_VER
+#define PROFILE_SCOPE(name) ScopedTimer CONCAT(profile_timer_, __COUNTER__)(name, g_timers)
+#else
+#define PROFILE_SCOPE(name) ScopedTimer CONCAT(profile_timer_, __LINE__)(name, g_timers)
+#endif
+
+#define LOG_PROFILE()                                                                                                  \
+	for (const auto& rec : g_timers)                                                                                   \
+	{                                                                                                                  \
+		char buf[256];                                                                                                 \
+		sprintf_s(buf, sizeof(buf), "%s: %.3f ms\n", rec.name.c_str(), rec.elapsedMs);                                 \
+		OutputDebugStringA(buf);                                                                                       \
+	}
+
+#define PREPARE_TIMERS g_timers.clear

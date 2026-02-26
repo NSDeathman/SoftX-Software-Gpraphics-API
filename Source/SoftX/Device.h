@@ -99,4 +99,5 @@ private:
 	void RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
 	void RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
 	void renderTile(int tileIndex);
+	void renderTileQuad(int tileIndex);
 };

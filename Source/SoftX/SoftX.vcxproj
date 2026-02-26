@@ -175,6 +175,7 @@
     <ClCompile Include="DeviceRasterization.cpp" />
     <ClCompile Include="DeviceTiledRendering.cpp" />
     <ClCompile Include="entry_point.cpp" />
+    <ClCompile Include="ScopedTimer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
