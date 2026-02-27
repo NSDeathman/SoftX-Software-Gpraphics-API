@@ -1,7 +1,11 @@
 #pragma once
-#include "MicroMath.h"
 
-class IRenderTarget
+#include "Math.h"
+#include "LibInternal.h"
+
+SOFTX_BEGIN
+
+class SOFTX_API IRenderTarget
 {
   public:
 	virtual ~IRenderTarget() = default;
@@ -17,3 +21,5 @@ class IRenderTarget
 	virtual int height() const = 0;
 	virtual int2 size() const = 0;
 };
+
+SOFTX_END

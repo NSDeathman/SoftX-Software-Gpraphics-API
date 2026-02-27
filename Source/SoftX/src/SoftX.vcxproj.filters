@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\DepthBuffer.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\Device.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\FrameBuffer.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\LibInternal.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\Math.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RenderTargetInterface.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RenderTargetTexture.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\SoftX.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\Texture.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\Types.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\ThreadPool.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Device.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="DeviceRasterization.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="DeviceTiledRendering.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="SoftX.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Include">
+      <UniqueIdentifier>{ab021737-3a84-4a11-bae8-bcfe070b1f03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src">
+      <UniqueIdentifier>{a8dfff75-6c46-410d-bb2a-205c40b04f8e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

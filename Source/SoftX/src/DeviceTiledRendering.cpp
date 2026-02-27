@@ -1,7 +1,6 @@
-#include "Device.h"
-#include <future>
+#include "pch.h"
 
-//#define DEBUG_TILES
+SOFTX_BEGIN
 
 void Device::buildTiles(int width, int height)
 {
@@ -446,3 +445,5 @@ void Device::renderTile(int tileIndex)
 		RasterizeTriangleTileSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z], tile.min, tile.max);
 	}
 }
+
+SOFTX_END

@@ -1,8 +1,12 @@
 #pragma once
+
 #include "RenderTargetInterface.h"
 #include "Texture.h"
+#include "LibInternal.h"
 
-class RenderTargetTexture : public IRenderTarget
+SOFTX_BEGIN
+
+class SOFTX_API RenderTargetTexture : public IRenderTarget
 {
   public:
 	RenderTargetTexture(int2 size) : m_texture(size)
@@ -56,3 +60,5 @@ class RenderTargetTexture : public IRenderTarget
   private:
 	TextureRGBA32F m_texture;
 };
+
+SOFTX_END

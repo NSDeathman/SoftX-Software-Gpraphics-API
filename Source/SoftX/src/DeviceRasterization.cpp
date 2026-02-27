@@ -1,4 +1,6 @@
-#include "Device.h"
+#include "pch.h"
+
+SOFTX_BEGIN
 
 void Device::DrawPoint(int x, int y, float z, const float4& color)
 {
@@ -15,8 +17,8 @@ void Device::DrawPoint(int x, int y, float z, const float4& color)
 void Device::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
 	// ÷елочисленный алгоритм Ѕрезенхема с интерпол€цией глубины
-	int dx = abs(x1 - x0);
-	int dy = -abs(y1 - y0);
+	int dx = std::abs(x1 - x0);
+	int dy = -std::abs(y1 - y0);
 	int sx = (x0 < x1) ? 1 : -1;
 	int sy = (y0 < y1) ? 1 : -1;
 	int err = dx + dy;
@@ -58,8 +60,8 @@ float4 Device::ClipToScreen(const float4& clipPos) const
 	float zNDC = _mm_cvtss_f32(_mm_shuffle_ps(ndc, ndc, 2));
 
 	// —кал€рные вычислени€
-	float screenX = m_viewport.x + (xNDC * 0.5f + 0.5f) * m_viewport.width;
-	float screenY = m_viewport.y + (1.0f - (yNDC * 0.5f + 0.5f)) * m_viewport.height;
+	float screenX = m_viewport.pos.x + (xNDC * 0.5f + 0.5f) * m_viewport.size.x;
+	float screenY = m_viewport.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * m_viewport.size.y;
 	float screenZ = m_viewport.minZ + zNDC * (m_viewport.maxZ - m_viewport.minZ);
 
 	return float4(screenX, screenY, screenZ, 1.0f);
@@ -358,3 +360,5 @@ void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1
 		}
 	}
 }
+
+SOFTX_END

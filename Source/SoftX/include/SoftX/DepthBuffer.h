@@ -2,10 +2,13 @@
 #include <vector>
 #include <algorithm>
 #include <limits>
-#include "MicroMath.h"
 #include <cassert>
 
-class DepthBuffer
+#include "LibInternal.h"
+#include "Math.h"
+
+SOFTX_BEGIN
+class SOFTX_API DepthBuffer
 {
   public:
 	DepthBuffer(int2 size)
@@ -109,3 +112,4 @@ class DepthBuffer
 	int m_width, m_height;
 	std::vector<float> m_depths;
 };
+SOFTX_END

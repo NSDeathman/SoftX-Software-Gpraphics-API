@@ -2,18 +2,24 @@
 #include <windows.h>
 #include <vector>
 #include <cstdint>
-#include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
-#include "MicroMath.h" // содержит float2, int2
+#include "Math.h"
 #include "RenderTargetInterface.h"
 
-class Framebuffer : public IRenderTarget
+SOFTX_BEGIN
+
+class SOFTX_API Framebuffer : public IRenderTarget
 {
   public:
-	Framebuffer(int2 size) : m_width(size.x), m_height(size.y), m_pixels(size.x * size.y, 0xFF000000)
+	Framebuffer(int2 size)
 	{
+		m_width = size.x;
+		m_height = size.y;
+		m_pixels.resize(size.x * size.y);
+		std::fill(m_pixels.begin(), m_pixels.end(), 0xFF000000);
 	}
 
 	// Очистка цветом float4 (компоненты в порядке RGBA)
@@ -151,3 +157,5 @@ class Framebuffer : public IRenderTarget
 	int m_width, m_height;
 	std::vector<uint32_t> m_pixels;
 };
+
+SOFTX_END

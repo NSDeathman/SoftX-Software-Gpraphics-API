@@ -1,14 +1,14 @@
-#include "Device.h"
+#include "pch.h"
+
+SOFTX_BEGIN
 
 Device::Device(const PresentParameters& params)
-    : m_params(params)
-    , m_backBuffer(params.BackBufferSize)
-    , m_depthBuffer(params.BackBufferSize)
-    , m_currentRT(&m_backBuffer)
+	: m_params(params)
+	, m_backBuffer(params.BackBufferSize)
+	, m_depthBuffer(params.BackBufferSize)
+	, m_currentRT(&m_backBuffer)
     , m_pixelShader(nullptr)
     , m_vertexShader(nullptr)
-    , m_constant_buffer(nullptr)
-    , m_constant_buffer_size(0)
     , m_cullMode(CullMode::Back)
 	, m_fillMode(FillMode::Solid)
     , m_viewport(0, 0, (float)params.BackBufferSize.x, (float)params.BackBufferSize.y, 0, 1)
@@ -17,6 +17,37 @@ Device::Device(const PresentParameters& params)
 	, m_tileSize(64)
 {
 }
+
+void Device::Clear(const float4& color) { m_currentRT->clear(color); };
+void Device::ClearDepth(float depth) { m_depthBuffer.clear(depth); };
+
+void Device::SetPixelShader(PixelShader shader) { m_pixelShader = std::move(shader); };
+void Device::SetVertexShader(VertexShader shader) { m_vertexShader = std::move(shader); };
+
+void Device::SetConstantBuffer(ConstantBuffer CBuffer) { m_constant_buffer = CBuffer; };
+
+void Device::SetVertexBuffer(const VertexBuffer& buffer) { m_vertexBuffer = buffer; }
+void Device::SetIndexBuffer(const IndexBuffer& buffer) { m_indexBuffer = buffer; }
+
+void Device::SetRenderTarget(IRenderTarget* rt) { m_currentRT = rt ? rt : &m_backBuffer; }
+IRenderTarget* Device::GetRenderTarget() const { return m_currentRT; }
+
+void Device::SetViewport(const Viewport& vp) { m_viewport = vp; }
+const Viewport& Device::GetViewport() const { return m_viewport; }
+
+void Device::SetCullMode(CullMode mode) { m_cullMode = mode; }
+CullMode Device::GetCullMode() const { return m_cullMode; }
+
+void Device::SetFillMode(FillMode mode) { m_fillMode = mode; }
+FillMode Device::GetFillMode() const { return m_fillMode; }
+
+void Device::EnableTiledRendering(bool enable) { m_tiledRendering = enable; };
+void Device::SetTileSize(int tileSize) { m_tileSize = tileSize; };
+bool Device::IsTiledRenderingEnabled() const { return m_tiledRendering; };
+
+Framebuffer& Device::GetBackBuffer() { return m_backBuffer; }
+
+PresentParameters& Device::GetPresentParams() { return m_params; }
 
 void Device::renderTileQuad(int tileIndex)
 {
@@ -73,7 +104,7 @@ void Device::DrawFullScreenQuad()
 
 void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 {
-	if (!m_vertexShader || !m_pixelShader || m_vertexBuffer.empty() || m_indexBuffer.empty())
+	if (!m_vertexShader || !m_pixelShader || m_vertexBuffer.IsEmpty() || m_indexBuffer.IsEmpty())
 		return;
 
 	// Очищаем временные массивы
@@ -82,14 +113,14 @@ void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 
 	// Трансформируем все вершины, которые используются в индексах
 	// (для простоты трансформируем все уникальные индексы)
-	std::vector<bool> vertexProcessed(m_vertexBuffer.size(), false);
+	std::vector<bool> vertexProcessed(m_vertexBuffer.Size(), false);
 	for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
 	{
-		uint32_t idx = m_indexBuffer[i];
+		uint32_t idx = m_indexBuffer.GetByIndex(i);
 		if (!vertexProcessed[idx])
 		{
 			vertexProcessed[idx] = true;
-			VertexOutput out = m_vertexShader(m_vertexBuffer[idx], m_constant_buffer);
+			VertexOutput out = m_vertexShader(m_vertexBuffer.GetByIndex(idx), m_constant_buffer);
 			out.Position = ClipToScreen(out.Position);
 			// Сохраняем в массив, позиция по idx
 			if (m_transformedVerts.size() <= idx)
@@ -103,9 +134,9 @@ void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 	{
 		if (i + 2 >= startIndex + indexCount)
 			break;
-		uint32_t i0 = m_indexBuffer[i];
-		uint32_t i1 = m_indexBuffer[i + 1];
-		uint32_t i2 = m_indexBuffer[i + 2];
+		uint32_t i0 = m_indexBuffer.GetByIndex(i);
+		uint32_t i1 = m_indexBuffer.GetByIndex(i + 1);
+		uint32_t i2 = m_indexBuffer.GetByIndex(i + 2);
 		m_triangles.push_back({(int)i0, (int)i1, (int)i2});
 	}
 
@@ -162,6 +193,10 @@ void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 	}
 }
 
+void Device::DrawIndexed() 
+{ 
+	DrawIndexed((uint32_t)m_indexBuffer.Size(), 0); 
+};
 
 void Device::Present() {
     HDC hdc = GetDC(m_params.hDeviceWindow);
@@ -177,3 +212,5 @@ void Device::Present() {
         ReleaseDC(m_params.hDeviceWindow, hdc);
     }
 }
+
+SOFTX_END

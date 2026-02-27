@@ -5,8 +5,12 @@
 #include <algorithm>     // дл€ std::min, std::max
 #include <cstdlib>       // дл€ std::abs (int)
 
+#include "LibInternal.h"
+
 #undef min
 #undef max
+
+SOFTX_BEGIN
 
 // ====================  онстанты и угловые преобразовани€ ====================
 constexpr float PI = 3.14159265358979323846f;
@@ -585,3 +589,5 @@ inline float4x4 lookAtLH(const float3& eye, const float3& at, const float3& up) 
                     float4(zaxis.x, zaxis.y, zaxis.z, -dot(zaxis, eye)),
                     float4(0,0,0,1));
 }
+
+SOFTX_END

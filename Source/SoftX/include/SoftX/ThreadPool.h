@@ -1,3 +1,5 @@
+#pragma once
+
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -5,6 +7,8 @@
 #include <queue>
 #include <thread>
 #include <vector>
+
+SOFTX_BEGIN
 
 class ThreadPool {
 public:
@@ -69,3 +73,5 @@ private:
     bool stop;
     int activeTasks; // защищается queueMutex
 };
+
+SOFTX_END
