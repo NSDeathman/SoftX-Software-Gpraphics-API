@@ -145,10 +145,10 @@ public:
 struct Viewport
 {
 	float2 pos;			 // верхний левый угол в пикселях
-	float2 size;		 // размеры в пикселях
+	int2 size;		 // размеры в пикселях
 	float minZ, maxZ;	 // диапазон глубины (обычно 0..1)
 
-	Viewport() : pos(float2(0.0f, 0.0f)), size(float2(0.0f, 0.0f)), minZ(0), maxZ(1)
+	Viewport() : pos(float2(0.0f, 0.0f)), size(int2(0, 0)), minZ(0), maxZ(1)
 	{
 	}
 	Viewport(float x, float y, float width, float height, float minZ = 0, float maxZ = 1)

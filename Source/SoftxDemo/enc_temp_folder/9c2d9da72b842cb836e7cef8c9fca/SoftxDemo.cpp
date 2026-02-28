@@ -127,7 +127,7 @@ int main()
 	Device device(pp);
 
 	Viewport vp;
-	vp.size = int2(pp.BackBufferSize.x, pp.BackBufferSize.y);
+	vp.size = float2((float)pp.BackBufferSize.x, (float)pp.BackBufferSize.y);
 	vp.pos = float2(0, 0);
 	vp.minZ = 0;
 	vp.maxZ = 1;
