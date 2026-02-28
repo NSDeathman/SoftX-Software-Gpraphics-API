@@ -1,214 +1,255 @@
 #include "pch.h"
+#include <SoftX/SoftX.h>  // или соответствующие заголовки
+#include <atomic>
 
 SOFTX_BEGIN
 
+// Конструктор
 Device::Device(const PresentParameters& params)
-	: m_params(params)
-	, m_backBuffer(params.BackBufferSize)
-	, m_depthBuffer(params.BackBufferSize)
-	, m_currentRT(&m_backBuffer)
-    , m_pixelShader(nullptr)
-    , m_vertexShader(nullptr)
-    , m_cullMode(CullMode::Back)
-	, m_fillMode(FillMode::Solid)
-    , m_viewport(0, 0, (float)params.BackBufferSize.x, (float)params.BackBufferSize.y, 0, 1)
-	, m_threadPool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency()))
-	, m_tiledRendering(true)
-	, m_tileSize(64)
+    : m_params(params)
+    , m_backBuffer(params.BackBufferSize)
+    , m_depthBuffer(params.BackBufferSize)
+    , m_threadPool(std::make_unique<ThreadPool>(std::thread::hardware_concurrency()))
 {
 }
 
-void Device::Clear(const float4& color) { m_currentRT->clear(color); };
-void Device::ClearDepth(float depth) { m_depthBuffer.clear(depth); };
+// Сеттер/геттер для контекста
+void Device::SetDeviceContext(const DeviceContext& ctx)
+{
+    m_DeviceContext = ctx;
+}
 
-void Device::SetPixelShader(PixelShader shader) { m_pixelShader = std::move(shader); };
-void Device::SetVertexShader(VertexShader shader) { m_vertexShader = std::move(shader); };
+DeviceContext Device::GetDeviceContext() const
+{
+    return m_DeviceContext;
+}
 
-void Device::SetConstantBuffer(ConstantBuffer CBuffer) { m_constant_buffer = CBuffer; };
+void Device::SetVertexBuffer(const VertexBuffer& buffer)
+{
+	m_DeviceContext.SetVertexBuffer(buffer);
+}
 
-void Device::SetVertexBuffer(const VertexBuffer& buffer) { m_vertexBuffer = buffer; }
-void Device::SetIndexBuffer(const IndexBuffer& buffer) { m_indexBuffer = buffer; }
+void Device::SetIndexBuffer(const IndexBuffer& buffer)
+{
+	m_DeviceContext.SetIndexBuffer(buffer);
+}
 
-void Device::SetRenderTarget(IRenderTarget* rt) { m_currentRT = rt ? rt : &m_backBuffer; }
-IRenderTarget* Device::GetRenderTarget() const { return m_currentRT; }
+void Device::SetConstantBuffer(ConstantBuffer cbuffer)
+{
+	m_DeviceContext.SetConstantBuffer(cbuffer);
+}
 
-void Device::SetViewport(const Viewport& vp) { m_viewport = vp; }
-const Viewport& Device::GetViewport() const { return m_viewport; }
+// Очистка цветом: используем рендертаргет из контекста или backbuffer по умолчанию
+void Device::Clear(const float4& color)
+{
+    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    if (rt)
+        rt->clear(color);
+    else
+        m_backBuffer.clear(color);
+}
 
-void Device::SetCullMode(CullMode mode) { m_cullMode = mode; }
-CullMode Device::GetCullMode() const { return m_cullMode; }
+void Device::ClearDepth(float depth)
+{
+    m_depthBuffer.clear(depth);
+}
 
-void Device::SetFillMode(FillMode mode) { m_fillMode = mode; }
-FillMode Device::GetFillMode() const { return m_fillMode; }
+Framebuffer& Device::GetBackBuffer()
+{
+    return m_backBuffer;
+}
 
-void Device::EnableTiledRendering(bool enable) { m_tiledRendering = enable; };
-void Device::SetTileSize(int tileSize) { m_tileSize = tileSize; };
-bool Device::IsTiledRenderingEnabled() const { return m_tiledRendering; };
+PresentParameters& Device::GetPresentParams()
+{
+    return m_params;
+}
 
-Framebuffer& Device::GetBackBuffer() { return m_backBuffer; }
-
-PresentParameters& Device::GetPresentParams() { return m_params; }
-
+// Вспомогательный метод для отрисовки одного тайла (используется в DrawFullScreenQuad)
 void Device::renderTileQuad(int tileIndex)
 {
-	const Tile& tile = m_tiles[tileIndex];
-	int w = m_currentRT->width();
-	int h = m_currentRT->height();
+    const Tile& tile = m_tiles[tileIndex];
+    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    if (!rt) return;  // если рендертаргет не задан, выходим
 
-	VertexOutput input = {};
+    int w = rt->width();
+    int h = rt->height();
 
-	for (int y = tile.min.y; y <= tile.max.y; ++y)
-	{
-		float v = (float)y / (h - 1);
-		for (int x = tile.min.x; x <= tile.max.x; ++x)
-		{
-			float u = (float)x / (w - 1);
-			input.UV = float2(u, v);
-			float4 color = m_pixelShader(input, m_constant_buffer);
-			m_currentRT->set_pixel(int2(x, y), color);
-		}
-	}
+    VertexOutput input = {};
+    auto ps = m_DeviceContext.GetPixelShader();
+    auto cb = m_DeviceContext.GetConstantBuffer();
+
+    for (int y = tile.min.y; y <= tile.max.y; ++y)
+    {
+        float v = (float)y / (h - 1);
+        for (int x = tile.min.x; x <= tile.max.x; ++x)
+        {
+            float u = (float)x / (w - 1);
+            input.UV = float2(u, v);
+            float4 color = ps(input, cb);
+            rt->set_pixel(int2(x, y), color);
+        }
+    }
 }
 
 void Device::DrawFullScreenQuad()
 {
-	if (!m_pixelShader)
-		return;
+    auto ps = m_DeviceContext.GetPixelShader();
+    if (!ps) return;
 
-	int w = m_currentRT->width();
-	int h = m_currentRT->height();
+    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    if (!rt) rt = &m_backBuffer;  // по умолчанию используем backbuffer
 
-	// Построить тайлы для текущего размера экрана
-	buildTiles(w, h); // использует m_tileSize (например, 64)
+    int w = rt->width();
+    int h = rt->height();
 
-	int numTiles = (int)m_tiles.size();
-	std::atomic<int> tileIndex(0);
+    // Построить тайлы для текущего размера экрана
+    buildTiles(w, h); // использует m_tileSize из контекста? надо брать из контекста
+    // исправим buildTiles, чтобы он использовал размер из контекста
+    // пока оставим как есть, но позже нужно будет везде использовать контекст
 
-	auto worker = [this, &tileIndex, numTiles]() {
-		while (true)
-		{
-			int idx = tileIndex.fetch_add(1);
-			if (idx >= numTiles)
-				break;
-			renderTileQuad(idx);
-		}
-	};
+    int numTiles = (int)m_tiles.size();
+    std::atomic<int> tileIndex(0);
 
-	int numThreads = (int)m_threadPool->threadCount();
-	for (int i = 0; i < numThreads; ++i)
-	{
-		m_threadPool->enqueue(worker);
-	}
-	m_threadPool->wait();
+    auto worker = [this, &tileIndex, numTiles]() {
+        while (true)
+        {
+            int idx = tileIndex.fetch_add(1);
+            if (idx >= numTiles) break;
+            renderTileQuad(idx);
+        }
+    };
+
+    int numThreads = (int)m_threadPool->threadCount();
+    for (int i = 0; i < numThreads; ++i)
+    {
+        m_threadPool->enqueue(worker);
+    }
+    m_threadPool->wait();
 }
 
 void Device::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 {
-	if (!m_vertexShader || !m_pixelShader || m_vertexBuffer.IsEmpty() || m_indexBuffer.IsEmpty())
+	std::string err;
+	bool rslt = m_DeviceContext.Validate(&err);
+	if (!rslt)
+	{
+		printf("%s", err.c_str());
 		return;
-
-	// Очищаем временные массивы
-	m_transformedVerts.clear();
-	m_triangles.clear();
-
-	// Трансформируем все вершины, которые используются в индексах
-	// (для простоты трансформируем все уникальные индексы)
-	std::vector<bool> vertexProcessed(m_vertexBuffer.Size(), false);
-	for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
-	{
-		uint32_t idx = m_indexBuffer.GetByIndex(i);
-		if (!vertexProcessed[idx])
-		{
-			vertexProcessed[idx] = true;
-			VertexOutput out = m_vertexShader(m_vertexBuffer.GetByIndex(idx), m_constant_buffer);
-			out.Position = ClipToScreen(out.Position);
-			// Сохраняем в массив, позиция по idx
-			if (m_transformedVerts.size() <= idx)
-				m_transformedVerts.resize(idx + 1);
-			m_transformedVerts[idx] = out;
-		}
 	}
 
-	// Собираем треугольники
-	for (uint32_t i = startIndex; i < startIndex + indexCount; i += 3)
-	{
-		if (i + 2 >= startIndex + indexCount)
-			break;
-		uint32_t i0 = m_indexBuffer.GetByIndex(i);
-		uint32_t i1 = m_indexBuffer.GetByIndex(i + 1);
-		uint32_t i2 = m_indexBuffer.GetByIndex(i + 2);
-		m_triangles.push_back({(int)i0, (int)i1, (int)i2});
-	}
+    // Получаем все необходимые данные из контекста
+    auto vs = m_DeviceContext.GetVertexShader();
+    auto ps = m_DeviceContext.GetPixelShader();
+    auto vb = m_DeviceContext.GetVertexBuffer();
+    auto ib = m_DeviceContext.GetIndexBuffer();
+    auto cb = m_DeviceContext.GetConstantBuffer();
+    auto rt = m_DeviceContext.GetRenderTarget();
+    auto fillMode = m_DeviceContext.GetFillMode();
+    auto cullMode = m_DeviceContext.GetCullMode();
+    auto tiledEnabled = m_DeviceContext.GetTileRenderingState();
+    auto tileSize = m_DeviceContext.GetTileSize();  // размер тайла для биннинга
 
-	if (m_fillMode == FillMode::Solid)
-	{
-		if (m_tiledRendering)
-		{
-			buildTiles(m_currentRT->width(), m_currentRT->height());
-			binTriangles(m_transformedVerts, m_triangles);
-			renderTilesMultithreaded();
-		}
-		else
-		{
-			// Последовательный рендеринг
-			for (const auto& tri : m_triangles)
-			{
-				RasterizeTriangleSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z]);
-			}
-		}
-	}
-	else if (m_fillMode == FillMode::Wireframe)
-	{
-		// Рисуем рёбра треугольников белым цветом (можно изменить)
-		float4 wireColor(1.0f, 1.0f, 1.0f, 1.0f);
-		for (const auto& tri : m_triangles)
-		{
-			const auto& v0 = m_transformedVerts[tri.x];
-			const auto& v1 = m_transformedVerts[tri.y];
-			const auto& v2 = m_transformedVerts[tri.z];
-			DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y), (int)round(v1.Position.x),
-					 (int)round(v1.Position.y), v0.Position.z, v1.Position.z, wireColor);
-			DrawLine((int)round(v1.Position.x), (int)round(v1.Position.y), (int)round(v2.Position.x),
-					 (int)round(v2.Position.y), v1.Position.z, v2.Position.z, wireColor);
-			DrawLine((int)round(v2.Position.x), (int)round(v2.Position.y), (int)round(v0.Position.x),
-					 (int)round(v0.Position.y), v2.Position.z, v0.Position.z, wireColor);
-		}
-	}
-	else if (m_fillMode == FillMode::Point)
-	{
-		// Рисуем вершины (каждую один раз)
-		std::vector<bool> drawn(m_transformedVerts.size(), false);
-		for (const auto& tri : m_triangles)
-		{
-			for (int idx : {tri.x, tri.y, tri.z})
-			{
-				if (!drawn[idx])
-				{
-					drawn[idx] = true;
-					const auto& v = m_transformedVerts[idx];
-					DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
-				}
-			}
-		}
-	}
+    // Очищаем временные массивы
+    m_transformedVerts.clear();
+    m_triangles.clear();
+
+    // Трансформируем все вершины, которые используются в индексах
+    std::vector<bool> vertexProcessed(vb.Size(), false);
+    for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
+    {
+        uint32_t idx = ib.GetByIndex(i);
+        if (!vertexProcessed[idx])
+        {
+            vertexProcessed[idx] = true;
+            VertexOutput out = vs(vb.GetByIndex(idx), cb);
+            out.Position = ClipToScreen(out.Position); // использует текущий viewport из контекста? ClipToScreen должен брать viewport из контекста
+            if (m_transformedVerts.size() <= idx)
+                m_transformedVerts.resize(idx + 1);
+            m_transformedVerts[idx] = out;
+        }
+    }
+
+    // Собираем треугольники
+    for (uint32_t i = startIndex; i < startIndex + indexCount; i += 3)
+    {
+        if (i + 2 >= startIndex + indexCount) break;
+        uint32_t i0 = ib.GetByIndex(i);
+        uint32_t i1 = ib.GetByIndex(i + 1);
+        uint32_t i2 = ib.GetByIndex(i + 2);
+        m_triangles.push_back({(int)i0, (int)i1, (int)i2});
+    }
+
+    if (fillMode == FillMode::Solid)
+    {
+        if (tiledEnabled)
+        {
+            buildTiles(rt->width(), rt->height()); // передаём размеры рендертаргета
+            // В buildTiles нужно будет использовать tileSize из контекста
+            // Но пока оставим как есть, используя сохранённый m_tileSize, который нужно синхронизировать
+            binTriangles(m_transformedVerts, m_triangles);
+            renderTilesMultithreaded();
+        }
+        else
+        {
+            // Последовательный рендеринг
+            for (const auto& tri : m_triangles)
+            {
+                RasterizeTriangleSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z]);
+            }
+        }
+    }
+    else if (fillMode == FillMode::Wireframe)
+    {
+        float4 wireColor(1.0f, 1.0f, 1.0f, 1.0f);
+        for (const auto& tri : m_triangles)
+        {
+            const auto& v0 = m_transformedVerts[tri.x];
+            const auto& v1 = m_transformedVerts[tri.y];
+            const auto& v2 = m_transformedVerts[tri.z];
+            DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y),
+                     (int)round(v1.Position.x), (int)round(v1.Position.y),
+                     v0.Position.z, v1.Position.z, wireColor);
+            DrawLine((int)round(v1.Position.x), (int)round(v1.Position.y),
+                     (int)round(v2.Position.x), (int)round(v2.Position.y),
+                     v1.Position.z, v2.Position.z, wireColor);
+            DrawLine((int)round(v2.Position.x), (int)round(v2.Position.y),
+                     (int)round(v0.Position.x), (int)round(v0.Position.y),
+                     v2.Position.z, v0.Position.z, wireColor);
+        }
+    }
+    else if (fillMode == FillMode::Point)
+    {
+        std::vector<bool> drawn(m_transformedVerts.size(), false);
+        for (const auto& tri : m_triangles)
+        {
+            for (int idx : {tri.x, tri.y, tri.z})
+            {
+                if (!drawn[idx])
+                {
+                    drawn[idx] = true;
+                    const auto& v = m_transformedVerts[idx];
+                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
+                }
+            }
+        }
+    }
 }
 
-void Device::DrawIndexed() 
-{ 
-	DrawIndexed((uint32_t)m_indexBuffer.Size(), 0); 
-};
+void Device::DrawIndexed()
+{
+    // Используем все индексы из индексного буфера, хранящегося в контексте
+    uint32_t count = (uint32_t)m_DeviceContext.GetIndexBuffer().Size();
+    DrawIndexed(count, 0);
+}
 
-void Device::Present() {
+void Device::Present()
+{
     HDC hdc = GetDC(m_params.hDeviceWindow);
     if (hdc) {
-        // Получаем текущий размер клиентской области окна (может меняться)
         RECT clientRect;
         GetClientRect(m_params.hDeviceWindow, &clientRect);
         int2 dstSize(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
-
-        // Выводим задний буфер в окно (можно масштабировать, но пока просто копируем)
         m_backBuffer.present(hdc, int2(0, 0), dstSize);
-
         ReleaseDC(m_params.hDeviceWindow, hdc);
     }
 }

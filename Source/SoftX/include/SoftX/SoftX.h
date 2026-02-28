@@ -8,4 +8,5 @@
 #include "Framebuffer.h"
 #include "DepthBuffer.h"
 #include "RenderTargetTexture.h"
+#include "DeviceContext.h"
 #include "Device.h"

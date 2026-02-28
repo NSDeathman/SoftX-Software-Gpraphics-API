@@ -69,7 +69,7 @@ public:
 	{
 		m_data.clear();
 	}
-	bool IsEmpty()
+	bool IsEmpty() const
 	{
 		return m_data.empty();
 	}
@@ -105,7 +105,7 @@ public:
 	{
 		m_data.clear();
 	}
-	bool IsEmpty()
+	bool IsEmpty() const
 	{
 		return m_data.empty();
 	}

@@ -5,6 +5,7 @@
 
 #include "LibInternal.h"
 #include "ThreadPool.h"
+#include "DeviceContext.h"
 
 SOFTX_BEGIN
 
@@ -13,24 +14,16 @@ public:
     Device(const PresentParameters& params);
     ~Device() = default;
 
+	void SetDeviceContext(const DeviceContext& ctx);
+	DeviceContext GetDeviceContext() const;
+
+	void SetVertexBuffer(const VertexBuffer& buffer);
+	void SetIndexBuffer(const IndexBuffer& buffer);
+	void SetConstantBuffer(ConstantBuffer cbuffer);
+
     // Очистка заднего буфера цветом
     void Clear(const float4& color);
     void ClearDepth(float depth);
-
-    // Установка пиксельного шейдера и константного буфера
-    void SetPixelShader(PixelShader shader);
-    void SetVertexShader(VertexShader shader);
-
-    void SetConstantBuffer(ConstantBuffer CBuffer);
-
-    void SetVertexBuffer(const VertexBuffer& buffer);
-    void SetIndexBuffer(const IndexBuffer& buffer);
-
-    void SetRenderTarget(IRenderTarget* rt);
-    IRenderTarget* GetRenderTarget() const;
-
-    void SetViewport(const Viewport& vp);
-    const Viewport& GetViewport() const;
 
     // Рисует полноэкранный четырёхугольник, выполняя пиксельный шейдер для каждого пикселя
 	void DrawFullScreenQuad();
@@ -42,17 +35,6 @@ public:
 	void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
 	void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
 	void RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
-
-    void SetCullMode(CullMode mode);
-    CullMode GetCullMode() const;
-
-    void SetFillMode(FillMode mode);
-    FillMode GetFillMode() const;
-
-    // Включение/выключение тайлового рендера
-    void EnableTiledRendering(bool enable);
-    void SetTileSize(int tileSize = 64);
-    bool IsTiledRenderingEnabled() const;
 
     // Презентация: копирует задний буфер в окно
     void Present();
@@ -68,20 +50,8 @@ private:
 
     Framebuffer m_backBuffer;
     DepthBuffer m_depthBuffer;
-    IRenderTarget* m_currentRT;
 
-    Viewport m_viewport;
-
-    PixelShader m_pixelShader;
-    VertexShader m_vertexShader;
-
-    ConstantBuffer m_constant_buffer;
-
-    VertexBuffer m_vertexBuffer;
-    IndexBuffer m_indexBuffer;
-
-    CullMode m_cullMode;
-	FillMode m_fillMode;
+	DeviceContext m_DeviceContext;
 
 	bool m_tiledRendering;
 	int m_tileSize;

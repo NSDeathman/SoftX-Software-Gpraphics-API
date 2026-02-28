@@ -37,6 +37,9 @@
     <ClInclude Include="..\include\SoftX\ThreadPool.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\SoftX\DeviceContext.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Device.cpp">
@@ -52,6 +55,9 @@
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="SoftX.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="DeviceContext.cpp">
       <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>

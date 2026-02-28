@@ -38,6 +38,8 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -51,6 +53,8 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -74,25 +78,25 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\SoftX\lib\x86\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftX\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\SoftX\lib\x86\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftX\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\SoftX\lib\x64\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftX\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\SoftX\lib\x64\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftX\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -103,6 +107,8 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -124,6 +130,10 @@
       <Optimization>MaxSpeed</Optimization>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <BrowseInformation>true</BrowseInformation>
+      <ShowIncludes>true</ShowIncludes>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -142,6 +152,8 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -163,6 +175,10 @@
       <Optimization>MaxSpeed</Optimization>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <BrowseInformation>true</BrowseInformation>
+      <ShowIncludes>true</ShowIncludes>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -175,6 +191,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\SoftX\DepthBuffer.h" />
     <ClInclude Include="..\include\SoftX\Device.h" />
+    <ClInclude Include="..\include\SoftX\DeviceContext.h" />
     <ClInclude Include="..\include\SoftX\FrameBuffer.h" />
     <ClInclude Include="..\include\SoftX\LibInternal.h" />
     <ClInclude Include="..\include\SoftX\Math.h" />
@@ -188,6 +205,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Device.cpp" />
+    <ClCompile Include="DeviceContext.cpp" />
     <ClCompile Include="DeviceRasterization.cpp" />
     <ClCompile Include="DeviceTiledRendering.cpp" />
     <ClCompile Include="pch.cpp">

@@ -75,28 +75,28 @@
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\SoftX\lib\x86\;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\..\binaries\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftXDemo\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\SoftX\lib\x86\;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\..\binaries\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftXDemo\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\SoftX\lib\x64\;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\..\binaries\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftXDemo\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)..\SoftX\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\SoftX\lib\x64\;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\..\binaries\</OutDir>
-    <IntDir>$(SolutionDir)..\..\build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\..\build\SoftXDemo\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
