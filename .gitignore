@@ -73,3 +73,4 @@ cmake-build*/
 *.exp
 
 Source/SoftxDemo/enc_temp_folder/*
+Source/SoftX/lib/*
