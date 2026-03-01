@@ -15,6 +15,14 @@ struct TransformCB
 	float4x4 wvp;
 };
 
+struct LightCB
+{
+	float4x4 wvp;
+	float4 lightDir;   // направление света (w не используется)
+	float4 lightColor; // цвет света
+	float4 ambient;	   // фоновое освещение
+};
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
@@ -36,6 +44,7 @@ VertexOutput vsTransform(const VertexInput& in, ConstantBuffer cb)
 	const TransformCB* transform = (const TransformCB*)cb.Data();
 	VertexOutput out;
 	out.Position = transform->wvp * float4(in.Position.x, in.Position.y, in.Position.z, 1.0f);
+	out.Normal = in.Normal;
 	out.Color = in.Color;
 	out.UV = in.UV;
 	return out;
@@ -45,18 +54,26 @@ void GSSplitTriangle(const VertexOutput in[3], std::vector<VertexOutput>& outVer
 {
 	// Вычисляем середины рёбер
 	VertexOutput mid0, mid1, mid2;
-	mid0.Position = (in[0].Position + in[1].Position) * 0.5f;
-	mid1.Position = (in[1].Position + in[2].Position) * 0.5f;
-	mid2.Position = (in[2].Position + in[0].Position) * 0.5f;
 
-	// Интерполируем атрибуты (цвет, uv)
-	mid0.Color = (in[0].Color + in[1].Color) * 0.5f;
-	mid1.Color = (in[1].Color + in[2].Color) * 0.5f;
-	mid2.Color = (in[2].Color + in[0].Color) * 0.5f;
+#define LERP(vertex, field, index0, index1) vertex.field = (in[index0].field + in[index1].field) * 0.5f
 
-	mid0.UV = (in[0].UV + in[1].UV) * 0.5f;
-	mid1.UV = (in[1].UV + in[2].UV) * 0.5f;
-	mid2.UV = (in[2].UV + in[0].UV) * 0.5f;
+	LERP(mid0, Position, 0, 1);
+	LERP(mid1, Position, 1, 2);
+	LERP(mid2, Position, 2, 0);	
+	
+	LERP(mid0, Color, 0, 1);
+	LERP(mid1, Color, 1, 2);
+	LERP(mid2, Color, 2, 0);	
+	
+	LERP(mid0, Normal, 0, 1);
+	LERP(mid1, Normal, 1, 2);
+	LERP(mid2, Normal, 2, 0);	
+	
+	LERP(mid0, UV, 0, 1);
+	LERP(mid1, UV, 1, 2);
+	LERP(mid2, UV, 2, 0);
+
+#undef LERP
 
 	// Добавляем вершины (6 новых вершин)
 	outVerts.push_back(in[0]);
@@ -90,6 +107,25 @@ float4 psColor(const VertexOutput& in, ConstantBuffer /*cb*/)
 	return in.Color;
 }
 
+float4 psLight(const VertexOutput& in, ConstantBuffer cb)
+{
+	const LightCB* light = (const LightCB*)cb.Data();
+
+	// Нормализуем интерполированную нормаль (она может стать не единичной после интерполяции)
+	float3 N = normalize(in.Normal);
+
+	// Направление света (предполагаем, что оно уже нормализовано и направлено на источник)
+	float3 L = normalize(light->lightDir.xyz());
+
+	// Диффузное освещение (max(0, dot(N, L)))
+	float diff = std::max(0.0f, dot(N, L));
+
+	// Итоговый цвет = (ambient + diffuse * lightColor) * baseColor
+	float3 finalColor = (light->ambient.xyz() + diff * light->lightColor.xyz()) * in.Color.xyz();
+
+	return float4(finalColor, in.Color.w);
+}
+
 // Шейдер для отображения текстуры на весь экран
 float4 psTexture(const VertexOutput& in, ConstantBuffer /*cb*/)
 {
@@ -99,60 +135,11 @@ float4 psTexture(const VertexOutput& in, ConstantBuffer /*cb*/)
 	return float4(1, 0, 1, 1); // заглушка, будет заменено
 }
 
-void CreateCube(VertexBuffer& vb, IndexBuffer& ib)
-{
-    // Координаты вершин куба (от -1 до 1)
-    float3 corners[8] = {
-        float3(-1, -1, -1), float3( 1, -1, -1), float3( 1,  1, -1), float3(-1,  1, -1),
-        float3(-1, -1,  1), float3( 1, -1,  1), float3( 1,  1,  1), float3(-1,  1,  1)
-    };
-
-    // Цвета для каждой грани (R, G, B, A)
-    float4 colors[6] = {
-        float4(1, 0, 0, 1), // +X (красный)
-        float4(0, 1, 0, 1), // -X (зелёный)
-        float4(0, 0, 1, 1), // +Y (синий)
-        float4(1, 1, 0, 1), // -Y (жёлтый)
-        float4(0, 1, 1, 1), // +Z (голубой)
-        float4(1, 0, 1, 1)  // -Z (фиолетовый)
-    };
-
-    // Определяем грани: для каждой грани задаём 4 индекса из corners[]
-    int faces[6][4] = {
-        {1, 5, 6, 2}, // +X
-        {0, 3, 7, 4}, // -X
-        {3, 2, 6, 7}, // +Y
-        {0, 4, 5, 1}, // -Y
-        {4, 7, 6, 5}, // +Z
-        {0, 1, 2, 3}  // -Z
-    };
-
-    for (int f = 0; f < 6; ++f) {
-        int idx[4] = { faces[f][0], faces[f][1], faces[f][2], faces[f][3] };
-        float4 col = colors[f];
-
-        int start = (int)vb.Size();
-        vb.Add({ corners[idx[0]], col, float2(0, 0) });
-        vb.Add({ corners[idx[1]], col, float2(1, 0) });
-        vb.Add({ corners[idx[2]], col, float2(1, 1) });
-        vb.Add({ corners[idx[3]], col, float2(0, 1) });
-
-        // Два треугольника (0-1-2 и 0-2-3)
-        ib.Add(start);
-        ib.Add(start + 1);
-        ib.Add(start + 2);
-        ib.Add(start);
-        ib.Add(start + 2);
-        ib.Add(start + 3);
-    }
-}
-
 void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int sliceCount, int stackCount)
 {
 	vb.Clear();
 	ib.Clear();
 
-	// Вершины
 	for (int stack = 0; stack <= stackCount; ++stack)
 	{
 		float phi = PI * stack / stackCount; // от 0 до PI
@@ -165,22 +152,23 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int sliceCoun
 			float sinTheta = sinf(theta);
 			float cosTheta = cosf(theta);
 
+			// Позиция на сфере
 			float3 pos(radius * sinPhi * cosTheta, radius * cosPhi, radius * sinPhi * sinTheta);
 
-			// Нормаль (нормализованная позиция)
+			// Нормаль (для сферы с центром в 0 совпадает с нормализованной позицией)
 			float3 normal = normalize(pos);
 
-			// Цвет на основе нормали
+			// Цвет на основе нормали (опционально)
 			float4 color((normal.x + 1.0f) * 0.5f, (normal.y + 1.0f) * 0.5f, (normal.z + 1.0f) * 0.5f, 1.0f);
 
-			// UV (для текстур)
+			// Текстурные координаты
 			float2 uv((float)slice / sliceCount, (float)stack / stackCount);
 
-			vb.Add({pos, color, uv});
+			vb.Add({pos, normal, color, uv});
 		}
 	}
 
-	// Индексы
+	// Индексы для двух треугольников на каждый четырёхугольник
 	for (int stack = 0; stack < stackCount; ++stack)
 	{
 		for (int slice = 0; slice < sliceCount; ++slice)
@@ -190,7 +178,6 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int sliceCoun
 			int third = first + (sliceCount + 1);
 			int fourth = third + 1;
 
-			// Два треугольника на квад
 			ib.Add(first);
 			ib.Add(second);
 			ib.Add(third);
@@ -231,7 +218,7 @@ int main()
 	// Создаём общие ресурсы (вершинный и индексный буфер)
 	VertexBuffer vb;
 	IndexBuffer ib;
-	CreateSphere(vb, ib, 1.0f, 64, 32);
+	CreateSphere(vb, ib, 1.0f, 32, 16);
 
 	// Создаём две текстуры-рендертаргета (по 400x600 каждая)
 	RenderTargetTexture rtLeft(int2(400, 600));
@@ -245,7 +232,7 @@ int main()
 	ctxLeft->SetRenderTarget(&rtLeft, true);
 	ctxLeft->SetViewport(Viewport(0, 0, 400, 600));
 	ctxLeft->SetVertexShader(vsTransform);
-	ctxLeft->SetPixelShader(psColor);
+	ctxLeft->SetPixelShader(psLight);
 	ctxLeft->SetVertexBuffer(vb);
 	ctxLeft->SetIndexBuffer(ib);
 	ctxLeft->SetCullMode(CullMode::Back);
@@ -258,7 +245,7 @@ int main()
 	ctxRight->SetViewport(Viewport(0, 0, 400, 600));
 	ctxRight->SetVertexShader(vsTransform);
 	ctxRight->SetGeometryShader(GSSplitTriangle);
-	ctxRight->SetPixelShader(psColor);
+	ctxRight->SetPixelShader(psLight);
 	ctxRight->SetVertexBuffer(vb);
 	ctxRight->SetIndexBuffer(ib);
 	ctxRight->SetCullMode(CullMode::Back);
@@ -292,16 +279,22 @@ int main()
 		float3 target(0, 0, 0);
 		float3 up(0, 1, 0);
 		float4x4 view = lookAtLH(eye, target, up);
-		float4x4 modelLeft = rotationY(angle);
+		float4x4 modelLeft = rotationY(0);
 		float aspect = 400.0f / 600.0f;
 		float4x4 proj = perspectiveLH(3.14159f / 4.0f, aspect, 0.1f, 100.0f);
-		TransformCB cbLeft;
+		LightCB cbLeft;
 		cbLeft.wvp = proj * view * modelLeft;
+		cbLeft.lightDir = float4(0, 1, 1, 0);
+		cbLeft.lightColor = float4(1, 1, 1, 1);
+		cbLeft.ambient = float4(0.2f, 0.2f, 0.2f, 1);
 		ConstantBuffer cbLeftBuf(&cbLeft, sizeof(cbLeft));
 
-		float4x4 modelRight = rotationY(angle);
-		TransformCB cbRight;
+		float4x4 modelRight = rotationY(0);
+		LightCB cbRight;
 		cbRight.wvp = proj * view * modelRight;
+		cbRight.lightDir = float4(0, 1, 1, 0);
+		cbRight.lightColor = float4(1, 1, 1, 1);
+		cbRight.ambient = float4(0.2f, 0.2f, 0.2f, 1);
 		ConstantBuffer cbRightBuf(&cbRight, sizeof(cbRight));
 
 		// Запускаем потоки для отложенных контекстов

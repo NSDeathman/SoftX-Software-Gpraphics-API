@@ -117,6 +117,7 @@ class SOFTX_API DeviceContext
     void RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
 
 	float4 ClipToScreen(const float4& clipPos) const;
+	VertexOutput trilerp(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, float a, float b, float c);
 };
 
 SOFTX_END

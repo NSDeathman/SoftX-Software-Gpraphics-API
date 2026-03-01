@@ -86,6 +86,22 @@ float4 DeviceContext::ClipToScreen(const float4& clipPos) const
     return float4(screenX, screenY, screenZ, 1.0f);
 }
 
+VertexOutput DeviceContext::trilerp(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, float a, float b, float c)
+{
+	VertexOutput result;
+
+#define TRILERP(field) result.field = a * v0.field + b * v1.field + c * v2.field
+
+	TRILERP(Position);
+	TRILERP(Normal);
+	TRILERP(Color);
+	TRILERP(UV);
+
+#undef TRILERP
+
+	return result;
+}
+
 void DeviceContext::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
 {
     IRenderTarget* rt = m_RenderTarget;
@@ -146,21 +162,13 @@ void DeviceContext::RasterizeTriangle(const VertexOutput& v0, const VertexOutput
             float c = f2 / area2;
 
             // Интерполяция атрибутов
-            float z = a * v0.Position.z + b * v1.Position.z + c * v2.Position.z;
-            float4 color = a * v0.Color + b * v1.Color + c * v2.Color;
-            float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
+			VertexOutput frag = trilerp(v0, v1, v2, a, b, c);
 
             // Проверка глубины
             int idx = y * width + x;
-            if (z < m_DepthBuffer->at(idx))
+			if (frag.Position.z < m_DepthBuffer->at(idx))
             {
-				m_DepthBuffer->at(idx) = z;
-
-                // Формируем VertexOutput для пиксельного шейдера
-                VertexOutput frag;
-                frag.Position = float4((float)x, (float)y, z, 1.0f);
-                frag.Color = color;
-                frag.UV = uv;
+				m_DepthBuffer->at(idx) = frag.Position.z;
 
                 // Вызов пиксельного шейдера
                 float4 finalColor = ps(frag, cb);
@@ -349,27 +357,20 @@ void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOut
                 continue;
             }
 
-            float a = f0 / area2;
-            float b = f1 / area2;
-            float c = f2 / area2;
+			float a = f0 / area2;
+			float b = f1 / area2;
+			float c = f2 / area2;
 
-            float z = a * v0.Position.z + b * v1.Position.z + c * v2.Position.z;
-            float4 color = a * v0.Color + b * v1.Color + c * v2.Color;
-            float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
+			VertexOutput frag = trilerp(v0, v1, v2, a, b, c);
 
-            int idx = y * width + x;
-            if (z < m_DepthBuffer->at(idx))
-            {
-                m_DepthBuffer->at(idx) = z;
+			int idx = y * width + x;
+			if (frag.Position.z < m_DepthBuffer->at(idx))
+			{
+				m_DepthBuffer->at(idx) = frag.Position.z;
 
-                VertexOutput frag;
-                frag.Position = float4((float)x, (float)y, z, 1.0f);
-                frag.Color = color;
-                frag.UV = uv;
-
-                float4 finalColor = ps(frag, cb);
-                rt->set_pixel(int2(x, y), finalColor);
-            }
+				float4 finalColor = ps(frag, cb);
+				rt->set_pixel(int2(x, y), finalColor);
+			}
         }
     }
 }

@@ -307,6 +307,7 @@ public:
     explicit float4(__m128 vec) : v(vec) {}
     float4(float x, float y, float z, float w) : v(_mm_set_ps(w, z, y, x)) {}
     float4(const float4& other) : v(other.v) {}
+    float4(float3 xyz, float w) : v(_mm_set_ps(w, xyz.z, xyz.y, xyz.x)) {}
 
     // Присваивание
     float4& operator=(const float4& other) { v = other.v; return *this; }
@@ -353,6 +354,9 @@ public:
     friend float4 operator-(float s, const float4& v) { return float4(_mm_sub_ps(_mm_set1_ps(s), v.v)); }
     friend float4 operator*(float s, const float4& v) { return v * s; }
     friend float4 operator/(float s, const float4& v) { return float4(_mm_div_ps(_mm_set1_ps(s), v.v)); }
+
+    float3 xyz() const { return float3(x, y, z); }
+    float4 xyzw() const { return float4(x, y, z, w); }
 };
 
 // Математические функции для float4

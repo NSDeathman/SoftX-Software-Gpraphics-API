@@ -114,8 +114,7 @@ void DeviceContext::renderTilesSingleThreaded()
     }
 }
 
-void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2,
-										  int2 tileMin, int2 tileMax)
+void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax)
 {
 	IRenderTarget* rt = m_RenderTarget;
 	if (!rt)
@@ -172,19 +171,14 @@ void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOu
 			float b = f1 / area2;
 			float c = f2 / area2;
 
-			float z = a * v0.Position.z + b * v1.Position.z + c * v2.Position.z;
-			float4 color = a * v0.Color + b * v1.Color + c * v2.Color;
-			float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
+            VertexOutput frag = trilerp(v0, v1, v2, a, b, c);
 
 			int idx = y * width + x;
-			if (z < m_DepthBuffer->at(idx))
+			if (frag.Position.z < m_DepthBuffer->at(idx))
 			{
-				m_DepthBuffer->at(idx) = z;
+				m_DepthBuffer->at(idx) = frag.Position.z;
 
-				VertexOutput frag;
-				frag.Position = float4((float)x, (float)y, z, 1.0f);
-				frag.Color = color;
-				frag.UV = uv;
+				frag.Position = float4(frag.Position.xyz(), 1.0f);
 
 				float4 finalColor = ps(frag, cb);
 				rt->set_pixel(int2(x, y), finalColor);
@@ -330,79 +324,66 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
             if (depthMask == 0) continue;
 
             // Распаковка
-            float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4], uArr[4], vArr[4];
-            _mm_storeu_ps(zArr, z);
-            _mm_storeu_ps(rArr, r);
-            _mm_storeu_ps(gArr, g);
-            _mm_storeu_ps(bArr, b);
-            _mm_storeu_ps(aArr, a);
-            _mm_storeu_ps(uArr, u);
-            _mm_storeu_ps(vArr, v);
+            float aArr[4], bArr[4], cArr[4];
+			_mm_storeu_ps(aArr, alpha);
+			_mm_storeu_ps(bArr, beta);
+			_mm_storeu_ps(cArr, gamma);
 
-            // Обрабатываем каждый пиксель, проверяя принадлежность к тайлу
-            for (int i = 0; i < 4; ++i)
-            {
-                int px = x + i;
-                if (px < tileMin.x || px > tileMax.x)
-                    continue;
+			for (int i = 0; i < 4; ++i)
+			{
+				int px = x + i;
+				if (px < tileMin.x || px > tileMax.x)
+					continue;
 
-                int bit = 1 << i;
-                if (depthMask & bit)
-                {
-                    int py = y;
-                    int idx = py * width + px;
+				int bit = 1 << i;
+				if (depthMask & bit)
+				{
+					int py = y;
+					int idx = py * width + px;
 
-                    m_DepthBuffer->at(idx) = zArr[i];
+					// Интерполяция всех атрибутов через trilerp
+					VertexOutput frag = trilerp(v0, v1, v2, aArr[i], bArr[i], cArr[i]);
+					frag.Position = float4((float)px, (float)py, frag.Position.z, 1.0f);
+					m_DepthBuffer->at(idx) = frag.Position.z;
 
-                    VertexOutput frag;
-                    frag.Position = float4((float)px, (float)py, zArr[i], 1.0f);
-                    frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
-                    frag.UV = float2(uArr[i], vArr[i]);
-
-                    float4 finalColor = ps(frag, cb);
-                    rt->set_pixel(int2(px, py), finalColor);
-                }
-            }
+					float4 finalColor = ps(frag, cb);
+					rt->set_pixel(int2(px, py), finalColor);
+				}
+			}
         }
 
         // Скалярный доводчик для оставшихся пикселей
-        for (; x <= iMaxX; ++x)
-        {
-            // Проверка на тайл
-            if (x < tileMin.x || x > tileMax.x)
-                continue;
+		for (; x <= iMaxX; ++x)
+		{
+			// Проверка на тайл
+			if (x < tileMin.x || x > tileMax.x)
+				continue;
 
-            float2 p((float)x + 0.5f, (float)y + 0.5f);
+			float2 p((float)x + 0.5f, (float)y + 0.5f);
 
-            float f0 = edgeFunction(v1.Position, v2.Position, p);
-            float f1 = edgeFunction(v2.Position, v0.Position, p);
-            float f2 = edgeFunction(v0.Position, v1.Position, p);
+			float f0 = edgeFunction(v1.Position, v2.Position, p);
+			float f1 = edgeFunction(v2.Position, v0.Position, p);
+			float f2 = edgeFunction(v0.Position, v1.Position, p);
 
-            if (f0 * area2 < 0 || f1 * area2 < 0 || f2 * area2 < 0)
-                continue;
+			if (f0 * area2 < 0 || f1 * area2 < 0 || f2 * area2 < 0)
+				continue;
 
-            float a = f0 / area2;
-            float b = f1 / area2;
-            float c = f2 / area2;
+			float a = f0 / area2;
+			float b = f1 / area2;
+			float c = f2 / area2;
 
-            float z = a * v0.Position.z + b * v1.Position.z + c * v2.Position.z;
-            float4 color = a * v0.Color + b * v1.Color + c * v2.Color;
-            float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
+			// Интерполяция всех атрибутов через trilerp
+			VertexOutput frag = trilerp(v0, v1, v2, a, b, c);
 
-            int idx = y * width + x;
-            if (z < m_DepthBuffer->at(idx))
-            {
-                m_DepthBuffer->at(idx) = z;
+			int idx = y * width + x;
+			if (frag.Position.z < m_DepthBuffer->at(idx))
+			{
+				m_DepthBuffer->at(idx) = frag.Position.z;
 
-                VertexOutput frag;
-                frag.Position = float4((float)x, (float)y, z, 1.0f);
-                frag.Color = color;
-                frag.UV = uv;
-
-                float4 finalColor = ps(frag, cb);
-                rt->set_pixel(int2(x, y), finalColor);
-            }
-        }
+				float4 finalColor = ps(frag, cb);
+				rt->set_pixel(int2(x, y), finalColor);
+			}
+		}
     }
 }
 

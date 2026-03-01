@@ -1,4 +1,5 @@
 #pragma once
+
 #include <windows.h>
 #include <vector>
 #include <functional>
@@ -18,13 +19,14 @@ struct PresentParameters
 struct VertexInput
 {
 	float3 Position; // локальные координаты
+	float3 Normal;
 	float4 Color;
 	float2 UV;
 
-	VertexInput() : Position(0, 0, 0), Color(0, 0, 0, 0), UV(0, 0)
+	VertexInput() : Position(0, 0, 0), Normal(0, 0, 0), Color(0, 0, 0, 0), UV(0, 0)
 	{
 	}
-	VertexInput(const float3& pos, const float4& col, const float2& uv = float2(0, 0)) : Position(pos), Color(col), UV(uv)
+	VertexInput(const float3& pos, const float3& norm, const float4& col, const float2& uv = float2(0, 0)) : Position(pos), Normal(norm), Color(col), UV(uv)
 	{
 	}
 };
@@ -32,13 +34,14 @@ struct VertexInput
 struct VertexOutput
 {
 	float4 Position; // clip space coordinates (x,y,z,w)
-	float4 Color;	 // будет интерполироваться
+	float4 Color;
+	float3 Normal;
 	float2 UV;
 
-	VertexOutput() : Position(0, 0, 0, 0), Color(0, 0, 0, 0), UV(0, 0)
+	VertexOutput() : Position(0, 0, 0, 0), Normal(0, 0, 0), Color(0, 0, 0, 0), UV(0, 0)
 	{
 	}
-	VertexOutput(const float4& pos, const float4& col, const float2& uv = float2(0, 0)) : Position(pos), Color(col), UV(uv)
+	VertexOutput(const float4& pos, const float3& norm, const float4& col, const float2& uv = float2(0, 0)) : Position(pos), Normal(norm), Color(col), UV(uv)
 	{
 	}
 };
