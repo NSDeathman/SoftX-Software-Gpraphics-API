@@ -11,6 +11,8 @@ DeviceContext::DeviceContext() :
 	m_IndexBuffer(), 
 	m_ConstantBuffer(),
 	m_RenderTarget(nullptr), 
+	m_OwnDepthBuffer(nullptr),
+	m_DepthBuffer(nullptr),
 	m_cullMode(CullMode::Back), 
 	m_fillMode(FillMode::Solid), 
 	m_Viewport(),
@@ -79,6 +81,50 @@ void DeviceContext::SetRenderTarget(IRenderTarget* target)
 IRenderTarget* DeviceContext::GetRenderTarget() const
 {
 	return m_RenderTarget;
+}
+
+void DeviceContext::SetDepthBuffer(DepthBuffer* depthBuffer)
+{
+	m_DepthBuffer = depthBuffer;
+}
+
+DepthBuffer* DeviceContext::GetDepthBuffer() const
+{
+	return m_DepthBuffer;
+}
+
+void DeviceContext::SetRenderTarget(IRenderTarget* rt, bool createDepthBuffer)
+{
+	m_RenderTarget = rt;
+	if (createDepthBuffer && rt)
+	{
+		int2 newSize = rt->size();
+		if (!m_OwnDepthBuffer || m_OwnDepthBuffer->size() != newSize)
+		{
+			m_OwnDepthBuffer = std::make_unique<DepthBuffer>(newSize);
+		}
+		m_DepthBuffer = m_OwnDepthBuffer.get();
+	}
+	else
+	{
+		m_DepthBuffer = nullptr;
+	}
+}
+
+void DeviceContext::Clear(const float4& color)
+{
+	if (m_RenderTarget)
+	{
+		m_RenderTarget->clear(color);
+	}
+}
+
+void DeviceContext::ClearDepth(float depth)
+{
+	if (m_DepthBuffer)
+	{
+		m_DepthBuffer->clear(depth);
+	}
 }
 
 void DeviceContext::SetCullMode(CullMode mode)

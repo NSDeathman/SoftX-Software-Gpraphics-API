@@ -1,21 +1,20 @@
 ﻿#define SOFTX_STATIC
 #include <Windows.h>
 #include <SoftX/SoftX.h>
+#include <thread>
+#include <vector>
 
 #pragma comment(lib, "SoftX.lib")
 
 using namespace SoftX;
 
-// Глобальный флаг для выхода из цикла
 bool g_running = true;
 
-// Структура для константного буфера (матрица world-view-projection)
 struct TransformCB
 {
 	float4x4 wvp;
 };
 
-// Оконная процедура
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
@@ -32,10 +31,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// Вершинный шейдер – умножает позицию на матрицу wvp
 VertexOutput vsTransform(const VertexInput& in, ConstantBuffer cb)
 {
-	const TransformCB* transform = static_cast<const TransformCB*>(cb.Data());
+	const TransformCB* transform = (const TransformCB*)cb.Data();
 	VertexOutput out;
 	out.Position = transform->wvp * float4(in.Position.x, in.Position.y, in.Position.z, 1.0f);
 	out.Color = in.Color;
@@ -43,66 +41,72 @@ VertexOutput vsTransform(const VertexInput& in, ConstantBuffer cb)
 	return out;
 }
 
-// Пиксельный шейдер – возвращает интерполированный цвет
 float4 psColor(const VertexOutput& in, ConstantBuffer /*cb*/)
 {
 	return in.Color;
 }
 
-// Вспомогательная функция для создания куба (24 вершины, 36 индексов)
+// Шейдер для отображения текстуры на весь экран
+float4 psTexture(const VertexOutput& in, ConstantBuffer /*cb*/)
+{
+	// Здесь мы ожидаем, что текстура будет передана через глобальную переменную или через захват лямбды
+	// Для простоты используем глобальную текстуру (но в демо мы передадим её через захват лямбды)
+	// В реальном коде можно передавать через uniform.
+	return float4(1, 0, 1, 1); // заглушка, будет заменено
+}
+
 void CreateCube(VertexBuffer& vb, IndexBuffer& ib)
 {
-	// Координаты вершин куба (от -1 до 1)
-	float3 corners[8] = {float3(-1, -1, -1), float3(1, -1, -1), float3(1, 1, -1), float3(-1, 1, -1),
-						 float3(-1, -1, 1),	 float3(1, -1, 1),	float3(1, 1, 1),  float3(-1, 1, 1)};
+    // Координаты вершин куба (от -1 до 1)
+    float3 corners[8] = {
+        float3(-1, -1, -1), float3( 1, -1, -1), float3( 1,  1, -1), float3(-1,  1, -1),
+        float3(-1, -1,  1), float3( 1, -1,  1), float3( 1,  1,  1), float3(-1,  1,  1)
+    };
 
-	// Цвета для каждой грани (R, G, B, A)
-	float4 colors[6] = {
-		float4(1, 0, 0, 1), // +X (красный)
-		float4(0, 1, 0, 1), // -X (зелёный)
-		float4(0, 0, 1, 1), // +Y (синий)
-		float4(1, 1, 0, 1), // -Y (жёлтый)
-		float4(0, 1, 1, 1), // +Z (голубой)
-		float4(1, 0, 1, 1)	// -Z (фиолетовый)
-	};
+    // Цвета для каждой грани (R, G, B, A)
+    float4 colors[6] = {
+        float4(1, 0, 0, 1), // +X (красный)
+        float4(0, 1, 0, 1), // -X (зелёный)
+        float4(0, 0, 1, 1), // +Y (синий)
+        float4(1, 1, 0, 1), // -Y (жёлтый)
+        float4(0, 1, 1, 1), // +Z (голубой)
+        float4(1, 0, 1, 1)  // -Z (фиолетовый)
+    };
 
-	// Определяем грани: для каждой грани задаём 4 индекса из corners[]
-	int faces[6][4] = {
-		{1, 5, 6, 2}, // +X
-		{0, 3, 7, 4}, // -X
-		{3, 2, 6, 7}, // +Y
-		{0, 4, 5, 1}, // -Y
-		{4, 7, 6, 5}, // +Z
-		{0, 1, 2, 3}  // -Z
-	};
+    // Определяем грани: для каждой грани задаём 4 индекса из corners[]
+    int faces[6][4] = {
+        {1, 5, 6, 2}, // +X
+        {0, 3, 7, 4}, // -X
+        {3, 2, 6, 7}, // +Y
+        {0, 4, 5, 1}, // -Y
+        {4, 7, 6, 5}, // +Z
+        {0, 1, 2, 3}  // -Z
+    };
 
-	for (int f = 0; f < 6; ++f)
-	{
-		int idx[4] = {faces[f][0], faces[f][1], faces[f][2], faces[f][3]};
-		float4 col = colors[f];
+    for (int f = 0; f < 6; ++f) {
+        int idx[4] = { faces[f][0], faces[f][1], faces[f][2], faces[f][3] };
+        float4 col = colors[f];
 
-		int start = (int)vb.Size(); // запоминаем текущее количество вершин
-		vb.Add({corners[idx[0]], col, float2(0, 0)});
-		vb.Add({corners[idx[1]], col, float2(1, 0)});
-		vb.Add({corners[idx[2]], col, float2(1, 1)});
-		vb.Add({corners[idx[3]], col, float2(0, 1)});
+        int start = (int)vb.Size();
+        vb.Add({ corners[idx[0]], col, float2(0, 0) });
+        vb.Add({ corners[idx[1]], col, float2(1, 0) });
+        vb.Add({ corners[idx[2]], col, float2(1, 1) });
+        vb.Add({ corners[idx[3]], col, float2(0, 1) });
 
-		// Два треугольника (0-1-2 и 0-2-3)
-		ib.Add(start);
-		ib.Add(start + 1);
-		ib.Add(start + 2);
-		ib.Add(start);
-		ib.Add(start + 2);
-		ib.Add(start + 3);
-	}
+        // Два треугольника (0-1-2 и 0-2-3)
+        ib.Add(start);
+        ib.Add(start + 1);
+        ib.Add(start + 2);
+        ib.Add(start);
+        ib.Add(start + 2);
+        ib.Add(start + 3);
+    }
 }
 
 int main()
 {
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
-
-	// Регистрация класса окна
-	const wchar_t CLASS_NAME[] = L"SoftX3DTest";
+	const wchar_t CLASS_NAME[] = L"MultiThreadTest";
 	WNDCLASS wc = {};
 	wc.lpfnWndProc = WndProc;
 	wc.hInstance = hInstance;
@@ -110,48 +114,57 @@ int main()
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	RegisterClass(&wc);
 
-	// Создание окна фиксированного размера 800x600
-	HWND hWnd = CreateWindowEx(0, CLASS_NAME, L"SoftX 3D Test", WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
-							   CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, hInstance, nullptr);
+	HWND hWnd = CreateWindowEx(0, CLASS_NAME, L"SoftX Multi-Threaded Demo",
+							   WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT,
+							   800, 600, nullptr, nullptr, hInstance, nullptr);
 	if (!hWnd)
 		return -1;
 	ShowWindow(hWnd, SW_SHOW);
 
-	// Параметры устройства
 	PresentParameters pp;
 	pp.BackBufferSize = int2(800, 600);
 	pp.hDeviceWindow = hWnd;
 	pp.Windowed = true;
 
-	// Создание устройства
 	Device device(pp);
+	auto& immediateCtx = device.GetImmediateContext();
 
-	Viewport vp;
-	vp.size = int2(pp.BackBufferSize.x, pp.BackBufferSize.y);
-	vp.pos = float2(0, 0);
-	vp.minZ = 0;
-	vp.maxZ = 1;
-
-	// Создание данных куба
+	// Создаём общие ресурсы (вершинный и индексный буфер куба)
 	VertexBuffer vb;
 	IndexBuffer ib;
 	CreateCube(vb, ib);
 
-	// Создаём и настраиваем контекст
-	DeviceContext ctx;
-	ctx.SetRenderTarget(&device.GetBackBuffer());
-	ctx.SetViewport(vp);
-	ctx.SetVertexShader(vsTransform);
-	ctx.SetPixelShader(psColor);
-	ctx.SetVertexBuffer(vb);
-	ctx.SetIndexBuffer(ib);
-	ctx.SetCullMode(CullMode::Back);
-	ctx.SetFillMode(FillMode::Solid);
-	ctx.SetTileRenderingState(true);
-	ctx.SetTileSize(64);
+	// Создаём две текстуры-рендертаргета (по 400x600 каждая)
+	RenderTargetTexture rtLeft(int2(400, 600));
+	RenderTargetTexture rtRight(int2(400, 600));
 
-	// Передаём контекст устройству
-	device.SetDeviceContext(ctx);
+	// Создаём отложенные контексты
+	auto ctxLeft = device.CreateDeferredContext();
+	auto ctxRight = device.CreateDeferredContext();
+
+	// Настраиваем левый контекст
+	ctxLeft->SetRenderTarget(&rtLeft, true);
+	ctxLeft->SetViewport(Viewport(0, 0, 400, 600));
+	ctxLeft->SetVertexShader(vsTransform);
+	ctxLeft->SetPixelShader(psColor);
+	ctxLeft->SetVertexBuffer(vb);
+	ctxLeft->SetIndexBuffer(ib);
+	ctxLeft->SetCullMode(CullMode::Back);
+	ctxLeft->SetFillMode(FillMode::Solid);
+	ctxLeft->SetTileRenderingState(true);
+	ctxLeft->SetTileSize(64);
+
+	// Настраиваем правый контекст
+	ctxRight->SetRenderTarget(&rtRight, true);
+	ctxRight->SetViewport(Viewport(0, 0, 400, 600));
+	ctxRight->SetVertexShader(vsTransform);
+	ctxRight->SetPixelShader(psColor);
+	ctxRight->SetVertexBuffer(vb);
+	ctxRight->SetIndexBuffer(ib);
+	ctxRight->SetCullMode(CullMode::Back);
+	ctxRight->SetFillMode(FillMode::Solid);
+	ctxRight->SetTileRenderingState(true);
+	ctxRight->SetTileSize(64);
 
 	// Переменные для анимации
 	float angle = 0.0f;
@@ -159,45 +172,82 @@ int main()
 	QueryPerformanceFrequency(&freq);
 	QueryPerformanceCounter(&lastTime);
 
-	// Главный цикл рендеринга
+	// Главный цикл
 	MSG msg = {};
 	while (g_running)
 	{
-		// Обработка сообщений
 		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
 
-		// Вычисление времени кадра
 		LARGE_INTEGER currentTime;
 		QueryPerformanceCounter(&currentTime);
 		float deltaTime = float(double(currentTime.QuadPart - lastTime.QuadPart) / freq.QuadPart);
 		lastTime = currentTime;
-		angle += deltaTime * 0.5f; // вращение ~0.5 радиан в секунду
+		angle += deltaTime * 0.5f;
 
-		// Матрицы
+		// Матрицы для левого куба (поворот вокруг Y)
 		float3 eye(0, 0, -50);
 		float3 target(0, 0, 0);
 		float3 up(0, 1, 0);
 		float4x4 view = lookAtLH(eye, target, up);
-		float4x4 model = rotationY(angle) * rotationX(angle * 0.3f);
-		float aspect = 800.0f / 600.0f;
+		float4x4 modelLeft = rotationY(angle);
+		float aspect = 400.0f / 600.0f;
 		float4x4 proj = perspectiveLH(3.14159f / 4.0f, aspect, 0.1f, 100.0f);
-		TransformCB cb;
-		cb.wvp = proj * view * model;
-		ConstantBuffer cbuffer(&cb, sizeof(cb));
-		device.SetConstantBuffer(cbuffer);
+		TransformCB cbLeft;
+		cbLeft.wvp = proj * view * modelLeft;
+		ConstantBuffer cbLeftBuf(&cbLeft, sizeof(cbLeft));
 
-		// Очистка буферов
-		device.Clear(float4(0.2f, 0.2f, 0.2f, 1.0f));
-		device.ClearDepth(1.0f);
+		// Матрицы для правого куба (поворот вокруг X)
+		float4x4 modelRight = rotationX(angle * 0.7f);
+		TransformCB cbRight;
+		cbRight.wvp = proj * view * modelRight;
+		ConstantBuffer cbRightBuf(&cbRight, sizeof(cbRight));
 
-		// Рендеринг куба
-		device.DrawIndexed(); // использует все индексы
+		// Запускаем потоки для отложенных контекстов
+		std::thread t1([&]() {
+			ctxLeft->SetConstantBuffer(cbLeftBuf);
+			ctxLeft->Clear(float4(0.1f, 0.1f, 0.1f, 1.0f));
+			ctxLeft->ClearDepth(1.0f);
+			ctxLeft->DrawIndexed();
+		});
 
-		// Вывод на экран
+		std::thread t2([&]() {
+			ctxRight->SetConstantBuffer(cbRightBuf);
+			ctxRight->Clear(float4(0.2f, 0.2f, 0.2f, 1.0f));
+			ctxRight->ClearDepth(1.0f);
+			ctxRight->DrawIndexed();
+		});
+
+		t1.join();
+		t2.join();
+
+		// Теперь в главном контексте выводим результаты на экран
+		immediateCtx.SetRenderTarget(&device.GetBackBuffer(), false);
+		immediateCtx.Clear(float4(0, 0, 0, 1));
+		immediateCtx.ClearDepth(1.0f);
+
+		// Пиксельный шейдер, который отображает две текстуры рядом
+		auto psCombine = [&](const VertexOutput& in, ConstantBuffer) -> float4 {
+			float2 uv = in.UV;
+			if (uv.x < 0.5f)
+			{
+				// левая половина – текстура rtLeft, но UV нужно перемасштабировать
+				float2 uvLeft(uv.x * 2.0f, uv.y);
+				return rtLeft.texture().sample(uvLeft);
+			}
+			else
+			{
+				float2 uvRight((uv.x - 0.5f) * 2.0f, uv.y);
+				return rtRight.texture().sample(uvRight);
+			}
+		};
+
+		immediateCtx.SetPixelShader(psCombine);
+		immediateCtx.DrawFullScreenQuad();
+
 		device.Present();
 	}
 

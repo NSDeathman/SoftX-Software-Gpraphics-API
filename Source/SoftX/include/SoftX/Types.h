@@ -151,11 +151,11 @@ struct Viewport
 	Viewport() : pos(float2(0.0f, 0.0f)), size(int2(0, 0)), minZ(0), maxZ(1)
 	{
 	}
-	Viewport(float x, float y, float width, float height, float minZ = 0, float maxZ = 1)
-		: pos(float2(x,y)), size(float2(width, height)), minZ(minZ), maxZ(maxZ)
+	Viewport(float x, float y, int width, int height, float minZ = 0, float maxZ = 1)
+		: pos(float2(x,y)), size(int2(width, height)), minZ(minZ), maxZ(maxZ)
 	{
 	}
-	Viewport(float2 _pos, float2 _size, float minZ = 0, float maxZ = 1)
+	Viewport(float2 _pos, int2 _size, float minZ = 0, float maxZ = 1)
 		: pos(_pos), size(_size), minZ(minZ), maxZ(maxZ)
 	{
 	}

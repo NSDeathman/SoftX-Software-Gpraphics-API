@@ -1,24 +1,36 @@
 #include "pch.h"
+
 #include <SoftX/SoftX.h>
+#include <SoftX/ThreadPoolManager.h>
 
 SOFTX_BEGIN
 
-void Device::DrawPoint(int x, int y, float z, const float4& color)
+void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 {
-    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
+
+    if (!m_DepthBuffer)
+		return;
+
     if (x < 0 || x >= rt->width() || y < 0 || y >= rt->height())
         return;
     int idx = y * rt->width() + x;
-    if (z < m_depthBuffer.at(idx))
+    if (z < m_DepthBuffer->at(idx))
     {
-        m_depthBuffer.at(idx) = z;
+		m_DepthBuffer->at(idx) = z;
         rt->set_pixel(int2(x, y), color);
     }
 }
 
-void Device::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
+void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
+    IRenderTarget* rt = m_RenderTarget;
+    if (!rt) return;
+
+    if (!m_DepthBuffer)
+		return;
+
     // Целочисленный алгоритм Брезенхема с интерполяцией глубины
     int dx = std::abs(x1 - x0);
     int dy = -std::abs(y1 - y0);
@@ -47,9 +59,9 @@ void Device::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const 
     }
 }
 
-float4 Device::ClipToScreen(const float4& clipPos) const
+float4 DeviceContext::ClipToScreen(const float4& clipPos) const
 {
-    Viewport vp = m_DeviceContext.GetViewport(); // используем контекст
+	Viewport vp = m_Viewport;
 
     // Извлекаем компоненты с помощью SSE
     __m128 pos = clipPos.v;
@@ -76,22 +88,30 @@ VertexOutput Interpolate(const VertexOutput& v0, const VertexOutput& v1, const V
 {
     VertexOutput result;
 
+#define LERPTRI(field) (a * v0.field + b * v1.field + c * v2.field) 
+
     // Интерполяция позиции
-    result.Position = a * v0.Position + b * v1.Position + c * v2.Position;
+	result.Position = LERPTRI(Position);
 
     // Интерполяция цвета
-    result.Color = a * v0.Color + b * v1.Color + c * v2.Color;
+    result.Color = LERPTRI(Color);
 
     // Интерполяция текстурных координат
-    result.UV = a * v0.UV + b * v1.UV + c * v2.UV;
+    result.UV = LERPTRI(UV);
+
+#undef LERPTRI
 
     return result;
 }
 
-void Device::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
+void DeviceContext::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
 {
-    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
+
+    if (!m_DepthBuffer)
+		return;
+
     int width = rt->width();
     int height = rt->height();
 
@@ -110,7 +130,7 @@ void Device::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, c
     // 2. Предвычисляем площадь треугольника (удвоенная)
     float area2 = edgeFunction(v0.Position, v1.Position, v2.Position);
 
-    CullMode cull = m_DeviceContext.GetCullMode();
+    CullMode cull = m_cullMode;
     if (cull == CullMode::Back && area2 < 0)
         return;
     if (cull == CullMode::Front && area2 > 0)
@@ -119,8 +139,8 @@ void Device::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, c
     if (std::abs(area2) < 1e-6f)
         return; // вырожденный треугольник
 
-    auto ps = m_DeviceContext.GetPixelShader();
-    auto cb = m_DeviceContext.GetConstantBuffer();
+    auto ps = m_PixelShader;
+    auto cb = m_ConstantBuffer;
 
     // 3. Проходим по всем пикселям bounding box
     for (int y = iMinY; y <= iMaxY; ++y)
@@ -150,9 +170,9 @@ void Device::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, c
 
             // Проверка глубины
             int idx = y * width + x;
-            if (z < m_depthBuffer.at(idx))
+            if (z < m_DepthBuffer->at(idx))
             {
-                m_depthBuffer.at(idx) = z;
+				m_DepthBuffer->at(idx) = z;
 
                 // Формируем VertexOutput для пиксельного шейдера
                 VertexOutput frag;
@@ -170,10 +190,14 @@ void Device::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, c
     }
 }
 
-void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
+void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
 {
-    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
+
+    if (!m_DepthBuffer)
+		return;
+
     int width = rt->width();
     int height = rt->height();
 
@@ -191,7 +215,7 @@ void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1
     // Площадь треугольника (удвоенная)
     float area2 = edgeFunction(v0.Position, v1.Position, v2.Position);
 
-    CullMode cull = m_DeviceContext.GetCullMode();
+    CullMode cull = m_cullMode;
     if (cull == CullMode::Back && area2 < 0)
         return;
     if (cull == CullMode::Front && area2 > 0)
@@ -199,8 +223,8 @@ void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1
     if (std::abs(area2) < 1e-6f)
         return;
 
-    auto ps = m_DeviceContext.GetPixelShader();
-    auto cb = m_DeviceContext.GetConstantBuffer();
+    auto ps = m_PixelShader;
+    auto cb = m_ConstantBuffer;
 
     // Предвычисляем константы для edge-функций
     float4 dx01_ = v1.Position - v0.Position;
@@ -320,7 +344,7 @@ void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1
 
             // Загрузка текущих глубин из буфера (невыровненная загрузка)
             int idx0 = y * width + x;
-            __m128 depths = _mm_loadu_ps(&m_depthBuffer.at(idx0)); // предполагаем, что at возвращает ссылку
+            __m128 depths = _mm_loadu_ps(&m_DepthBuffer->at(idx0));
 
             // Сравнение глубин (z < depths)
             __m128 depthCmp = _mm_cmplt_ps(z, depths);
@@ -351,7 +375,7 @@ void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1
                     int idx = py * width + px;
 
                     // Записываем новую глубину
-                    m_depthBuffer.at(idx) = zArr[i];
+                    m_DepthBuffer->at(idx) = zArr[i];
 
                     // Формируем VertexOutput для шейдера
                     VertexOutput frag;
@@ -365,6 +389,131 @@ void Device::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1
                     // Запись во фреймбуфер
                     rt->set_pixel(int2(px, py), finalColor);
                 }
+            }
+        }
+    }
+}
+
+void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex) 
+{
+    if (!m_VertexShader || !m_PixelShader || m_VertexBuffer.IsEmpty() || m_IndexBuffer.IsEmpty() || !m_RenderTarget)
+        return;
+
+    IRenderTarget* rt = m_RenderTarget;
+    DepthBuffer* db = m_DepthBuffer;
+    if (!rt || !db) return;
+
+    int width = rt->width();
+    int height = rt->height();
+
+    m_transformedVerts.clear();
+    m_triangles.clear();
+
+    // Трансформируем все уникальные вершины
+    std::vector<bool> vertexProcessed(m_VertexBuffer.Size(), false);
+    for (uint32_t i = startIndex; i < startIndex + indexCount; ++i) {
+        uint32_t idx = m_IndexBuffer.GetByIndex(i);
+        if (!vertexProcessed[idx]) {
+            vertexProcessed[idx] = true;
+            VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
+            out.Position = ClipToScreen(out.Position);
+            if (m_transformedVerts.size() <= idx)
+                m_transformedVerts.resize(idx + 1);
+            m_transformedVerts[idx] = out;
+        }
+    }
+
+    // Сбор треугольников
+    for (uint32_t i = startIndex; i < startIndex + indexCount; i += 3) {
+        if (i + 2 >= startIndex + indexCount) break;
+        uint32_t i0 = m_IndexBuffer.GetByIndex(i);
+        uint32_t i1 = m_IndexBuffer.GetByIndex(i + 1);
+        uint32_t i2 = m_IndexBuffer.GetByIndex(i + 2);
+        m_triangles.push_back({(int)i0, (int)i1, (int)i2});
+    }
+
+    if (m_fillMode == FillMode::Solid) {
+        if (m_EnableTiledRendering) {
+            buildTiles(width, height);
+            binTriangles(m_transformedVerts, m_triangles);
+            renderTilesMultithreaded();
+        } else {
+            for (const auto& tri : m_triangles) {
+                RasterizeTriangleSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z]);
+            }
+        }
+    } else if (m_fillMode == FillMode::Wireframe) {
+        float4 wireColor(1,1,1,1);
+        for (const auto& tri : m_triangles) {
+            const auto& v0 = m_transformedVerts[tri.x];
+            const auto& v1 = m_transformedVerts[tri.y];
+            const auto& v2 = m_transformedVerts[tri.z];
+            DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y),
+                     (int)round(v1.Position.x), (int)round(v1.Position.y),
+                     v0.Position.z, v1.Position.z, wireColor);
+            DrawLine((int)round(v1.Position.x), (int)round(v1.Position.y),
+                     (int)round(v2.Position.x), (int)round(v2.Position.y),
+                     v1.Position.z, v2.Position.z, wireColor);
+            DrawLine((int)round(v2.Position.x), (int)round(v2.Position.y),
+                     (int)round(v0.Position.x), (int)round(v0.Position.y),
+                     v2.Position.z, v0.Position.z, wireColor);
+        }
+    } else if (m_fillMode == FillMode::Point) {
+        std::vector<bool> drawn(m_transformedVerts.size(), false);
+        for (const auto& tri : m_triangles) {
+            for (int idx : {tri.x, tri.y, tri.z}) {
+                if (!drawn[idx]) {
+                    drawn[idx] = true;
+                    const auto& v = m_transformedVerts[idx];
+                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
+                }
+            }
+        }
+    }
+}
+
+void DeviceContext::DrawIndexed()
+{
+	// Используем все индексы из индексного буфера, хранящегося в контексте
+	uint32_t count = (uint32_t)m_IndexBuffer.Size();
+	DrawIndexed(count, 0);
+}
+
+void DeviceContext::DrawFullScreenQuad() {
+    if (!m_PixelShader || !m_RenderTarget) return;
+
+    IRenderTarget* rt = m_RenderTarget;
+    int w = rt->width();
+    int h = rt->height();
+
+    if (m_EnableTiledRendering) {
+        buildTiles(w, h);
+        int numTiles = (int)m_tiles.size();
+        std::atomic<int> tileIndex(0);
+
+        auto worker = [this, &tileIndex, numTiles]() {
+            while (true) {
+                int idx = tileIndex.fetch_add(1);
+                if (idx >= numTiles) break;
+                renderTileQuad(idx);
+            }
+        };
+
+        auto& pool = ThreadPoolManager::Get();
+        int numThreads = (int)pool.threadCount();
+        for (int i = 0; i < numThreads; ++i) {
+            pool.enqueue(worker);
+        }
+        pool.wait();
+    } else {
+        VertexOutput input;
+        for (int y = 0; y < h; ++y) {
+            float v = (float)y / (h - 1);
+            for (int x = 0; x < w; ++x) {
+                float u = (float)x / (w - 1);
+                input.UV = float2(u, v);
+                float4 color = m_PixelShader(input, m_ConstantBuffer);
+                rt->set_pixel(int2(x, y), color);
             }
         }
     }

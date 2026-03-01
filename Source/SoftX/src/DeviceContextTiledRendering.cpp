@@ -1,15 +1,20 @@
-#include "pch.h"
+п»ї#include "pch.h"
+
 #include <SoftX/SoftX.h>
+#include <SoftX/ThreadPoolManager.h>
+
 #include <atomic>
+
+#define DEBUG_TILES
 
 SOFTX_BEGIN
 
-// ========== Методы для работы с тайлами ==========
+// ========== РњРµС‚РѕРґС‹ РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ С‚Р°Р№Р»Р°РјРё ==========
 
-void Device::buildTiles(int width, int height)
+void DeviceContext::buildTiles(int width, int height)
 {
     m_tiles.clear();
-    int tileSize = m_DeviceContext.GetTileSize();   // берём размер из контекста
+	int tileSize = m_TileSize;
     int tilesX = (width + tileSize - 1) / tileSize;
     int tilesY = (height + tileSize - 1) / tileSize;
     for (int ty = 0; ty < tilesY; ++ty)
@@ -24,15 +29,15 @@ void Device::buildTiles(int width, int height)
     }
 }
 
-void Device::binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles)
+void DeviceContext::binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles)
 {
-    // Очищаем списки треугольников для каждого тайла
+    // РћС‡РёС‰Р°РµРј СЃРїРёСЃРєРё С‚СЂРµСѓРіРѕР»СЊРЅРёРєРѕРІ РґР»СЏ РєР°Р¶РґРѕРіРѕ С‚Р°Р№Р»Р°
     for (auto& tile : m_tiles)
         tile.triangleIndices.clear();
 
-    int tileSize = m_DeviceContext.GetTileSize();
-    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
-    if (!rt) return;   // если нет рендертаргета – выходим
+    int tileSize = m_TileSize;
+    IRenderTarget* rt = m_RenderTarget;
+    if (!rt) return;   // РµСЃР»Рё РЅРµС‚ СЂРµРЅРґРµСЂС‚Р°СЂРіРµС‚Р° вЂ“ РІС‹С…РѕРґРёРј
     int rtWidth = rt->width();
     int rtHeight = rt->height();
 
@@ -48,7 +53,7 @@ void Device::binTriangles(const std::vector<VertexOutput>& verts, const std::vec
         float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
         float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-        // Преобразуем в индексы тайлов
+        // РџСЂРµРѕР±СЂР°Р·СѓРµРј РІ РёРЅРґРµРєСЃС‹ С‚Р°Р№Р»РѕРІ
         int tileX0 = std::max(0, (int)(minX / tileSize));
         int tileY0 = std::max(0, (int)(minY / tileSize));
         int tileX1 = std::min((int)(maxX / tileSize), (rtWidth - 1) / tileSize);
@@ -78,7 +83,7 @@ void Device::binTriangles(const std::vector<VertexOutput>& verts, const std::vec
     }
 }
 
-void Device::renderTilesMultithreaded()
+void DeviceContext::renderTilesMultithreaded()
 {
     int numTiles = (int)m_tiles.size();
     std::atomic<int> tileIndex(0);
@@ -92,15 +97,16 @@ void Device::renderTilesMultithreaded()
         }
     };
 
-    int numThreads = (int)m_threadPool->threadCount();
+    auto& pool = ThreadPoolManager::Get();
+	int numThreads = (int)pool.threadCount();
     for (int i = 0; i < numThreads; ++i)
     {
-        m_threadPool->enqueue(worker);
+		pool.enqueue(worker);
     }
-    m_threadPool->wait();
+	pool.wait();
 }
 
-void Device::renderTilesSingleThreaded()
+void DeviceContext::renderTilesSingleThreaded()
 {
     for (size_t i = 0; i < m_tiles.size(); ++i)
     {
@@ -108,20 +114,24 @@ void Device::renderTilesSingleThreaded()
     }
 }
 
-void Device::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax)
+void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax)
 {
-    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
+
+    if (!m_DepthBuffer)
+		return;
+
     int width = rt->width();
     int height = rt->height();
 
-    // Bounding box треугольника
+    // Bounding box С‚СЂРµСѓРіРѕР»СЊРЅРёРєР°
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    // Пересекаем с тайлом
+    // РџРµСЂРµСЃРµРєР°РµРј СЃ С‚Р°Р№Р»РѕРј
     int iMinX = std::max((int)std::ceil(minX), tileMin.x);
     int iMaxX = std::min((int)std::floor(maxX), tileMax.x);
     int iMinY = std::max((int)std::ceil(minY), tileMin.y);
@@ -130,17 +140,17 @@ void Device::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v
     if (iMinX > iMaxX || iMinY > iMaxY)
         return;
 
-    // Площадь треугольника и culling
+    // РџР»РѕС‰Р°РґСЊ С‚СЂРµСѓРіРѕР»СЊРЅРёРєР° Рё culling
     float area2 = edgeFunction(v0.Position, v1.Position, v2.Position);
-    CullMode cull = m_DeviceContext.GetCullMode();
+    CullMode cull = m_cullMode;
     if (cull == CullMode::Back && area2 < 0) return;
     if (cull == CullMode::Front && area2 > 0) return;
     if (std::abs(area2) < 1e-6f) return;
 
-    auto ps = m_DeviceContext.GetPixelShader();
-    auto cb = m_DeviceContext.GetConstantBuffer();
+    auto ps = m_PixelShader;
+    auto cb = m_ConstantBuffer;
 
-    // Растеризация (скалярная)
+    // Р Р°СЃС‚РµСЂРёР·Р°С†РёСЏ (СЃРєР°Р»СЏСЂРЅР°СЏ)
     for (int y = iMinY; y <= iMaxY; ++y)
     {
         for (int x = iMinX; x <= iMaxX; ++x)
@@ -166,9 +176,9 @@ void Device::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v
             float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
 
             int idx = y * width + x;
-            if (z < m_depthBuffer.at(idx))
+            if (z < m_DepthBuffer->at(idx))
             {
-                m_depthBuffer.at(idx) = z;
+				m_DepthBuffer->at(idx) = z;
 
                 VertexOutput frag;
                 frag.Position = float4((float)x, (float)y, z, 1.0f);
@@ -182,20 +192,24 @@ void Device::RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v
     }
 }
 
-void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax)
+void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax)
 {
-    IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+    IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
+
+    if (!m_DepthBuffer)
+		return;
+
     int width = rt->width();
     int height = rt->height();
 
-    // Bounding box треугольника
+    // Bounding box С‚СЂРµСѓРіРѕР»СЊРЅРёРєР°
     float triMinX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float triMaxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float triMinY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float triMaxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    // Пересекаем с тайлом
+    // РџРµСЂРµСЃРµРєР°РµРј СЃ С‚Р°Р№Р»РѕРј
     int iMinX = std::max((int)std::ceil(triMinX), tileMin.x);
     int iMaxX = std::min((int)std::floor(triMaxX), tileMax.x);
     int iMinY = std::max((int)std::ceil(triMinY), tileMin.y);
@@ -205,15 +219,15 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
         return;
 
     float area2 = edgeFunction(v0.Position, v1.Position, v2.Position);
-    CullMode cull = m_DeviceContext.GetCullMode();
+    CullMode cull = m_cullMode;
     if (cull == CullMode::Back && area2 < 0) return;
     if (cull == CullMode::Front && area2 > 0) return;
     if (std::abs(area2) < 1e-6f) return;
 
-    auto ps = m_DeviceContext.GetPixelShader();
-    auto cb = m_DeviceContext.GetConstantBuffer();
+    auto ps = m_PixelShader;
+    auto cb = m_ConstantBuffer;
 
-    // ---------- SSE-часть ----------
+    // ---------- SSE-С‡Р°СЃС‚СЊ ----------
     {
         float4 dx01 = v1.Position - v0.Position;
         float4 dx12 = v2.Position - v1.Position;
@@ -269,7 +283,7 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
             int xBlockStart = (xStart + 3) & ~3;
             int xBlockEnd = xEnd & ~3;
 
-            // Левый остаток
+            // Р›РµРІС‹Р№ РѕСЃС‚Р°С‚РѕРє
             for (int x = xStart; x < xBlockStart; ++x)
             {
                 float2 p((float)x + 0.5f, (float)y + 0.5f);
@@ -287,9 +301,9 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
                 float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
 
                 int idx = y * width + x;
-                if (z < m_depthBuffer.at(idx))
+                if (z < m_DepthBuffer->at(idx))
                 {
-                    m_depthBuffer.at(idx) = z;
+					m_DepthBuffer->at(idx) = z;
                     VertexOutput frag;
                     frag.Position = float4((float)x, (float)y, z, 1.0f);
                     frag.Color = color;
@@ -299,7 +313,7 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
                 }
             }
 
-            // SSE-блоки
+            // SSE-Р±Р»РѕРєРё
             for (int x = xBlockStart; x < xBlockEnd; x += 4)
             {
                 __m128 baseX = _mm_set_ps(x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
@@ -331,7 +345,7 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
                 __m128 v = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0v), _mm_mul_ps(beta, v1v)), _mm_mul_ps(gamma, v2v));
 
                 int idx0 = y * width + x;
-                __m128 depths = _mm_loadu_ps(&m_depthBuffer.at(idx0));
+				__m128 depths = _mm_loadu_ps(&m_DepthBuffer->at(idx0));
                 __m128 depthCmp = _mm_cmplt_ps(z, depths);
                 int depthMask = _mm_movemask_ps(depthCmp) & insideMask;
                 if (depthMask == 0) continue;
@@ -352,7 +366,7 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
                         int px = x + i;
                         int py = y;
                         int idx = py * width + px;
-                        m_depthBuffer.at(idx) = zArr[i];
+						m_DepthBuffer->at(idx) = zArr[i];
 
                         VertexOutput frag;
                         frag.Position = float4((float)px, (float)py, zArr[i], 1.0f);
@@ -365,7 +379,7 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
                 }
             }
 
-            // Правый остаток
+            // РџСЂР°РІС‹Р№ РѕСЃС‚Р°С‚РѕРє
             for (int x = xBlockEnd; x <= xEnd; ++x)
             {
                 float2 p((float)x + 0.5f, (float)y + 0.5f);
@@ -383,9 +397,9 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
                 float2 uv = a * v0.UV + b * v1.UV + c * v2.UV;
 
                 int idx = y * width + x;
-                if (z < m_depthBuffer.at(idx))
+				if (z < m_DepthBuffer->at(idx))
                 {
-                    m_depthBuffer.at(idx) = z;
+					m_DepthBuffer->at(idx) = z;
                     VertexOutput frag;
                     frag.Position = float4((float)x, (float)y, z, 1.0f);
                     frag.Color = color;
@@ -398,14 +412,14 @@ void Device::RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput
     }
 }
 
-void Device::renderTile(int tileIndex)
+void DeviceContext::renderTile(int tileIndex)
 {
     const Tile& tile = m_tiles[tileIndex];
 
 #ifdef DEBUG_TILES
     if (!tile.triangleIndices.empty())
     {
-        IRenderTarget* rt = m_DeviceContext.GetRenderTarget();
+        IRenderTarget* rt = m_RenderTarget;
         if (rt)
         {
             for (int x = tile.min.x; x <= tile.max.x; ++x)
@@ -428,5 +442,50 @@ void Device::renderTile(int tileIndex)
         RasterizeTriangleTileSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z], tile.min, tile.max);
     }
 }
+
+void DeviceContext::renderTileQuad(int tileIndex)
+{
+	const Tile& tile = m_tiles[tileIndex];
+	IRenderTarget* rt = m_RenderTarget;
+	if (!rt)
+		return;
+
+#ifdef DEBUG_TILES
+	if (!tile.triangleIndices.empty())
+	{
+		if (rt)
+		{
+			for (int x = tile.min.x; x <= tile.max.x; ++x)
+			{
+				rt->set_pixel(int2(x, tile.min.y), float4(1, 0, 0, 1));
+				rt->set_pixel(int2(x, tile.max.y), float4(1, 0, 0, 1));
+			}
+			for (int y = tile.min.y; y <= tile.max.y; ++y)
+			{
+				rt->set_pixel(int2(tile.min.x, y), float4(1, 0, 0, 1));
+				rt->set_pixel(int2(tile.max.x, y), float4(1, 0, 0, 1));
+			}
+		}
+	}
+#endif
+
+	int w = rt->width();
+	int h = rt->height();
+	VertexOutput input = {};
+	auto ps = m_PixelShader;
+	auto cb = m_ConstantBuffer;
+	for (int y = tile.min.y; y <= tile.max.y; ++y)
+	{
+		float v = (float)y / (h - 1);
+		for (int x = tile.min.x; x <= tile.max.x; ++x)
+		{
+			float u = (float)x / (w - 1);
+			input.UV = float2(u, v);
+			float4 color = ps(input, cb);
+			rt->set_pixel(int2(x, y), color);
+		}
+	}
+}
+
 
 SOFTX_END
