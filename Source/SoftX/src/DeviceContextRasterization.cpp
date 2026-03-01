@@ -238,6 +238,18 @@ void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOut
     __m128 v2cb = _mm_set1_ps(v2.Color.z);
     __m128 v2ca = _mm_set1_ps(v2.Color.w);
 
+    __m128 v0nx = _mm_set1_ps(v0.Normal.x);
+	__m128 v0ny = _mm_set1_ps(v0.Normal.y);
+	__m128 v0nz = _mm_set1_ps(v0.Normal.z);
+
+	__m128 v1nx = _mm_set1_ps(v1.Normal.x);
+	__m128 v1ny = _mm_set1_ps(v1.Normal.y);
+	__m128 v1nz = _mm_set1_ps(v1.Normal.z);
+
+	__m128 v2nx = _mm_set1_ps(v2.Normal.x);
+	__m128 v2ny = _mm_set1_ps(v2.Normal.y);
+	__m128 v2nz = _mm_set1_ps(v2.Normal.z);
+
     __m128 v0u = _mm_set1_ps(v0.UV.x);
     __m128 v0v = _mm_set1_ps(v0.UV.y);
     __m128 v1u = _mm_set1_ps(v1.UV.x);
@@ -305,6 +317,10 @@ void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOut
             __m128 u = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0u), _mm_mul_ps(beta, v1u)), _mm_mul_ps(gamma, v2u));
             __m128 v = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0v), _mm_mul_ps(beta, v1v)), _mm_mul_ps(gamma, v2v));
 
+            __m128 nx = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0nx), _mm_mul_ps(beta, v1nx)), _mm_mul_ps(gamma, v2nx));
+            __m128 ny = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0ny), _mm_mul_ps(beta, v1ny)), _mm_mul_ps(gamma, v2ny));
+            __m128 nz = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0nz), _mm_mul_ps(beta, v1nz)), _mm_mul_ps(gamma, v2nz));
+
             // Загрузка глубины
             int idx0 = y * width + x;
             __m128 depths = _mm_loadu_ps(&m_DepthBuffer->at(idx0));
@@ -322,6 +338,11 @@ void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOut
             _mm_storeu_ps(uArr, u);
             _mm_storeu_ps(vArr, v);
 
+            float nxArr[4], nyArr[4], nzArr[4];
+			_mm_storeu_ps(nxArr, nx);
+			_mm_storeu_ps(nyArr, ny);
+			_mm_storeu_ps(nzArr, nz);
+
             for (int i = 0; i < 4; ++i)
             {
                 if (depthMask & (1 << i))
@@ -335,6 +356,7 @@ void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOut
                     VertexOutput frag;
                     frag.Position = float4((float)px, (float)py, zArr[i], 1.0f);
                     frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
+					frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
                     frag.UV = float2(uArr[i], vArr[i]);
 
                     float4 finalColor = ps(frag, cb);
