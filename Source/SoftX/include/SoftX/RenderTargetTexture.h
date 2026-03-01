@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "RenderTargetInterface.h"
 #include "Texture.h"
@@ -15,7 +15,7 @@ class SOFTX_API RenderTargetTexture : public IRenderTarget
 
 	void clear(const float4& color) override
 	{
-		// Çàïîëíÿåì òåêñòóðó öâåòîì
+		// Ð—Ð°Ð¿Ð¾Ð»Ð½ÑÐµÐ¼ Ñ‚ÐµÐºÑÑ‚ÑƒÑ€Ñƒ Ñ†Ð²ÐµÑ‚Ð¾Ð¼
 		int w = m_texture.width();
 		int h = m_texture.height();
 		__m128 col = _mm_set_ps(color.w, color.z, color.y, color.x); // float4 RGBA -> __m128 (w,z,y,x)
@@ -23,7 +23,7 @@ class SOFTX_API RenderTargetTexture : public IRenderTarget
 		{
 			for (int x = 0; x < w; ++x)
 			{
-				m_texture.stream_write(int2(x, y), col); // ìîæíî èñïîëüçîâàòü îáû÷íóþ çàïèñü
+				m_texture.stream_write(int2(x, y), col); // Ð¼Ð¾Ð¶Ð½Ð¾ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ð¾Ð±Ñ‹Ñ‡Ð½ÑƒÑŽ Ð·Ð°Ð¿Ð¸ÑÑŒ
 			}
 		}
 	}
@@ -47,7 +47,7 @@ class SOFTX_API RenderTargetTexture : public IRenderTarget
 		return int2(width(), height());
 	}
 
-	// Äîñòóï ê òåêñòóðå äëÿ èñïîëüçîâàíèÿ â øåéäåðàõ
+	// Ð”Ð¾ÑÑ‚ÑƒÐ¿ Ðº Ñ‚ÐµÐºÑÑ‚ÑƒÑ€Ðµ Ð´Ð»Ñ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½Ð¸Ñ Ð² ÑˆÐµÐ¹Ð´ÐµÑ€Ð°Ñ…
 	const TextureRGBA32F& texture() const
 	{
 		return m_texture;

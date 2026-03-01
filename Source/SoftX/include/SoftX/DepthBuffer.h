@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 #include <vector>
 #include <algorithm>
 #include <limits>
@@ -12,11 +12,11 @@ class SOFTX_API DepthBuffer
 {
   public:
 	DepthBuffer(int2 size)
-		: m_width(size.x), m_height(size.y), m_depths(size.x * size.y, 1.0f) // по умолчанию 1.0 (дальнее)
+		: m_width(size.x), m_height(size.y), m_depths(size.x * size.y, 1.0f) // РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1.0 (РґР°Р»СЊРЅРµРµ)
 	{
 	}
 
-	// Очистка заданным значением глубины
+	// РћС‡РёСЃС‚РєР° Р·Р°РґР°РЅРЅС‹Рј Р·РЅР°С‡РµРЅРёРµРј РіР»СѓР±РёРЅС‹
 	void clear(float depth)
 	{
 		float* data = m_depths.data();
@@ -25,15 +25,15 @@ class SOFTX_API DepthBuffer
 		__m128 depth4 = _mm_set1_ps(depth);
 		size_t i = 0;
 
-		// Потоковая запись (минует кэш) – максимальная скорость,
-		// но требует выравнивания адреса по 16 байт.
+		// РџРѕС‚РѕРєРѕРІР°СЏ Р·Р°РїРёСЃСЊ (РјРёРЅСѓРµС‚ РєСЌС€) вЂ“ РјР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЃРєРѕСЂРѕСЃС‚СЊ,
+		// РЅРѕ С‚СЂРµР±СѓРµС‚ РІС‹СЂР°РІРЅРёРІР°РЅРёСЏ Р°РґСЂРµСЃР° РїРѕ 16 Р±Р°Р№С‚.
 		for (; i + 4 <= count; i += 4)
 		{
 			_mm_stream_ps(data + i, depth4);
 		}
-		_mm_sfence(); // гарантирует видимость записей
+		_mm_sfence(); // РіР°СЂР°РЅС‚РёСЂСѓРµС‚ РІРёРґРёРјРѕСЃС‚СЊ Р·Р°РїРёСЃРµР№
 
-		// Остаток (менее 4 элементов)
+		// РћСЃС‚Р°С‚РѕРє (РјРµРЅРµРµ 4 СЌР»РµРјРµРЅС‚РѕРІ)
 		for (; i < count; ++i)
 		{
 			data[i] = depth;
@@ -41,17 +41,17 @@ class SOFTX_API DepthBuffer
 	}
 
 
-	// Чтение глубины по координатам
+	// Р§С‚РµРЅРёРµ РіР»СѓР±РёРЅС‹ РїРѕ РєРѕРѕСЂРґРёРЅР°С‚Р°Рј
 	float read(int2 coords) const
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
 		{
 			return m_depths[coords.y * m_width + coords.x];
 		}
-		return 1.0f; // за границами возвращаем дальнее
+		return 1.0f; // Р·Р° РіСЂР°РЅРёС†Р°РјРё РІРѕР·РІСЂР°С‰Р°РµРј РґР°Р»СЊРЅРµРµ
 	}
 
-	// Запись глубины по координатам (без проверки, для внутреннего использования)
+	// Р—Р°РїРёСЃСЊ РіР»СѓР±РёРЅС‹ РїРѕ РєРѕРѕСЂРґРёРЅР°С‚Р°Рј (Р±РµР· РїСЂРѕРІРµСЂРєРё, РґР»СЏ РІРЅСѓС‚СЂРµРЅРЅРµРіРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ)
 	void write(int2 coords, float depth)
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -60,7 +60,7 @@ class SOFTX_API DepthBuffer
 		}
 	}
 
-	// Прямой доступ к данным (для быстрой пакетной записи)
+	// РџСЂСЏРјРѕР№ РґРѕСЃС‚СѓРї Рє РґР°РЅРЅС‹Рј (РґР»СЏ Р±С‹СЃС‚СЂРѕР№ РїР°РєРµС‚РЅРѕР№ Р·Р°РїРёСЃРё)
 	float* data()
 	{
 		return m_depths.data();
@@ -94,7 +94,7 @@ class SOFTX_API DepthBuffer
 		return m_depths[index];
 	}
 
-	// Размеры
+	// Р Р°Р·РјРµСЂС‹
 	int width() const
 	{
 		return m_width;

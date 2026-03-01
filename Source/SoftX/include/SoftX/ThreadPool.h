@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include <atomic>
 #include <condition_variable>
@@ -25,13 +25,13 @@ public:
                         tasks.pop();
                         ++activeTasks;
                     }
-                    // Выполняем задачу без блокировки мьютекса
+                    // Р’С‹РїРѕР»РЅСЏРµРј Р·Р°РґР°С‡Сѓ Р±РµР· Р±Р»РѕРєРёСЂРѕРІРєРё РјСЊСЋС‚РµРєСЃР°
                     task();
                     {
                         std::unique_lock<std::mutex> lock(queueMutex);
                         --activeTasks;
                     }
-                    // Уведомляем ожидающие потоки (например, wait)
+                    // РЈРІРµРґРѕРјР»СЏРµРј РѕР¶РёРґР°СЋС‰РёРµ РїРѕС‚РѕРєРё (РЅР°РїСЂРёРјРµСЂ, wait)
                     condition.notify_all();
                 }
             });
@@ -71,7 +71,7 @@ private:
     std::mutex queueMutex;
     std::condition_variable condition;
     bool stop;
-    int activeTasks; // защищается queueMutex
+    int activeTasks; // Р·Р°С‰РёС‰Р°РµС‚СЃСЏ queueMutex
 };
 
 SOFTX_END

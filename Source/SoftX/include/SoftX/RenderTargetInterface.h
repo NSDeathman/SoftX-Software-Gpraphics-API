@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include "Math.h"
 #include "LibInternal.h"
@@ -10,13 +10,13 @@ class SOFTX_API IRenderTarget
   public:
 	virtual ~IRenderTarget() = default;
 
-	// Очистка цветом
+	// РћС‡РёСЃС‚РєР° С†РІРµС‚РѕРј
 	virtual void clear(const float4& color) = 0;
 
-	// Установка пикселя
+	// РЈСЃС‚Р°РЅРѕРІРєР° РїРёРєСЃРµР»СЏ
 	virtual void set_pixel(int2 coords, const float4& color) = 0;
 
-	// Размеры
+	// Р Р°Р·РјРµСЂС‹
 	virtual int width() const = 0;
 	virtual int height() const = 0;
 	virtual int2 size() const = 0;

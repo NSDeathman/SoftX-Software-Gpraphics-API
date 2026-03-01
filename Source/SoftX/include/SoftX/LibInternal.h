@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #define SOFTX_API
 #define SOFTX_BEGIN namespace SoftX {

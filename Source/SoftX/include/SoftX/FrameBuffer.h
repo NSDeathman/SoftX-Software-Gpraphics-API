@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 #include <windows.h>
 #include <vector>
 #include <cstdint>
@@ -22,14 +22,14 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		std::fill(m_pixels.begin(), m_pixels.end(), 0xFF000000);
 	}
 
-	// Очистка цветом float4 (компоненты в порядке RGBA)
+	// РћС‡РёСЃС‚РєР° С†РІРµС‚РѕРј float4 (РєРѕРјРїРѕРЅРµРЅС‚С‹ РІ РїРѕСЂСЏРґРєРµ RGBA)
 	void clear(const float4& color) override
 	{
 		uint32_t c = float4ToBGRA(color);
 		std::fill(m_pixels.begin(), m_pixels.end(), c);
 	}
 
-	// Очистка готовым 32-битным цветом (0xAARRGGBB)
+	// РћС‡РёСЃС‚РєР° РіРѕС‚РѕРІС‹Рј 32-Р±РёС‚РЅС‹Рј С†РІРµС‚РѕРј (0xAARRGGBB)
 	void clear(uint32_t color)
 	{
 		uint32_t* data = m_pixels.data();
@@ -46,7 +46,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		}
 	}
 
-	// Установка пикселя по координатам (float4 цвет)
+	// РЈСЃС‚Р°РЅРѕРІРєР° РїРёРєСЃРµР»СЏ РїРѕ РєРѕРѕСЂРґРёРЅР°С‚Р°Рј (float4 С†РІРµС‚)
 	void set_pixel(int2 coords, const float4& color) override
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -55,7 +55,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		}
 	}
 
-	// Установка пикселя готовым цветом (0xAARRGGBB)
+	// РЈСЃС‚Р°РЅРѕРІРєР° РїРёРєСЃРµР»СЏ РіРѕС‚РѕРІС‹Рј С†РІРµС‚РѕРј (0xAARRGGBB)
 	void set_pixel(int2 coords, uint32_t color)
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -64,7 +64,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		}
 	}
 
-	// Чтение пикселя как 32-бит цвета (0xAARRGGBB)
+	// Р§С‚РµРЅРёРµ РїРёРєСЃРµР»СЏ РєР°Рє 32-Р±РёС‚ С†РІРµС‚Р° (0xAARRGGBB)
 	uint32_t get_pixel(int2 coords) const
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -74,7 +74,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		return 0;
 	}
 
-	// Получение указателя на данные для GDI
+	// РџРѕР»СѓС‡РµРЅРёРµ СѓРєР°Р·Р°С‚РµР»СЏ РЅР° РґР°РЅРЅС‹Рµ РґР»СЏ GDI
 	const uint32_t* data() const
 	{
 		return m_pixels.data();
@@ -84,7 +84,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		return m_pixels.data();
 	}
 
-	// Размеры
+	// Р Р°Р·РјРµСЂС‹
 	int width() const override
 	{
 		return m_width;
@@ -98,7 +98,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		return int2(m_width, m_height);
 	}
 
-	// Сохранение в TGA (порядок BGRA уже совпадает с требуемым в файле)
+	// РЎРѕС…СЂР°РЅРµРЅРёРµ РІ TGA (РїРѕСЂСЏРґРѕРє BGRA СѓР¶Рµ СЃРѕРІРїР°РґР°РµС‚ СЃ С‚СЂРµР±СѓРµРјС‹Рј РІ С„Р°Р№Р»Рµ)
 	bool saveTGA(const char* filename) const
 	{
 		std::ofstream file(filename, std::ios::binary);
@@ -118,13 +118,13 @@ class SOFTX_API Framebuffer : public IRenderTarget
 		header[17] = 8 | (1 << 5); // 8 bits alpha, top-left origin
 		file.write(reinterpret_cast<const char*>(header), 18);
 
-		// Пиксели уже в порядке BGRA (как требует TGA)
+		// РџРёРєСЃРµР»Рё СѓР¶Рµ РІ РїРѕСЂСЏРґРєРµ BGRA (РєР°Рє С‚СЂРµР±СѓРµС‚ TGA)
 		file.write(reinterpret_cast<const char*>(m_pixels.data()), m_pixels.size() * 4);
 		file.close();
 		return true;
 	}
 
-	// Вывод на GDI-контекст (например, в окне)
+	// Р’С‹РІРѕРґ РЅР° GDI-РєРѕРЅС‚РµРєСЃС‚ (РЅР°РїСЂРёРјРµСЂ, РІ РѕРєРЅРµ)
 	void present(HDC hdc, int2 dstPos = int2(0, 0), int2 dstSize = int2(-1, -1)) const
 	{
 		int dstW = (dstSize.x == -1) ? m_width : dstSize.x;
@@ -144,7 +144,7 @@ class SOFTX_API Framebuffer : public IRenderTarget
 	}
 
   private:
-	// Преобразование float4 (RGBA) в 32-бит BGRA (0xAARRGGBB)
+	// РџСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРµ float4 (RGBA) РІ 32-Р±РёС‚ BGRA (0xAARRGGBB)
 	static uint32_t float4ToBGRA(const float4& c)
 	{
 		uint8_t r = static_cast<uint8_t>(std::clamp(c.x * 255.0f, 0.0f, 255.0f));

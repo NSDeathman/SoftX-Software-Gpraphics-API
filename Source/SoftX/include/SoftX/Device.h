@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include <windows.h>
 #include <functional>
@@ -26,13 +26,13 @@ public:
 	void SetIndexBuffer(const IndexBuffer& buffer);
 	void SetConstantBuffer(ConstantBuffer cbuffer);
 
-    // Презентация: копирует задний буфер в окно
+    // РџСЂРµР·РµРЅС‚Р°С†РёСЏ: РєРѕРїРёСЂСѓРµС‚ Р·Р°РґРЅРёР№ Р±СѓС„РµСЂ РІ РѕРєРЅРѕ
     void Present();
 
-    // Доступ к заднему буферу для рисования (прямое манипулирование пикселями)
+    // Р”РѕСЃС‚СѓРї Рє Р·Р°РґРЅРµРјСѓ Р±СѓС„РµСЂСѓ РґР»СЏ СЂРёСЃРѕРІР°РЅРёСЏ (РїСЂСЏРјРѕРµ РјР°РЅРёРїСѓР»РёСЂРѕРІР°РЅРёРµ РїРёРєСЃРµР»СЏРјРё)
     Framebuffer& GetBackBuffer();
 
-    // Геттеры для параметров
+    // Р“РµС‚С‚РµСЂС‹ РґР»СЏ РїР°СЂР°РјРµС‚СЂРѕРІ
     PresentParameters& GetPresentParams();
 
 private:

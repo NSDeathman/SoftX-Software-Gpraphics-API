@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include "LibInternal.h"
 #include "Types.h"
@@ -15,7 +15,7 @@ class SOFTX_API DeviceContext
 	DeviceContext(DeviceContext&&) = default;
 	DeviceContext& operator=(DeviceContext&&) = default;
 
-	// Сеттеры и геттеры для шейдеров
+	// РЎРµС‚С‚РµСЂС‹ Рё РіРµС‚С‚РµСЂС‹ РґР»СЏ С€РµР№РґРµСЂРѕРІ
 	void SetVertexShader(VertexShader shader);
 	VertexShader GetVertexShader() const;
 
@@ -25,7 +25,7 @@ class SOFTX_API DeviceContext
 	void SetPixelShader(PixelShader shader);
 	PixelShader GetPixelShader() const;
 
-	// Сеттеры и геттеры для буферов
+	// РЎРµС‚С‚РµСЂС‹ Рё РіРµС‚С‚РµСЂС‹ РґР»СЏ Р±СѓС„РµСЂРѕРІ
 	void SetVertexBuffer(const VertexBuffer& buffer);
 	VertexBuffer GetVertexBuffer() const;
 
@@ -35,39 +35,39 @@ class SOFTX_API DeviceContext
 	void SetConstantBuffer(const ConstantBuffer& buffer);
 	ConstantBuffer GetConstantBuffer() const;
 
-	// Сеттеры и геттеры для рендертаргета
+	// РЎРµС‚С‚РµСЂС‹ Рё РіРµС‚С‚РµСЂС‹ РґР»СЏ СЂРµРЅРґРµСЂС‚Р°СЂРіРµС‚Р°
 	void SetRenderTarget(IRenderTarget* target);
 	void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);
 	IRenderTarget* GetRenderTarget() const;
 
-	// Методы для управления depth buffer
+	// РњРµС‚РѕРґС‹ РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ depth buffer
 	void SetDepthBuffer(DepthBuffer* depthBuffer);
 	DepthBuffer* GetDepthBuffer() const;
 
-	void Clear(const float4& color);	 // очистка render target
-	void ClearDepth(float depth = 1.0f); // очистка depth buffer
+	void Clear(const float4& color);	 // РѕС‡РёСЃС‚РєР° render target
+	void ClearDepth(float depth = 1.0f); // РѕС‡РёСЃС‚РєР° depth buffer
 
-	// Режимы отсечения и заполнения
+	// Р РµР¶РёРјС‹ РѕС‚СЃРµС‡РµРЅРёСЏ Рё Р·Р°РїРѕР»РЅРµРЅРёСЏ
 	void SetCullMode(CullMode mode);
 	CullMode GetCullMode() const;
 
 	void SetFillMode(FillMode mode);
 	FillMode GetFillMode() const;
 
-	// Вьюпорт
+	// Р’СЊСЋРїРѕСЂС‚
 	void SetViewport(const Viewport& vp);
 	Viewport GetViewport() const;
 
-	// Тайловый рендеринг
+	// РўР°Р№Р»РѕРІС‹Р№ СЂРµРЅРґРµСЂРёРЅРі
 	void SetTileRenderingState(bool enable);
 	bool GetTileRenderingState() const;
 
 	void SetTileSize(uint32_t size);
 	uint32_t GetTileSize() const;
 
-	// Проверка корректности текущего состояния
-	// Возвращает true, если состояние готово к рисованию
-	// Если передан указатель на строку, в неё будет записано описание ошибки (при false)
+	// РџСЂРѕРІРµСЂРєР° РєРѕСЂСЂРµРєС‚РЅРѕСЃС‚Рё С‚РµРєСѓС‰РµРіРѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ
+	// Р’РѕР·РІСЂР°С‰Р°РµС‚ true, РµСЃР»Рё СЃРѕСЃС‚РѕСЏРЅРёРµ РіРѕС‚РѕРІРѕ Рє СЂРёСЃРѕРІР°РЅРёСЋ
+	// Р•СЃР»Рё РїРµСЂРµРґР°РЅ СѓРєР°Р·Р°С‚РµР»СЊ РЅР° СЃС‚СЂРѕРєСѓ, РІ РЅРµС‘ Р±СѓРґРµС‚ Р·Р°РїРёСЃР°РЅРѕ РѕРїРёСЃР°РЅРёРµ РѕС€РёР±РєРё (РїСЂРё false)
 	bool Validate(std::string* errorMsg = nullptr) const;
 
 	void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
@@ -95,12 +95,12 @@ class SOFTX_API DeviceContext
 	bool m_EnableTiledRendering;
 	uint32_t m_TileSize;
 
-	// Данные для тайлового рендера
+	// Р”Р°РЅРЅС‹Рµ РґР»СЏ С‚Р°Р№Р»РѕРІРѕРіРѕ СЂРµРЅРґРµСЂР°
     std::vector<Tile> m_tiles;
     std::vector<VertexOutput> m_transformedVerts;
     std::vector<int3> m_triangles;
 
-    // Внутренние методы тайлового рендера
+    // Р’РЅСѓС‚СЂРµРЅРЅРёРµ РјРµС‚РѕРґС‹ С‚Р°Р№Р»РѕРІРѕРіРѕ СЂРµРЅРґРµСЂР°
     void buildTiles(int width, int height);
     void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
     void renderTilesMultithreaded();
@@ -108,7 +108,7 @@ class SOFTX_API DeviceContext
     void renderTile(int tileIndex);
     void renderTileQuad(int tileIndex);
 
-    // Методы растеризации
+    // РњРµС‚РѕРґС‹ СЂР°СЃС‚РµСЂРёР·Р°С†РёРё
 	void DrawPoint(int x, int y, float z, const float4& color);
     void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
     void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);

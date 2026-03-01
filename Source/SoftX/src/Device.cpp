@@ -1,10 +1,10 @@
-#include "pch.h"
-#include <SoftX/SoftX.h>  // или соответствующие заголовки
+п»ї#include "pch.h"
+#include <SoftX/SoftX.h>  // РёР»Рё СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёРµ Р·Р°РіРѕР»РѕРІРєРё
 #include <atomic>
 
 SOFTX_BEGIN
 
-// Конструктор
+// РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
 Device::Device(const PresentParameters& params)
     : m_params(params)
     , m_backBuffer(params.BackBufferSize)
@@ -12,7 +12,7 @@ Device::Device(const PresentParameters& params)
 {
 }
 
-// Сеттер/геттер для контекста
+// РЎРµС‚С‚РµСЂ/РіРµС‚С‚РµСЂ РґР»СЏ РєРѕРЅС‚РµРєСЃС‚Р°
 void Device::SetDeviceContext(DeviceContext ctx)
 {
 	m_DeviceContext = std::move(ctx);

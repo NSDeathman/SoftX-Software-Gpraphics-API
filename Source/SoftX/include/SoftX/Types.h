@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #include <windows.h>
 #include <vector>
@@ -11,14 +11,14 @@ SOFTX_BEGIN
 
 struct PresentParameters
 {
-	int2 BackBufferSize; // размер заднего буфера (framebuffer)
-	HWND hDeviceWindow;	 // окно для вывода
-	bool Windowed;		 // всегда true для нашего софтверного рендерера
+	int2 BackBufferSize; // СЂР°Р·РјРµСЂ Р·Р°РґРЅРµРіРѕ Р±СѓС„РµСЂР° (framebuffer)
+	HWND hDeviceWindow;	 // РѕРєРЅРѕ РґР»СЏ РІС‹РІРѕРґР°
+	bool Windowed;		 // РІСЃРµРіРґР° true РґР»СЏ РЅР°С€РµРіРѕ СЃРѕС„С‚РІРµСЂРЅРѕРіРѕ СЂРµРЅРґРµСЂРµСЂР°
 };
 
 struct VertexInput
 {
-	float3 Position; // локальные координаты
+	float3 Position; // Р»РѕРєР°Р»СЊРЅС‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹
 	float3 Normal;
 	float4 Color;
 	float2 UV;
@@ -147,9 +147,9 @@ public:
 
 struct Viewport
 {
-	float2 pos;			 // верхний левый угол в пикселях
-	int2 size;		 // размеры в пикселях
-	float minZ, maxZ;	 // диапазон глубины (обычно 0..1)
+	float2 pos;			 // РІРµСЂС…РЅРёР№ Р»РµРІС‹Р№ СѓРіРѕР» РІ РїРёРєСЃРµР»СЏС…
+	int2 size;		 // СЂР°Р·РјРµСЂС‹ РІ РїРёРєСЃРµР»СЏС…
+	float minZ, maxZ;	 // РґРёР°РїР°Р·РѕРЅ РіР»СѓР±РёРЅС‹ (РѕР±С‹С‡РЅРѕ 0..1)
 
 	Viewport() : pos(float2(0.0f, 0.0f)), size(int2(0, 0)), minZ(0), maxZ(1)
 	{
@@ -166,9 +166,9 @@ struct Viewport
 
 struct Tile
 {
-	int2 min;						  // левый верхний угол в пикселях
-	int2 max;						  // правый нижний угол (включительно)
-	std::vector<int> triangleIndices; // индексы треугольников, попадающих в тайл
+	int2 min;						  // Р»РµРІС‹Р№ РІРµСЂС…РЅРёР№ СѓРіРѕР» РІ РїРёРєСЃРµР»СЏС…
+	int2 max;						  // РїСЂР°РІС‹Р№ РЅРёР¶РЅРёР№ СѓРіРѕР» (РІРєР»СЋС‡РёС‚РµР»СЊРЅРѕ)
+	std::vector<int> triangleIndices; // РёРЅРґРµРєСЃС‹ С‚СЂРµСѓРіРѕР»СЊРЅРёРєРѕРІ, РїРѕРїР°РґР°СЋС‰РёС… РІ С‚Р°Р№Р»
 
 	Tile(int2 min, int2 max) : min(min), max(max)
 	{
@@ -181,16 +181,16 @@ using GeometryShader = std::function<void(const VertexOutput[3], std::vector<Ver
 
 enum class CullMode
 {
-	None,  // не отсекать грани
-	Front, // отсекать лицевые грани
-	Back   // отсекать тыльные грани (обычно используется)
+	None,  // РЅРµ РѕС‚СЃРµРєР°С‚СЊ РіСЂР°РЅРё
+	Front, // РѕС‚СЃРµРєР°С‚СЊ Р»РёС†РµРІС‹Рµ РіСЂР°РЅРё
+	Back   // РѕС‚СЃРµРєР°С‚СЊ С‚С‹Р»СЊРЅС‹Рµ РіСЂР°РЅРё (РѕР±С‹С‡РЅРѕ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ)
 };
 
 enum class FillMode
 {
-	Point,	   // только вершины
-	Wireframe, // только рёбра
-	Solid	   // закрашенные треугольники
+	Point,	   // С‚РѕР»СЊРєРѕ РІРµСЂС€РёРЅС‹
+	Wireframe, // С‚РѕР»СЊРєРѕ СЂС‘Р±СЂР°
+	Solid	   // Р·Р°РєСЂР°С€РµРЅРЅС‹Рµ С‚СЂРµСѓРіРѕР»СЊРЅРёРєРё
 };
 
 SOFTX_END
