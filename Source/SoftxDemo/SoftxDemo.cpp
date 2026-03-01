@@ -250,7 +250,7 @@ int main()
 	ctxLeft->SetIndexBuffer(ib);
 	ctxLeft->SetCullMode(CullMode::Back);
 	ctxLeft->SetFillMode(FillMode::Solid);
-	ctxLeft->SetTileRenderingState(false);
+	ctxLeft->SetTileRenderingState(true);
 	ctxLeft->SetTileSize(64);
 
 	// Настраиваем правый контекст
@@ -263,7 +263,7 @@ int main()
 	ctxRight->SetIndexBuffer(ib);
 	ctxRight->SetCullMode(CullMode::Back);
 	ctxRight->SetFillMode(FillMode::Solid);
-	ctxRight->SetTileRenderingState(false);
+	ctxRight->SetTileRenderingState(true);
 	ctxRight->SetTileSize(64);
 
 	// Переменные для анимации
