@@ -228,7 +228,7 @@ int main()
 	Device device(pp);
 	auto& immediateCtx = device.GetImmediateContext();
 
-	// Создаём общие ресурсы (вершинный и индексный буфер)
+	// Создаём общие ресурсы (вершинный и индексный буфер куба)
 	VertexBuffer vb;
 	IndexBuffer ib;
 	CreateSphere(vb, ib, 1.0f, 16, 8);
