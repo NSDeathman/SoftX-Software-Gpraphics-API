@@ -1,5 +1,7 @@
 #include "pch.h"
 
+#include <ppl.h>
+
 #include <SoftX/SoftX.h>
 #include <SoftX/ThreadPoolManager.h>
 
@@ -82,26 +84,6 @@ float4 DeviceContext::ClipToScreen(const float4& clipPos) const
     float screenZ = vp.minZ + zNDC * (vp.maxZ - vp.minZ);
 
     return float4(screenX, screenY, screenZ, 1.0f);
-}
-
-VertexOutput Interpolate(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, float a, float b, float c)
-{
-    VertexOutput result;
-
-#define LERPTRI(field) (a * v0.field + b * v1.field + c * v2.field) 
-
-    // »нтерпол€ци€ позиции
-	result.Position = LERPTRI(Position);
-
-    // »нтерпол€ци€ цвета
-    result.Color = LERPTRI(Color);
-
-    // »нтерпол€ци€ текстурных координат
-    result.UV = LERPTRI(UV);
-
-#undef LERPTRI
-
-    return result;
 }
 
 void DeviceContext::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
@@ -409,19 +391,30 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
     m_transformedVerts.clear();
     m_triangles.clear();
 
-    // “рансформируем все уникальные вершины
-    std::vector<bool> vertexProcessed(m_VertexBuffer.Size(), false);
-    for (uint32_t i = startIndex; i < startIndex + indexCount; ++i) {
-        uint32_t idx = m_IndexBuffer.GetByIndex(i);
-        if (!vertexProcessed[idx]) {
-            vertexProcessed[idx] = true;
-            VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
-            out.Position = ClipToScreen(out.Position);
-            if (m_transformedVerts.size() <= idx)
-                m_transformedVerts.resize(idx + 1);
-            m_transformedVerts[idx] = out;
-        }
-    }
+    // Ўаг 1: собираем все уникальные индексы вершин
+	std::vector<uint32_t> uniqueIndices;
+	{
+		std::vector<bool> visited(m_VertexBuffer.Size(), false);
+		for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
+		{
+			uint32_t idx = m_IndexBuffer.GetByIndex(i);
+			if (!visited[idx])
+			{
+				visited[idx] = true;
+				uniqueIndices.push_back(idx);
+			}
+		}
+	}
+
+	// Ўаг 2: заранее выдел€ем пам€ть дл€ трансформированных вершин
+	m_transformedVerts.resize(m_VertexBuffer.Size());
+
+	// Ўаг 3: параллельно обрабатываем каждую уникальную вершину
+	concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
+		VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
+		out.Position = ClipToScreen(out.Position);
+		m_transformedVerts[idx] = out;
+	});
 
     // —бор треугольников
     for (uint32_t i = startIndex; i < startIndex + indexCount; i += 3) {
