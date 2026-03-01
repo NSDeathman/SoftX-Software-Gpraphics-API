@@ -231,7 +231,7 @@ int main()
 	// Создаём общие ресурсы (вершинный и индексный буфер)
 	VertexBuffer vb;
 	IndexBuffer ib;
-	CreateSphere(vb, ib, 1.0f, 16, 8);
+	CreateSphere(vb, ib, 1.0f, 64, 32);
 
 	// Создаём две текстуры-рендертаргета (по 400x600 каждая)
 	RenderTargetTexture rtLeft(int2(400, 600));
@@ -249,7 +249,7 @@ int main()
 	ctxLeft->SetVertexBuffer(vb);
 	ctxLeft->SetIndexBuffer(ib);
 	ctxLeft->SetCullMode(CullMode::Back);
-	ctxLeft->SetFillMode(FillMode::Wireframe);
+	ctxLeft->SetFillMode(FillMode::Solid);
 	ctxLeft->SetTileRenderingState(true);
 	ctxLeft->SetTileSize(64);
 
@@ -262,7 +262,7 @@ int main()
 	ctxRight->SetVertexBuffer(vb);
 	ctxRight->SetIndexBuffer(ib);
 	ctxRight->SetCullMode(CullMode::Back);
-	ctxRight->SetFillMode(FillMode::Wireframe);
+	ctxRight->SetFillMode(FillMode::Solid);
 	ctxRight->SetTileRenderingState(true);
 	ctxRight->SetTileSize(64);
 
