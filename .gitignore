@@ -71,7 +71,5 @@ changelog.txt
 cmake-build*/
 *.pdb
 *.exp
-Sources/xrEngine/optick_capture_100_frames.opt
 
-.vs\Minecraft++\v16\.suo
-Source/SoftxDemo/enc_temp_folder/2abe862123fc2f6018a0674d1518864b/SoftxDemo.cpp
+Source/SoftxDemo/enc_temp_folder/*
