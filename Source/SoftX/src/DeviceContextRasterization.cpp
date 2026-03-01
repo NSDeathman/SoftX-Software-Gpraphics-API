@@ -392,39 +392,78 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
     m_triangles.clear();
 
     // Шаг 1: собираем все уникальные индексы вершин
-	std::vector<uint32_t> uniqueIndices;
-	{
-		std::vector<bool> visited(m_VertexBuffer.Size(), false);
-		for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
-		{
-			uint32_t idx = m_IndexBuffer.GetByIndex(i);
-			if (!visited[idx])
-			{
-				visited[idx] = true;
-				uniqueIndices.push_back(idx);
-			}
-		}
-	}
+    std::vector<uint32_t> uniqueIndices;
+    {
+        std::vector<bool> visited(m_VertexBuffer.Size(), false);
+        for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
+        {
+            uint32_t idx = m_IndexBuffer.GetByIndex(i);
+            if (!visited[idx])
+            {
+                visited[idx] = true;
+                uniqueIndices.push_back(idx);
+            }
+        }
+    }
 
-	// Шаг 2: заранее выделяем память для трансформированных вершин
-	m_transformedVerts.resize(m_VertexBuffer.Size());
+    // Шаг 2: заранее выделяем память для трансформированных вершин
+    m_transformedVerts.resize(m_VertexBuffer.Size());
 
-	// Шаг 3: параллельно обрабатываем каждую уникальную вершину
-	concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
-		VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
-		out.Position = ClipToScreen(out.Position);
-		m_transformedVerts[idx] = out;
-	});
+    // Шаг 3: параллельно обрабатываем каждую уникальную вершину
+    concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
+        VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
+        out.Position = ClipToScreen(out.Position);
+        m_transformedVerts[idx] = out;
+    });
 
-    // Сбор треугольников
+    // Шаг 4: собираем исходные треугольники (индексы в m_transformedVerts)
+    std::vector<int3> sourceTriangles;
     for (uint32_t i = startIndex; i < startIndex + indexCount; i += 3) {
         if (i + 2 >= startIndex + indexCount) break;
         uint32_t i0 = m_IndexBuffer.GetByIndex(i);
         uint32_t i1 = m_IndexBuffer.GetByIndex(i + 1);
         uint32_t i2 = m_IndexBuffer.GetByIndex(i + 2);
-        m_triangles.push_back({(int)i0, (int)i1, (int)i2});
+        sourceTriangles.push_back({(int)i0, (int)i1, (int)i2});
     }
 
+    // Шаг 5: применяем геометрический шейдер (если есть)
+    if (m_GeometryShader) {
+        std::vector<VertexOutput> finalVerts;
+        std::vector<int3> finalTriangles;
+
+        for (const auto& tri : sourceTriangles) {
+            VertexOutput inVerts[3] = {
+                m_transformedVerts[tri.x],
+                m_transformedVerts[tri.y],
+                m_transformedVerts[tri.z]
+            };
+
+            std::vector<VertexOutput> outVerts;
+            std::vector<int> outIndices;  // индексы внутри outVerts
+            m_GeometryShader(inVerts, outVerts, outIndices);
+
+            int baseIndex = (int)finalVerts.size();
+            finalVerts.insert(finalVerts.end(), outVerts.begin(), outVerts.end());
+
+            // Преобразуем плоский список индексов в тройки
+            for (size_t j = 0; j + 2 < outIndices.size(); j += 3) {
+                finalTriangles.push_back({
+                    baseIndex + outIndices[j],
+                    baseIndex + outIndices[j + 1],
+                    baseIndex + outIndices[j + 2]
+                });
+            }
+        }
+
+        // Заменяем исходные массивы
+        m_transformedVerts = std::move(finalVerts);
+        m_triangles = std::move(finalTriangles);
+    } else {
+        // Если геометрического шейдера нет, просто копируем
+        m_triangles = std::move(sourceTriangles);
+    }
+
+    // Шаг 6: растеризация (как обычно)
     if (m_fillMode == FillMode::Solid) {
         if (m_EnableTiledRendering) {
             buildTiles(width, height);

@@ -174,6 +174,7 @@ struct Tile
 
 using PixelShader = std::function<float4(const VertexOutput& Input, ConstantBuffer ConstantBuffer)>;
 using VertexShader = std::function<VertexOutput(const VertexInput&, ConstantBuffer ConstantBuffer)>;
+using GeometryShader = std::function<void(const VertexOutput[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices)>;
 
 enum class CullMode
 {

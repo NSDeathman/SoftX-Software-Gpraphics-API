@@ -33,6 +33,16 @@ VertexShader DeviceContext::GetVertexShader() const
 	return m_VertexShader;
 }
 
+void DeviceContext::SetGeometryShader(GeometryShader shader)
+{
+	m_GeometryShader = std::move(shader);
+}
+
+GeometryShader DeviceContext::GetGeometryShader() const
+{
+	return m_GeometryShader;
+}
+
 void DeviceContext::SetPixelShader(PixelShader shader)
 {
 	m_PixelShader = std::move(shader);

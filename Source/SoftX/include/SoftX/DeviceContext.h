@@ -19,6 +19,9 @@ class SOFTX_API DeviceContext
 	void SetVertexShader(VertexShader shader);
 	VertexShader GetVertexShader() const;
 
+	void SetGeometryShader(GeometryShader shader);
+	GeometryShader GetGeometryShader() const;
+
 	void SetPixelShader(PixelShader shader);
 	PixelShader GetPixelShader() const;
 
@@ -73,6 +76,7 @@ class SOFTX_API DeviceContext
 
   private:
 	VertexShader m_VertexShader;
+	GeometryShader m_GeometryShader;
 	PixelShader m_PixelShader;
 
 	VertexBuffer m_VertexBuffer;

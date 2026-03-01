@@ -41,6 +41,50 @@ VertexOutput vsTransform(const VertexInput& in, ConstantBuffer cb)
 	return out;
 }
 
+void GSSplitTriangle(const VertexOutput in[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices)
+{
+	// Вычисляем середины рёбер
+	VertexOutput mid0, mid1, mid2;
+	mid0.Position = (in[0].Position + in[1].Position) * 0.5f;
+	mid1.Position = (in[1].Position + in[2].Position) * 0.5f;
+	mid2.Position = (in[2].Position + in[0].Position) * 0.5f;
+
+	// Интерполируем атрибуты (цвет, uv)
+	mid0.Color = (in[0].Color + in[1].Color) * 0.5f;
+	mid1.Color = (in[1].Color + in[2].Color) * 0.5f;
+	mid2.Color = (in[2].Color + in[0].Color) * 0.5f;
+
+	mid0.UV = (in[0].UV + in[1].UV) * 0.5f;
+	mid1.UV = (in[1].UV + in[2].UV) * 0.5f;
+	mid2.UV = (in[2].UV + in[0].UV) * 0.5f;
+
+	// Добавляем вершины (6 новых вершин)
+	outVerts.push_back(in[0]);
+	outVerts.push_back(mid0);
+	outVerts.push_back(in[1]);
+	outVerts.push_back(mid1);
+	outVerts.push_back(in[2]);
+	outVerts.push_back(mid2);
+
+	// Индексы для 4 маленьких треугольников
+	// Треугольник 1: in0 - mid0 - mid2
+	outIndices.push_back(0);
+	outIndices.push_back(1);
+	outIndices.push_back(5);
+	// Треугольник 2: mid0 - in1 - mid1
+	outIndices.push_back(1);
+	outIndices.push_back(2);
+	outIndices.push_back(3);
+	// Треугольник 3: mid2 - mid1 - in2
+	outIndices.push_back(5);
+	outIndices.push_back(3);
+	outIndices.push_back(4);
+	// Треугольник 4: mid0 - mid1 - mid2 (центральный)
+	outIndices.push_back(1);
+	outIndices.push_back(3);
+	outIndices.push_back(5);
+}
+
 float4 psColor(const VertexOutput& in, ConstantBuffer /*cb*/)
 {
 	return in.Color;
@@ -150,7 +194,7 @@ int main()
 	ctxLeft->SetVertexBuffer(vb);
 	ctxLeft->SetIndexBuffer(ib);
 	ctxLeft->SetCullMode(CullMode::Back);
-	ctxLeft->SetFillMode(FillMode::Solid);
+	ctxLeft->SetFillMode(FillMode::Wireframe);
 	ctxLeft->SetTileRenderingState(true);
 	ctxLeft->SetTileSize(64);
 
@@ -158,11 +202,12 @@ int main()
 	ctxRight->SetRenderTarget(&rtRight, true);
 	ctxRight->SetViewport(Viewport(0, 0, 400, 600));
 	ctxRight->SetVertexShader(vsTransform);
+	ctxRight->SetGeometryShader(GSSplitTriangle);
 	ctxRight->SetPixelShader(psColor);
 	ctxRight->SetVertexBuffer(vb);
 	ctxRight->SetIndexBuffer(ib);
 	ctxRight->SetCullMode(CullMode::Back);
-	ctxRight->SetFillMode(FillMode::Solid);
+	ctxRight->SetFillMode(FillMode::Wireframe);
 	ctxRight->SetTileRenderingState(true);
 	ctxRight->SetTileSize(64);
 
