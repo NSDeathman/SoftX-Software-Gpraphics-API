@@ -199,7 +199,7 @@ int main()
 	// Ресурсы сферы
 	VertexBuffer sphereVB;
 	IndexBuffer sphereIB;
-	CreateSphere(sphereVB, sphereIB, 1.0f, 64, 32); // более детальная сфера
+	CreateSphere(sphereVB, sphereIB, 1.0f, 16, 8); // более детальная сфера
 
 	// Два рендертаргета
 	RenderTargetTexture rtLeft(int2(400, 600));
@@ -225,7 +225,7 @@ int main()
 	ctxRight->SetRenderTarget(&rtRight, true);
 	ctxRight->SetViewport(Viewport(0, 0, 400, 600));
 	ctxRight->SetVertexShader(vsTransform);
-	ctxRight->SetGeometryShader(GSSplitTriangle);
+	//ctxRight->SetGeometryShader(GSSplitTriangle);
 	ctxRight->SetPixelShader(psLight);
 	ctxRight->SetVertexBuffer(sphereVB);
 	ctxRight->SetIndexBuffer(sphereIB);
@@ -333,6 +333,8 @@ int main()
 			return psCombine(in, ConstantBuffer(), &rtLeft.texture(), &rtRight.texture());
 		};
 		immediateCtx.SetPixelShader(psCombineFunc);
+		immediateCtx.SetTileRenderingState(true);
+		immediateCtx.SetTileSize(128);
 		immediateCtx.DrawFullScreenQuad();
 
 		device.Present();

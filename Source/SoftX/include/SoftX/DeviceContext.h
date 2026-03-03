@@ -105,8 +105,8 @@ class SOFTX_API DeviceContext
     void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
     void renderTilesMultithreaded();
     void renderTilesSingleThreaded();
-    void renderTile(int tileIndex);
-    void renderTileQuad(int tileIndex);
+	void renderTile(int tileIndex);
+	void renderTileQuad(int tileIndex, float invW, float invH);
 
     // Методы растеризации
 	void DrawPoint(int x, int y, float z, const float4& color);

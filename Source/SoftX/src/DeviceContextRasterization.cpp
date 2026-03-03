@@ -538,17 +538,19 @@ void DeviceContext::DrawFullScreenQuad() {
     IRenderTarget* rt = m_RenderTarget;
     int w = rt->width();
     int h = rt->height();
+    float invW = 1.0f / (w - 1);
+    float invH = 1.0f / (h - 1);
 
     if (m_EnableTiledRendering) {
         buildTiles(w, h);
         int numTiles = (int)m_tiles.size();
         std::atomic<int> tileIndex(0);
 
-        auto worker = [this, &tileIndex, numTiles]() {
+        auto worker = [this, invW, invH, &tileIndex, numTiles]() {
             while (true) {
                 int idx = tileIndex.fetch_add(1);
                 if (idx >= numTiles) break;
-                renderTileQuad(idx);
+                renderTileQuad(idx, invW, invH);
             }
         };
 
@@ -561,9 +563,9 @@ void DeviceContext::DrawFullScreenQuad() {
     } else {
         VertexOutput input;
         for (int y = 0; y < h; ++y) {
-            float v = (float)y / (h - 1);
+            float v = y * invH;
             for (int x = 0; x < w; ++x) {
-                float u = (float)x / (w - 1);
+                float u = x * invW;
                 input.UV = float2(u, v);
                 float4 color = m_PixelShader(input, m_ConstantBuffer);
                 rt->set_pixel(int2(x, y), color);

@@ -399,13 +399,13 @@ void DeviceContext::renderTile(int tileIndex)
         {
             for (int x = tile.min.x; x <= tile.max.x; ++x)
             {
-                rt->set_pixel(int2(x, tile.min.y), float4(1, 0, 0, 1));
-                rt->set_pixel(int2(x, tile.max.y), float4(1, 0, 0, 1));
+                rt->set_pixel(int2(x, tile.min.y), float4(0, 1, 0, 1));
+                rt->set_pixel(int2(x, tile.max.y), float4(0, 1, 0, 1));
             }
             for (int y = tile.min.y; y <= tile.max.y; ++y)
             {
-                rt->set_pixel(int2(tile.min.x, y), float4(1, 0, 0, 1));
-                rt->set_pixel(int2(tile.max.x, y), float4(1, 0, 0, 1));
+                rt->set_pixel(int2(tile.min.x, y), float4(0, 1, 0, 1));
+                rt->set_pixel(int2(tile.max.x, y), float4(0, 1, 0, 1));
             }
         }
     }
@@ -418,49 +418,28 @@ void DeviceContext::renderTile(int tileIndex)
     }
 }
 
-void DeviceContext::renderTileQuad(int tileIndex)
+void DeviceContext::renderTileQuad(int tileIndex, float invW, float invH)
 {
 	const Tile& tile = m_tiles[tileIndex];
 	IRenderTarget* rt = m_RenderTarget;
 	if (!rt)
 		return;
 
-#ifdef DEBUG_TILES
-	if (!tile.triangleIndices.empty())
-	{
-		if (rt)
-		{
-			for (int x = tile.min.x; x <= tile.max.x; ++x)
-			{
-				rt->set_pixel(int2(x, tile.min.y), float4(1, 0, 0, 1));
-				rt->set_pixel(int2(x, tile.max.y), float4(1, 0, 0, 1));
-			}
-			for (int y = tile.min.y; y <= tile.max.y; ++y)
-			{
-				rt->set_pixel(int2(tile.min.x, y), float4(1, 0, 0, 1));
-				rt->set_pixel(int2(tile.max.x, y), float4(1, 0, 0, 1));
-			}
-		}
-	}
-#endif
-
-	int w = rt->width();
-	int h = rt->height();
+	int w = rt->width(); // не используется для UV, но может понадобиться для других целей
 	VertexOutput input = {};
 	auto ps = m_PixelShader;
 	auto cb = m_ConstantBuffer;
 	for (int y = tile.min.y; y <= tile.max.y; ++y)
 	{
-		float v = (float)y / (h - 1);
+		float v = y * invH;
 		for (int x = tile.min.x; x <= tile.max.x; ++x)
 		{
-			float u = (float)x / (w - 1);
+			float u = x * invW;
 			input.UV = float2(u, v);
 			float4 color = ps(input, cb);
 			rt->set_pixel(int2(x, y), color);
 		}
 	}
 }
-
 
 SOFTX_END

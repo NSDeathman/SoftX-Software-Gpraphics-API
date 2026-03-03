@@ -41,12 +41,16 @@ class SOFTX_API TextureRGBA32F
 
 	__m128 sample_raw(float2 uv) const
 	{
-		float fu = uv.x * m_width - 0.5f;
-		float fv = uv.y * m_height - 0.5f;
-		int x = static_cast<int>(std::round(fu));
-		int y = static_cast<int>(std::round(fv));
-		x = std::clamp(x, 0, m_width - 1);
-		y = std::clamp(y, 0, m_height - 1);
+		int x = (int)(uv.x * m_width);
+		int y = (int)(uv.y * m_height);
+		if (x < 0)
+			x = 0;
+		if (x >= m_width)
+			x = m_width - 1;
+		if (y < 0)
+			y = 0;
+		if (y >= m_height)
+			y = m_height - 1;
 		return m_pixels[y * m_width + x];
 	}
 
