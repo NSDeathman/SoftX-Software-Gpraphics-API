@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "ThirdPartyIncluding.h"
 #include "RenderTargetInterface.h"
 #include "Texture.h"
 #include "LibInternal.h"

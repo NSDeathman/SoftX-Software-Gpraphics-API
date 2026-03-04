@@ -4,7 +4,7 @@
 #include <vector>
 #include <functional>
 
-#include "Math.h"
+#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
 
 SOFTX_BEGIN

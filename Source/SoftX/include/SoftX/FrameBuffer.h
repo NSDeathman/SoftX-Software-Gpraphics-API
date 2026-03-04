@@ -6,7 +6,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "Math.h"
+#include "ThirdPartyIncluding.h"
 #include "RenderTargetInterface.h"
 #include "ThreadPoolManager.h"
 #include <xmmintrin.h>
@@ -25,7 +25,7 @@ public:
     // Очистка цветом float4 (компоненты в порядке RGBA)
     void clear(const float4& color) override
     {
-        __m128 col = color.v; // используем SSE-вектор
+        __m128 col = color.get_simd(); // используем SSE-вектор
         __m128* data = m_pixels.data();
         size_t count = m_pixels.size();
         size_t i = 0;
@@ -51,7 +51,7 @@ public:
         {
             __m128* data = m_pixels.data();
             int index = coords.y * m_width + coords.x;
-            _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color.v);
+			_mm_stream_ps(reinterpret_cast<float*>(&data[index]), color.get_simd());
         }
     }
 
@@ -119,48 +119,57 @@ public:
     // Вывод на GDI-контекст – преобразование в BGRA и отправка
 	void present(HDC hdc, int2 dstPos, int2 dstSize) const
 	{
+		PROFILE_SCOPE("Present to GDI")
+
 		int dstW = (dstSize.x == -1) ? m_width : dstSize.x;
 		int dstH = (dstSize.y == -1) ? m_height : dstSize.y;
 
-		alignas(16) std::vector<uint32_t> bgraPixels(m_width * m_height);
+        alignas(16) std::vector<uint32_t> bgraBuffer(m_width * m_height);
 
-		const int tileSize = 64;
-		int tilesX = (m_width + tileSize - 1) / tileSize;
-		int tilesY = (m_height + tileSize - 1) / tileSize;
-		int numTiles = tilesX * tilesY;
+        {
+			PROFILE_SCOPE("Converting tiles")
 
-		std::atomic<int> tileCounter(0);
+			const int tileSize = 64;
+			int tilesX = (m_width + tileSize - 1) / tileSize;
+			int tilesY = (m_height + tileSize - 1) / tileSize;
+			int numTiles = tilesX * tilesY;
 
-		auto worker = [this, &tileCounter, numTiles, tileSize, &bgra = bgraPixels, width = m_width,
-					   height = m_height]() {
-			while (true)
+			std::atomic<int> tileCounter(0);
+
+			auto worker = [this, &tileCounter, numTiles, tileSize, &bgra = bgraBuffer, width = m_width,
+						   height = m_height]() {
+				while (true)
+				{
+					int idx = tileCounter.fetch_add(1);
+					if (idx >= numTiles)
+						break;
+					convertTile(idx, tileSize, bgra.data(), width, height);
+				}
+			};
+
+            auto& pool = ThreadPoolManager::Get();
+			int numThreads = (int)pool.threadCount();
+			for (int i = 0; i < numThreads; ++i)
 			{
-				int idx = tileCounter.fetch_add(1);
-				if (idx >= numTiles)
-					break;
-				convertTile(idx, tileSize, bgra.data(), width, height);
+				pool.enqueue(worker);
 			}
-		};
-
-		auto& pool = ThreadPoolManager::Get();
-		int numThreads = (int)pool.threadCount();
-		for (int i = 0; i < numThreads; ++i)
-		{
-			pool.enqueue(worker);
+			pool.wait();
 		}
-		pool.wait();
 
-		// Теперь отправляем готовый буфер в GDI
-		BITMAPINFO bmi = {};
-		bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-		bmi.bmiHeader.biWidth = m_width;
-		bmi.bmiHeader.biHeight = -m_height;
-		bmi.bmiHeader.biPlanes = 1;
-		bmi.bmiHeader.biBitCount = 32;
-		bmi.bmiHeader.biCompression = BI_RGB;
-		bmi.bmiHeader.biSizeImage = 0;
+        {
+			PROFILE_SCOPE("SetDIBitsToDevice");
 
-		SetDIBitsToDevice(hdc, dstPos.x, dstPos.y, dstW, dstH, 0, 0, 0, m_height, bgraPixels.data(), &bmi, DIB_RGB_COLORS);
+			BITMAPINFO bmi = {};
+			bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+			bmi.bmiHeader.biWidth = m_width;
+			bmi.bmiHeader.biHeight = -m_height;
+			bmi.bmiHeader.biPlanes = 1;
+			bmi.bmiHeader.biBitCount = 32;
+			bmi.bmiHeader.biCompression = BI_RGB;
+			bmi.bmiHeader.biSizeImage = 0;
+
+            SetDIBitsToDevice(hdc, dstPos.x, dstPos.y, dstW, dstH, 0, 0, 0, m_height, bgraBuffer.data(), &bmi, DIB_RGB_COLORS);
+		}
 	}
 
     // Сохранение в TGA (порядок BGRA) – аналогично, но можно оставить как есть или тоже оптимизировать

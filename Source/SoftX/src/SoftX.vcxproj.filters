@@ -16,9 +16,6 @@
     <ClInclude Include="..\include\SoftX\LibInternal.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\SoftX\Math.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\SoftX\RenderTargetInterface.h">
       <Filter>Include</Filter>
     </ClInclude>
@@ -42,6 +39,75 @@
     </ClInclude>
     <ClInclude Include="..\include\SoftX\ThreadPoolManager.h">
       <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\ThirdPartyIncluding.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\AfterMath.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\AfterMathInternal.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_aabb.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_config.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_constants.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_custom_template_vector.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_fast_functions.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_float2.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_float2x2.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_float3.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_float3x3.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_float4.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_float4x4.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_functions.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_half.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_half2.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_half3.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_half4.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_quaternion.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_template_vector2.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_template_vector3.h">
+      <Filter>Third-Party\AfterMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\AfterMath\include\math_template_vector4.h">
+      <Filter>Third-Party\AfterMath</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -74,5 +140,16 @@
     <Filter Include="Src">
       <UniqueIdentifier>{a8dfff75-6c46-410d-bb2a-205c40b04f8e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Third-Party">
+      <UniqueIdentifier>{8dc97b8b-38bd-47f2-bdbd-d091e8b14a8a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Third-Party\AfterMath">
+      <UniqueIdentifier>{1439aca4-62aa-4a96-8985-88b1d14eef39}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\include\AfterMath\include\math_aabb.inl">
+      <Filter>Third-Party\AfterMath</Filter>
+    </None>
   </ItemGroup>
 </Project>

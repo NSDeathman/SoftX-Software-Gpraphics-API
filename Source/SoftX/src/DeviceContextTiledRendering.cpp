@@ -13,6 +13,8 @@ SOFTX_BEGIN
 
 void DeviceContext::buildTiles(int width, int height)
 {
+	PROFILE_SCOPE("DeviceContext::buildTiles");
+
     m_tiles.clear();
 	int tileSize = m_TileSize;
     int tilesX = (width + tileSize - 1) / tileSize;
@@ -31,6 +33,8 @@ void DeviceContext::buildTiles(int width, int height)
 
 void DeviceContext::binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles)
 {
+	PROFILE_SCOPE("DeviceContext::binTriangles");
+
     // Очищаем списки треугольников для каждого тайла
     for (auto& tile : m_tiles)
         tile.triangleIndices.clear();
@@ -85,6 +89,8 @@ void DeviceContext::binTriangles(const std::vector<VertexOutput>& verts, const s
 
 void DeviceContext::renderTilesMultithreaded()
 {
+	PROFILE_SCOPE("DeviceContext::renderTilesMultithreaded");
+
     int numTiles = (int)m_tiles.size();
     std::atomic<int> tileIndex(0);
 
@@ -108,6 +114,7 @@ void DeviceContext::renderTilesMultithreaded()
 
 void DeviceContext::renderTilesSingleThreaded()
 {
+	PROFILE_SCOPE("DeviceContext::renderTilesSingleThreaded")
     for (size_t i = 0; i < m_tiles.size(); ++i)
     {
         renderTile((int)i);
@@ -389,37 +396,17 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
 
 void DeviceContext::renderTile(int tileIndex)
 {
-    const Tile& tile = m_tiles[tileIndex];
-
-#ifdef DEBUG_TILES
-    if (!tile.triangleIndices.empty())
-    {
-        IRenderTarget* rt = m_RenderTarget;
-        if (rt)
-        {
-            for (int x = tile.min.x; x <= tile.max.x; ++x)
-            {
-                rt->set_pixel(int2(x, tile.min.y), float4(0, 1, 0, 1));
-                rt->set_pixel(int2(x, tile.max.y), float4(0, 1, 0, 1));
-            }
-            for (int y = tile.min.y; y <= tile.max.y; ++y)
-            {
-                rt->set_pixel(int2(tile.min.x, y), float4(0, 1, 0, 1));
-                rt->set_pixel(int2(tile.max.x, y), float4(0, 1, 0, 1));
-            }
-        }
-    }
-#endif
-
-    for (int triIdx : tile.triangleIndices)
-    {
-        const auto& tri = m_triangles[triIdx];
-        RasterizeTriangleTileSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z], tile.min, tile.max);
-    }
+	const Tile& tile = m_tiles[tileIndex];
+	for (int triIdx : tile.triangleIndices)
+	{
+		const auto& tri = m_triangles[triIdx];
+		RasterizeTriangleTileSSE(m_transformedVerts[tri.x], m_transformedVerts[tri.y], m_transformedVerts[tri.z], tile.min, tile.max);
+	}
 }
 
 void DeviceContext::renderTileQuad(int tileIndex, float invW, float invH)
 {
+	PROFILE_SCOPE("DeviceContext::renderTileQuad");
 	const Tile& tile = m_tiles[tileIndex];
 	IRenderTarget* rt = m_RenderTarget;
 	if (!rt)

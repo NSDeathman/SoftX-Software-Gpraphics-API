@@ -4,8 +4,8 @@
 #include <limits>
 #include <cassert>
 
+#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
-#include "Math.h"
 
 SOFTX_BEGIN
 class SOFTX_API DepthBuffer

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Math.h"
+#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
 
 SOFTX_BEGIN

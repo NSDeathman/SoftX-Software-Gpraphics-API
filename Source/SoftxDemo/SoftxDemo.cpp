@@ -1,139 +1,68 @@
-﻿#define SOFTX_STATIC
-#include <Windows.h>
-#include <SoftX/SoftX.h>
-#include <thread>
+﻿// Test program for SoftX with perspective and view matrices
+// Renders a geometry with transformation
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <memory>
 #include <vector>
-#include <string>
+
+// Include SoftX
+#include <SoftX/SoftX.h>
 
 #pragma comment(lib, "SoftX.lib")
 
 using namespace SoftX;
+using namespace AfterMath;
 
-bool g_running = true;
+// Window dimensions
+const int WINDOW_WIDTH = 1280;
+const int WINDOW_HEIGHT = 720;
 
-// Структура константного буфера (объединённая)
-struct LightCB
+#define SIMPLE_TRIANGLE 0
+#define SPHERE 1
+#define CUBE 2
+
+#define GEOMETRY_TO_RENDER SPHERE
+
+// Global window handle
+HWND g_hWnd = nullptr;
+
+Device* g_device = nullptr;
+
+// Forward declaration of window procedure
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// Constant buffer structure
+struct ConstantBufferData
 {
-	float4x4 wvp;
-	float4 lightDir;   // направление света (нормализованное)
-	float4 lightColor; // цвет света
-	float4 ambient;	   // фоновое освещение
-	float4 eyePos;	   // позиция камеры (для блеска, пока не используется)
+	float4x4 modelViewProjection; // 64 bytes
 };
 
-// Прототипы шейдеров
-VertexOutput vsTransform(const VertexInput& in, ConstantBuffer cb);
-void GSSplitTriangle(const VertexOutput in[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices);
-float4 psLight(const VertexOutput& in, ConstantBuffer cb);
-float4 psCombine(const VertexOutput& in, ConstantBuffer cb, const TextureRGBA32F* texLeft,
-				 const TextureRGBA32F* texRight);
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+// Vertex shader: transforms position by MVP matrix
+VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb)
 {
-	switch (msg)
-	{
-	case WM_DESTROY:
-		g_running = false;
-		PostQuitMessage(0);
-		return 0;
-	case WM_KEYDOWN:
-		if (wParam == VK_ESCAPE)
-			DestroyWindow(hWnd);
-		return 0;
-	}
-	return DefWindowProc(hWnd, msg, wParam, lParam);
+	// Cast constant buffer data
+	const ConstantBufferData* data = reinterpret_cast<const ConstantBufferData*>(cb.Data());
+
+	VertexOutput output;
+	// Transform position: clipPos = MVP * float4(objectPos, 1.0f)
+	float4 objectPos(input.Position.x, input.Position.y, input.Position.z, 1.0f);
+	output.Position = data->modelViewProjection * objectPos;
+
+	// Pass through attributes (they will be interpolated)
+	output.Color = input.Color;
+	output.Normal = input.Normal;
+	output.UV = input.UV;
+
+	return output;
 }
 
-// Вершинный шейдер
-VertexOutput vsTransform(const VertexInput& in, ConstantBuffer cb)
+// Simple pixel shader: interpolated vertex color
+float4 ColorPS(const VertexOutput& input, ConstantBuffer cb)
 {
-	const LightCB* data = (const LightCB*)cb.Data();
-	VertexOutput out;
-	out.Position = data->wvp * float4(in.Position.x, in.Position.y, in.Position.z, 1.0f);
-	out.Normal = in.Normal; // в мировых координатах (объект не масштабируется)
-	out.Color = in.Color;
-	out.UV = in.UV;
-	return out;
+	return input.Color; // use interpolated color
 }
 
-// Геометрический шейдер – разбивает треугольник на 4 меньших
-void GSSplitTriangle(const VertexOutput in[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices)
-{
-	VertexOutput mid0, mid1, mid2;
-#define LERP(vertex, field, i0, i1) vertex.field = (in[i0].field + in[i1].field) * 0.5f
-
-	LERP(mid0, Position, 0, 1);
-	LERP(mid1, Position, 1, 2);
-	LERP(mid2, Position, 2, 0);
-
-	LERP(mid0, Normal, 0, 1);
-	LERP(mid1, Normal, 1, 2);
-	LERP(mid2, Normal, 2, 0);
-
-	LERP(mid0, Color, 0, 1);
-	LERP(mid1, Color, 1, 2);
-	LERP(mid2, Color, 2, 0);
-
-	LERP(mid0, UV, 0, 1);
-	LERP(mid1, UV, 1, 2);
-	LERP(mid2, UV, 2, 0);
-#undef LERP
-
-	int base = (int)outVerts.size();
-	outVerts.push_back(in[0]);
-	outVerts.push_back(mid0);
-	outVerts.push_back(in[1]);
-	outVerts.push_back(mid1);
-	outVerts.push_back(in[2]);
-	outVerts.push_back(mid2);
-
-	// Треугольник 1 (in0, mid0, mid2)
-	outIndices.push_back(base + 0);
-	outIndices.push_back(base + 1);
-	outIndices.push_back(base + 5);
-	// Треугольник 2 (mid0, in1, mid1)
-	outIndices.push_back(base + 1);
-	outIndices.push_back(base + 2);
-	outIndices.push_back(base + 3);
-	// Треугольник 3 (mid2, mid1, in2)
-	outIndices.push_back(base + 5);
-	outIndices.push_back(base + 3);
-	outIndices.push_back(base + 4);
-	// Треугольник 4 (mid0, mid1, mid2)
-	outIndices.push_back(base + 1);
-	outIndices.push_back(base + 3);
-	outIndices.push_back(base + 5);
-}
-
-// Пиксельный шейдер с диффузным освещением
-float4 psLight(const VertexOutput& in, ConstantBuffer cb)
-{
-	const LightCB* light = (const LightCB*)cb.Data();
-	float3 N = normalize(in.Normal);
-	float3 L = normalize(light->lightDir.xyz());
-	float diff = std::max(0.0f, dot(N, L));
-	float3 final = (light->ambient.xyz() + diff * light->lightColor.xyz()) * in.Color.xyz();
-	return float4(final, in.Color.w);
-}
-
-// Шейдер для комбинирования двух текстур на экране
-float4 psCombine(const VertexOutput& in, ConstantBuffer cb, const TextureRGBA32F* texLeft,
-				 const TextureRGBA32F* texRight)
-{
-	float2 uv = in.UV;
-	if (uv.x < 0.5f)
-	{
-		float2 uvLeft(uv.x * 2.0f, uv.y);
-		return texLeft->sample(uvLeft);
-	}
-	else
-	{
-		float2 uvRight((uv.x - 0.5f) * 2.0f, uv.y);
-		return texRight->sample(uvRight);
-	}
-}
-
-// Создание сферы
 void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, int stacks)
 {
 	vb.Clear();
@@ -171,187 +100,236 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, i
 	}
 }
 
-int main()
+void CreateCube(VertexBuffer& vb, IndexBuffer& ib, float size = 1.0f)
 {
-	HINSTANCE hInstance = GetModuleHandle(nullptr);
-	const wchar_t CLASS_NAME[] = L"SoftXDemo";
-	WNDCLASS wc = {};
+    vb.Clear();
+    ib.Clear();
+
+    float half = size * 0.5f;
+
+    // Координаты 8 углов куба
+    float3 corners[8] = {
+        float3(-half, -half, -half), // 0
+        float3( half, -half, -half), // 1
+        float3( half,  half, -half), // 2
+        float3(-half,  half, -half), // 3
+        float3(-half, -half,  half), // 4
+        float3( half, -half,  half), // 5
+        float3( half,  half,  half), // 6
+        float3(-half,  half,  half)  // 7
+    };
+
+    // Нормали для шести граней
+    float3 normals[6] = {
+        float3( 0,  0, -1), // -Z (задняя)
+        float3( 0,  0,  1), // +Z (передняя)
+        float3( 0, -1,  0), // -Y (низ)
+        float3( 0,  1,  0), // +Y (верх)
+        float3(-1,  0,  0), // -X (левая)
+        float3( 1,  0,  0)  // +X (правая)
+    };
+
+    // Цвета для каждой грани (для визуальной идентификации)
+    float4 colors[6] = {
+        float4(1, 0, 0, 1), // красный
+        float4(0, 1, 0, 1), // зелёный
+        float4(0, 0, 1, 1), // синий
+        float4(1, 1, 0, 1), // жёлтый
+        float4(1, 0, 1, 1), // пурпурный
+        float4(0, 1, 1, 1)  // голубой
+    };
+
+    // Индексы углов для каждой грани (порядок обхода против часовой стрелки, если смотреть на грань)
+    // Для левосторонней системы координат (Z вперёд) зададим грани так:
+    int faceIndices[6][4] = {
+        {0, 1, 2, 3}, // -Z (задняя)
+        {5, 4, 7, 6}, // +Z (передняя)
+        {0, 4, 5, 1}, // -Y (низ)
+        {3, 2, 6, 7}, // +Y (верх)
+        {0, 3, 7, 4}, // -X (левая)
+        {1, 5, 6, 2}  // +X (правая)
+    };
+
+    for (int f = 0; f < 6; ++f) {
+        int* idx = faceIndices[f];
+        float3 normal = normals[f];
+        float4 color = colors[f];
+
+        // UV-координаты для четырёх вершин грани
+        float2 uv[4] = {
+            float2(0, 0),
+            float2(1, 0),
+            float2(1, 1),
+            float2(0, 1)
+        };
+
+        int start = (int)vb.Size();
+        for (int v = 0; v < 4; ++v) {
+            vb.Add({ corners[idx[v]], normal, color, uv[v] });
+        }
+
+        // Два треугольника на грань: (0,1,2) и (0,2,3)
+        ib.Add(start);
+        ib.Add(start + 1);
+        ib.Add(start + 2);
+        ib.Add(start);
+        ib.Add(start + 2);
+        ib.Add(start + 3);
+    }
+}
+
+void DrawFrame()
+{
+	DeviceContext& ctx = g_device->GetImmediateContext();
+
+	// Setup matrices (column‑vector convention)
+	float aspect = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+
+	// Projection matrix: perspective, left‑handed, zero‑to‑one depth
+	float4x4 projection = perspective(Constants::degrees_to_radians(30.0f), aspect);
+
+	// View matrix: camera at (0,0,0) looking down +Z
+	float3 eye(0.0f, 0.0f, -10.0f);
+	float3 target(0.0f, 0.0f, 1.0f);
+	float4x4 view = look_at(eye, target);
+
+	static float angle = 0.0f;
+	angle += 0.01f;
+
+	// Model matrix: identity (object already in world space)
+	float4x4 model = scaling(2.0f) * rotation_y(angle);
+
+	// Combined MVP matrix
+	float4x4 mvp = projection * view * model;
+
+	// Create constant buffer with MVP
+	ConstantBufferData cbData;
+	cbData.modelViewProjection = mvp;
+
+	ConstantBuffer cb(&cbData, sizeof(cbData));
+	ctx.SetConstantBuffer(cb);
+
+	// Clear back buffer and depth buffer
+	float4 color = float4(0.1f, 0.5f, 0.1f, 1.0f);
+	ctx.Clear(color);
+	ctx.ClearDepth(1.0f);
+
+	// Draw triangle
+	ctx.DrawIndexed();
+
+	// Present to screen
+	g_device->Present();
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	// Register window class
+	WNDCLASSEX wc = {};
+	wc.cbSize = sizeof(WNDCLASSEX);
+	wc.style = CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = WndProc;
 	wc.hInstance = hInstance;
-	wc.lpszClassName = CLASS_NAME;
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	RegisterClass(&wc);
+	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
+	wc.lpszClassName = L"SoftXTestWindow";
+	RegisterClassEx(&wc);
 
-	HWND hWnd = CreateWindowEx(0, CLASS_NAME, L"SoftX Demo", WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
-							   CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, hInstance, nullptr);
-	if (!hWnd)
+	// Create window
+	RECT rc = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	g_hWnd =
+		CreateWindowEx(0, L"SoftXTestWindow", L"SoftX Triangle Test with Matrices", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+					   CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInstance, nullptr);
+	if (!g_hWnd)
 		return -1;
-	ShowWindow(hWnd, SW_SHOW);
 
-	PresentParameters pp;
-	pp.BackBufferSize = int2(800, 600);
-	pp.hDeviceWindow = hWnd;
-	pp.Windowed = true;
+	ShowWindow(g_hWnd, nCmdShow);
+	UpdateWindow(g_hWnd);
 
-	Device device(pp);
-	auto& immediateCtx = device.GetImmediateContext();
+	// Create SoftX device
+	PresentParameters params;
+	params.BackBufferSize = int2(WINDOW_WIDTH, WINDOW_HEIGHT);
+	params.hDeviceWindow = g_hWnd;
+	params.Windowed = true;
 
-	// Ресурсы сферы
-	VertexBuffer sphereVB;
-	IndexBuffer sphereIB;
-	CreateSphere(sphereVB, sphereIB, 1.0f, 16, 8); // более детальная сфера
+	Device device(params);
+	g_device = &device;
 
-	// Два рендертаргета
-	RenderTargetTexture rtLeft(int2(400, 600));
-	RenderTargetTexture rtRight(int2(400, 600));
+	DeviceContext& ctx = g_device->GetDeviceContext();
 
-	// Создаём отложенные контексты
-	auto ctxLeft = device.CreateDeferredContext();
-	auto ctxRight = device.CreateDeferredContext();
+	// Set render target (back buffer) and depth buffer
+	ctx.SetRenderTarget(&device.GetBackBuffer(), true);
 
-	// Настраиваем левый контекст (обычная сфера)
-	ctxLeft->SetRenderTarget(&rtLeft, true);
-	ctxLeft->SetViewport(Viewport(0, 0, 400, 600));
-	ctxLeft->SetVertexShader(vsTransform);
-	ctxLeft->SetPixelShader(psLight);
-	ctxLeft->SetVertexBuffer(sphereVB);
-	ctxLeft->SetIndexBuffer(sphereIB);
-	ctxLeft->SetCullMode(CullMode::Back);
-	ctxLeft->SetFillMode(FillMode::Solid);
-	ctxLeft->SetTileRenderingState(true);
-	ctxLeft->SetTileSize(16);
+	// Set shaders
+	ctx.SetVertexShader(TransformVS);
+	ctx.SetPixelShader(ColorPS);
 
-	// Настраиваем правый контекст (с геометрическим шейдером разбиения)
-	ctxRight->SetRenderTarget(&rtRight, true);
-	ctxRight->SetViewport(Viewport(0, 0, 400, 600));
-	ctxRight->SetVertexShader(vsTransform);
-	//ctxRight->SetGeometryShader(GSSplitTriangle);
-	ctxRight->SetPixelShader(psLight);
-	ctxRight->SetVertexBuffer(sphereVB);
-	ctxRight->SetIndexBuffer(sphereIB);
-	ctxRight->SetCullMode(CullMode::Back);
-	ctxRight->SetFillMode(FillMode::Solid);
-	ctxRight->SetTileRenderingState(true);
-	ctxRight->SetTileSize(16);
+	ctx.SetFillMode(FillMode::Wireframe);
+	ctx.SetCullMode(CullMode::Back);
 
-	// Переменные анимации
-	float sphereAngle = 0.0f; // вращение сфер
-	float lightAngle = 0.0f;  // угол источника света
-	LARGE_INTEGER freq, prevTime, fpsLastTime;
-	QueryPerformanceFrequency(&freq);
-	QueryPerformanceCounter(&prevTime);
-	QueryPerformanceCounter(&fpsLastTime);
-	int frameCount = 0;
-	float fps = 0.0f;
+	ctx.SetTileRenderingState(true);
+	ctx.SetTileSize(16);
 
+	// Set viewport
+	Viewport vp(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f);
+	ctx.SetViewport(vp);
+
+	VertexBuffer vb;
+	IndexBuffer ib;
+
+#if GEOMETRY_TO_RENDER == SIMPLE_TRIANGLE
+	// Define triangle vertices in object space
+	// A triangle with different colors at each vertex
+	vb.Add(VertexInput(float3(-1.0f, -1.0f, 0.0f), float3(0, 0, 0), float4(1, 0, 0, 1)));			// red
+	vb.Add(VertexInput(float3(1.0f, -1.0f, 0.0f), float3(0, 0, 0), float4(0, 1, 0, 1)));			// green
+	vb.Add(VertexInput(float3(0.0f, 1.0f, 0.0f), float3(0, 0, 0), float4(0, 0, 1, 1)));				// blue
+
+	// Index buffer
+	ib.Add(0);
+	ib.Add(1);
+	ib.Add(2);
+
+	ctx.SetCullMode(CullMode::None);
+
+#elif GEOMETRY_TO_RENDER == SPHERE
+	CreateSphere(vb, ib, 1.0f, 64, 32);
+#elif GEOMETRY_TO_RENDER == CUBE
+	CreateCube(vb, ib);
+#endif
+
+	// Set buffers
+	ctx.SetVertexBuffer(vb);
+	ctx.SetIndexBuffer(ib);
+
+	// Main message loop
 	MSG msg = {};
-	while (g_running)
+	while (msg.message != WM_QUIT)
 	{
-		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
-
-		LARGE_INTEGER currentTime;
-		QueryPerformanceCounter(&currentTime);
-		float deltaTime = float(double(currentTime.QuadPart - prevTime.QuadPart) / freq.QuadPart);
-		prevTime = currentTime;
-
-		// Обновляем анимацию
-		sphereAngle += deltaTime * 0.5f; // пол-оборота в секунду
-		lightAngle += deltaTime * 0.8f;	 // свет вращается чуть быстрее
-
-		// Матрицы
-		float3 eye(0, 0, -50);
-		float3 target(0, 0, 0);
-		float3 up(0, 1, 0);
-		float4x4 view = lookAtLH(eye, target, up);
-		float aspect = 400.0f / 600.0f;
-		float4x4 proj = perspectiveLH(DegToRad(40.0f), aspect, 0.1f, 100.0f);
-
-		// Левая сфера (вращается)
-		float4x4 modelLeft = rotationY(sphereAngle) * rotationX(sphereAngle * 0.3f);
-		// Правая сфера (тоже вращается, но геометрически разбита)
-		float4x4 modelRight = rotationY(sphereAngle) * rotationX(sphereAngle * 0.3f);
-
-		// Источник света движется по окружности в горизонтальной плоскости на высоте 2
-		float3 lightPos(3.0f * cosf(lightAngle), 2.0f, 3.0f * sinf(lightAngle));
-		float3 lightDir = normalize(lightPos - eye); // направление от камеры? Нет, от источника к объекту, но для
-													 // диффузного нужно направление на источник.
-		// Лучше направить свет из позиции источника на центр сцены:
-		float3 lightDirToScene = normalize(target - lightPos); // направление от источника к центру (объекту)
-		// Однако для диффузного освещения нам нужно направление от поверхности к источнику, поэтому L =
-		// normalize(lightPos - fragPos). Но мы используем единое направление для всей сцены (направленный свет).
-		// Сделаем направленный свет с вращающимся направлением. Для эффектности используем направленный свет, который
-		// вращается вокруг вертикальной оси.
-		float3 lightDirGlobal = normalize(float3(cosf(lightAngle), 1.0f, sinf(lightAngle))); // пучок под углом
-
-		// Цвет света плавно меняется
-		float4 lightColor(0.8f + 0.5f * sinf(lightAngle * 2.0f), 0.8f + 0.5f * sinf(lightAngle * 2.0f + 2.0f),
-						  0.8f + 0.5f * sinf(lightAngle * 2.0f + 4.0f), 1.0f);
-
-		// Константный буфер для левой сферы
-		LightCB cbLeft;
-		cbLeft.wvp = proj * view * modelLeft;
-		cbLeft.lightDir = float4(lightDirGlobal.x, lightDirGlobal.y, lightDirGlobal.z, 0.0f);
-		cbLeft.lightColor = lightColor;
-		cbLeft.ambient = float4(0.2f, 0.2f, 0.2f, 1.0f);
-		ConstantBuffer cbLeftBuf(&cbLeft, sizeof(cbLeft));
-
-		// Константный буфер для правой сферы
-		LightCB cbRight;
-		cbRight.wvp = proj * view * modelRight;
-		cbRight.lightDir = float4(lightDirGlobal.x, lightDirGlobal.y, lightDirGlobal.z, 0.0f);
-		cbRight.lightColor = lightColor;
-		cbRight.ambient = float4(0.2f, 0.2f, 0.2f, 1.0f);
-		ConstantBuffer cbRightBuf(&cbRight, sizeof(cbRight));
-
-		// Параллельный рендеринг в два контекста
-		std::thread t1([&]() {
-			ctxLeft->SetConstantBuffer(cbLeftBuf);
-			ctxLeft->Clear(float4(0.1f, 0.1f, 0.1f, 1.0f));
-			ctxLeft->ClearDepth(1.0f);
-			ctxLeft->DrawIndexed();
-		});
-		std::thread t2([&]() {
-			ctxRight->SetConstantBuffer(cbRightBuf);
-			ctxRight->Clear(float4(0.1f, 0.1f, 0.1f, 1.0f));
-			ctxRight->ClearDepth(1.0f);
-			ctxRight->DrawIndexed();
-		});
-		t1.join();
-		t2.join();
-
-		// Вывод на экран: комбинируем левую и правую текстуры
-		immediateCtx.SetRenderTarget(&device.GetBackBuffer(), false);
-		immediateCtx.Clear(float4(0, 0, 0, 1));
-		immediateCtx.ClearDepth(1.0f);
-
-		// Лямбда-шейдер, захватывающий текстуры
-		auto psCombineFunc = [&](const VertexOutput& in, ConstantBuffer) -> float4 {
-			return psCombine(in, ConstantBuffer(), &rtLeft.texture(), &rtRight.texture());
-		};
-		immediateCtx.SetPixelShader(psCombineFunc);
-		immediateCtx.SetTileRenderingState(true);
-		immediateCtx.SetTileSize(128);
-		immediateCtx.DrawFullScreenQuad();
-
-		device.Present();
-
-		// Обновление FPS
-		frameCount++;
-		double elapsedFPS = double(currentTime.QuadPart - fpsLastTime.QuadPart) / freq.QuadPart;
-		if (elapsedFPS >= 1.0)
+		else
 		{
-			fps = frameCount / (float)elapsedFPS;
-			wchar_t title[256];
-			swprintf(title, 256, L"SoftX Demo - FPS: %.1f", fps);
-			SetWindowTextW(hWnd, title);
-			frameCount = 0;
-			fpsLastTime = currentTime;
+			DrawFrame();
 		}
 	}
 
-	return 0;
+	return (int)msg.wParam;
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	switch (msg)
+	{
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		return 0;
+	case WM_KEYDOWN:
+		if (wParam == VK_ESCAPE)
+			DestroyWindow(hWnd);
+		return 0;
+	}
+	return DefWindowProc(hWnd, msg, wParam, lParam);
 }

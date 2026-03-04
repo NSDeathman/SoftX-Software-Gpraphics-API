@@ -9,6 +9,8 @@ SOFTX_BEGIN
 
 void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 {
+	PROFILE_SCOPE("DeviceContext::DrawPoint");
+
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
 
@@ -27,6 +29,8 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 
 void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
+	PROFILE_SCOPE("DeviceContext::DrawLine");
+
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
 
@@ -65,25 +69,18 @@ float4 DeviceContext::ClipToScreen(const float4& clipPos) const
 {
 	Viewport vp = m_Viewport;
 
-    // Извлекаем компоненты с помощью SSE
-    __m128 pos = clipPos.v;
-    float w = clipPos.w;
-    float invW = 1.0f / w;
+	// Перспективное деление
+	float invW = 1.0f / clipPos.w;
+	float xNDC = clipPos.x * invW; // от -1 до 1
+	float yNDC = clipPos.y * invW; // от -1 до 1
+	float zNDC = clipPos.z * invW; // от 0 до 1 (для LH_ZO проекции)
 
-    // Вектор ndc
-    __m128 ndc = _mm_mul_ps(pos, _mm_set1_ps(invW)); // x/w, y/w, z/w, 1
+	// Преобразование в экранные координаты
+	float screenX = vp.pos.x + (xNDC * 0.5f + 0.5f) * vp.size.x;
+	float screenY = vp.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * vp.size.y; // flip Y
+	float screenZ = vp.minZ + zNDC * (vp.maxZ - vp.minZ);
 
-    // Извлекаем x,y,z
-    float xNDC = _mm_cvtss_f32(ndc);
-    float yNDC = _mm_cvtss_f32(_mm_shuffle_ps(ndc, ndc, 1));
-    float zNDC = _mm_cvtss_f32(_mm_shuffle_ps(ndc, ndc, 2));
-
-    // Скалярные вычисления
-    float screenX = vp.pos.x + (xNDC * 0.5f + 0.5f) * vp.size.x;
-    float screenY = vp.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * vp.size.y;
-    float screenZ = vp.minZ + zNDC * (vp.maxZ - vp.minZ);
-
-    return float4(screenX, screenY, screenZ, 1.0f);
+	return float4(screenX, screenY, screenZ, 1.0f);
 }
 
 VertexOutput DeviceContext::trilerp(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, float a, float b, float c)
@@ -104,6 +101,8 @@ VertexOutput DeviceContext::trilerp(const VertexOutput& v0, const VertexOutput& 
 
 void DeviceContext::RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
 {
+	PROFILE_SCOPE("DeviceContext::RasterizeTriangle");
+
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
 
@@ -182,6 +181,8 @@ void DeviceContext::RasterizeTriangle(const VertexOutput& v0, const VertexOutput
 
 void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2)
 {
+	PROFILE_SCOPE("DeviceContext::RasterizeTriangleSSE");
+
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
     int width = rt->width();
@@ -399,6 +400,8 @@ void DeviceContext::RasterizeTriangleSSE(const VertexOutput& v0, const VertexOut
 
 void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex) 
 {
+	PROFILE_SCOPE("DeviceContext::DrawIndexed");
+
     if (!m_VertexShader || !m_PixelShader || m_VertexBuffer.IsEmpty() || m_IndexBuffer.IsEmpty() || !m_RenderTarget)
         return;
 
@@ -533,6 +536,8 @@ void DeviceContext::DrawIndexed()
 }
 
 void DeviceContext::DrawFullScreenQuad() {
+	PROFILE_SCOPE("DeviceContext::DrawFullScreenQuad");
+
     if (!m_PixelShader || !m_RenderTarget) return;
 
     IRenderTarget* rt = m_RenderTarget;

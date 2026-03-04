@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <functional>
 
+#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
 #include "ThreadPool.h"
 #include "DeviceContext.h"

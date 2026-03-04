@@ -1,9 +1,7 @@
 ﻿#pragma once
 
-#define NOMINMAX
-
+#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
-#include "Math.h"
 #include "Types.h"
 #include "Framebuffer.h"
 #include "DepthBuffer.h"

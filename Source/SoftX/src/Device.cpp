@@ -55,6 +55,8 @@ PresentParameters& Device::GetPresentParams()
 
 void Device::Present()
 {
+	PROFILE_SCOPE("Device::Present");
+
     HDC hdc = GetDC(m_params.hDeviceWindow);
     if (hdc) {
         RECT clientRect;

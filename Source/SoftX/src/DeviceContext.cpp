@@ -123,6 +123,8 @@ void DeviceContext::SetRenderTarget(IRenderTarget* rt, bool createDepthBuffer)
 
 void DeviceContext::Clear(const float4& color)
 {
+	PROFILE_SCOPE("DeviceContext::Clear");
+
 	if (m_RenderTarget)
 	{
 		m_RenderTarget->clear(color);
@@ -131,6 +133,8 @@ void DeviceContext::Clear(const float4& color)
 
 void DeviceContext::ClearDepth(float depth)
 {
+	PROFILE_SCOPE("DeviceContext::ClearDepth");
+
 	if (m_DepthBuffer)
 	{
 		m_DepthBuffer->clear(depth);
