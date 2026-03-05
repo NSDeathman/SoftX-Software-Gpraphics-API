@@ -1,5 +1,6 @@
 ﻿// Test program for SoftX with perspective and view matrices
-// Renders a geometry with transformation
+// Renders a single triangle with transformation
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -14,15 +15,11 @@
 using namespace SoftX;
 using namespace AfterMath;
 
+//#include "OptickCapture.h"
+
 // Window dimensions
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
-
-#define SIMPLE_TRIANGLE 0
-#define SPHERE 1
-#define CUBE 2
-
-#define GEOMETRY_TO_RENDER SPHERE
 
 // Global window handle
 HWND g_hWnd = nullptr;
@@ -65,8 +62,9 @@ float4 ColorPS(const VertexOutput& input, ConstantBuffer cb)
 
 void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, int stacks)
 {
-	vb.Clear();
-	ib.Clear();
+	std::vector<VertexInput> vertices;
+	std::vector<uint32_t> indices;
+
 	for (int stack = 0; stack <= stacks; ++stack)
 	{
 		float phi = PI * stack / stacks;
@@ -79,9 +77,10 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, i
 			float3 norm = normalize(pos);
 			float4 color((norm.x + 1.0f) * 0.5f, (norm.y + 1.0f) * 0.5f, (norm.z + 1.0f) * 0.5f, 1.0f);
 			float2 uv((float)slice / slices, (float)stack / stacks);
-			vb.Add({pos, norm, color, uv});
+			vertices.push_back({pos, norm, color, uv});
 		}
 	}
+
 	for (int stack = 0; stack < stacks; ++stack)
 	{
 		for (int slice = 0; slice < slices; ++slice)
@@ -90,135 +89,120 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, i
 			int second = first + 1;
 			int third = first + (slices + 1);
 			int fourth = third + 1;
-			ib.Add(first);
-			ib.Add(second);
-			ib.Add(third);
-			ib.Add(second);
-			ib.Add(fourth);
-			ib.Add(third);
+			indices.push_back(first);
+			indices.push_back(second);
+			indices.push_back(third);
+			indices.push_back(second);
+			indices.push_back(fourth);
+			indices.push_back(third);
 		}
 	}
+
+	vb = VertexBuffer(std::move(vertices));
+	ib = IndexBuffer(std::move(indices));
 }
 
 void CreateCube(VertexBuffer& vb, IndexBuffer& ib, float size = 1.0f)
 {
-    vb.Clear();
-    ib.Clear();
+	std::vector<VertexInput> vertices;
+	std::vector<uint32_t> indices;
 
-    float half = size * 0.5f;
+	float half = size * 0.5f;
 
-    // Координаты 8 углов куба
-    float3 corners[8] = {
-        float3(-half, -half, -half), // 0
-        float3( half, -half, -half), // 1
-        float3( half,  half, -half), // 2
-        float3(-half,  half, -half), // 3
-        float3(-half, -half,  half), // 4
-        float3( half, -half,  half), // 5
-        float3( half,  half,  half), // 6
-        float3(-half,  half,  half)  // 7
-    };
+	float3 corners[8] = {float3(-half, -half, -half), float3(half, -half, -half), float3(half, half, -half),
+						 float3(-half, half, -half),  float3(-half, -half, half), float3(half, -half, half),
+						 float3(half, half, half),	  float3(-half, half, half)};
 
-    // Нормали для шести граней
-    float3 normals[6] = {
-        float3( 0,  0, -1), // -Z (задняя)
-        float3( 0,  0,  1), // +Z (передняя)
-        float3( 0, -1,  0), // -Y (низ)
-        float3( 0,  1,  0), // +Y (верх)
-        float3(-1,  0,  0), // -X (левая)
-        float3( 1,  0,  0)  // +X (правая)
-    };
+	float3 normals[6] = {float3(0, 0, -1), float3(0, 0, 1),	 float3(0, -1, 0),
+						 float3(0, 1, 0),  float3(-1, 0, 0), float3(1, 0, 0)};
 
-    // Цвета для каждой грани (для визуальной идентификации)
-    float4 colors[6] = {
-        float4(1, 0, 0, 1), // красный
-        float4(0, 1, 0, 1), // зелёный
-        float4(0, 0, 1, 1), // синий
-        float4(1, 1, 0, 1), // жёлтый
-        float4(1, 0, 1, 1), // пурпурный
-        float4(0, 1, 1, 1)  // голубой
-    };
+	float4 colors[6] = {float4(1, 0, 0, 1), float4(0, 1, 0, 1), float4(0, 0, 1, 1),
+						float4(1, 1, 0, 1), float4(1, 0, 1, 1), float4(0, 1, 1, 1)};
 
-    // Индексы углов для каждой грани (порядок обхода против часовой стрелки, если смотреть на грань)
-    // Для левосторонней системы координат (Z вперёд) зададим грани так:
-    int faceIndices[6][4] = {
-        {0, 1, 2, 3}, // -Z (задняя)
-        {5, 4, 7, 6}, // +Z (передняя)
-        {0, 4, 5, 1}, // -Y (низ)
-        {3, 2, 6, 7}, // +Y (верх)
-        {0, 3, 7, 4}, // -X (левая)
-        {1, 5, 6, 2}  // +X (правая)
-    };
+	int faceIndices[6][4] = {{0, 1, 2, 3}, {5, 4, 7, 6}, {0, 4, 5, 1}, {3, 2, 6, 7}, {0, 3, 7, 4}, {1, 5, 6, 2}};
 
-    for (int f = 0; f < 6; ++f) {
-        int* idx = faceIndices[f];
-        float3 normal = normals[f];
-        float4 color = colors[f];
+	for (int f = 0; f < 6; ++f)
+	{
+		int* idx = faceIndices[f];
+		float3 normal = normals[f];
+		float4 color = colors[f];
 
-        // UV-координаты для четырёх вершин грани
-        float2 uv[4] = {
-            float2(0, 0),
-            float2(1, 0),
-            float2(1, 1),
-            float2(0, 1)
-        };
+		float2 uv[4] = {float2(0, 0), float2(1, 0), float2(1, 1), float2(0, 1)};
 
-        int start = (int)vb.Size();
-        for (int v = 0; v < 4; ++v) {
-            vb.Add({ corners[idx[v]], normal, color, uv[v] });
-        }
+		int start = (int)vertices.size();
+		for (int v = 0; v < 4; ++v)
+		{
+			vertices.push_back({corners[idx[v]], normal, color, uv[v]});
+		}
 
-        // Два треугольника на грань: (0,1,2) и (0,2,3)
-        ib.Add(start);
-        ib.Add(start + 1);
-        ib.Add(start + 2);
-        ib.Add(start);
-        ib.Add(start + 2);
-        ib.Add(start + 3);
-    }
+		indices.push_back(start);
+		indices.push_back(start + 1);
+		indices.push_back(start + 2);
+		indices.push_back(start);
+		indices.push_back(start + 2);
+		indices.push_back(start + 3);
+	}
+
+	vb = VertexBuffer(std::move(vertices));
+	ib = IndexBuffer(std::move(indices));
 }
 
 void DrawFrame()
 {
+	PROFILE_SCOPE("DrawFrame");
+
 	DeviceContext& ctx = g_device->GetImmediateContext();
 
-	// Setup matrices (column‑vector convention)
-	float aspect = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+	{
+		PROFILE_SCOPE("Setup matrices");
+		// Setup matrices (column‑vector convention)
+		float aspect = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
 
-	// Projection matrix: perspective, left‑handed, zero‑to‑one depth
-	float4x4 projection = perspective(Constants::degrees_to_radians(30.0f), aspect);
+		// Projection matrix: perspective, left‑handed, zero‑to‑one depth
+		float4x4 projection = perspective(Constants::degrees_to_radians(30.0f), aspect);
 
-	// View matrix: camera at (0,0,0) looking down +Z
-	float3 eye(0.0f, 0.0f, -10.0f);
-	float3 target(0.0f, 0.0f, 1.0f);
-	float4x4 view = look_at(eye, target);
+		// View matrix: camera at (0,0,0) looking down +Z
+		float3 eye(0.0f, 0.0f, -10.0f);
+		float3 target(0.0f, 0.0f, 1.0f);
+		float4x4 view = look_at(eye, target);
 
-	static float angle = 0.0f;
-	angle += 0.01f;
+		static float angle = 0.0f;
+		angle += 0.01f;
 
-	// Model matrix: identity (object already in world space)
-	float3x3 model = float3x3::scaling(2.0f) * float3x3::rotation_y(angle);
+		// Model matrix: identity (object already in world space)
+		float4x4 model = rotation_y(angle) * scaling(2.0f);
 
-	// Combined MVP matrix
-	float4x4 mvp = model * view * projection;
+		// Combined MVP matrix
+		float4x4 mvp = model * view * projection;
 
-	// Create constant buffer with MVP
-	ConstantBufferData cbData;
-	cbData.modelViewProjection = mvp;
+		// Create constant buffer with MVP
+		ConstantBufferData cbData;
+		cbData.modelViewProjection = mvp;
 
-	ConstantBuffer cb(&cbData, sizeof(cbData));
-	ctx.SetConstantBuffer(cb);
+		ConstantBuffer cb(&cbData, sizeof(cbData));
+		ctx.SetConstantBuffer(cb);
+	}
 
 	// Clear back buffer and depth buffer
-	float4 color = float4(0.1f, 0.5f, 0.1f, 1.0f);
-	ctx.Clear(color);
-	ctx.ClearDepth(1.0f);
+	{
+		PROFILE_SCOPE("Clearing backbuffer and depth");
 
-	// Draw triangle
-	ctx.DrawIndexed();
+		float4 color = float4(0.000f, 0.250f, 0.000f, 1.0f);
+		ctx.Clear(color);
+		ctx.ClearDepth(1.0f);
+	}
+
+	// Draw triangles
+	{
+		PROFILE_SCOPE("Draw");
+		ctx.DrawIndexed();
+	}
 
 	// Present to screen
-	g_device->Present();
+	{
+		PROFILE_SCOPE("Present");
+		g_device->Present();
+	}
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -260,6 +244,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	// Set render target (back buffer) and depth buffer
 	ctx.SetRenderTarget(&device.GetBackBuffer(), true);
 
+	// Set viewport
+	Viewport vp(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f);
+	ctx.SetViewport(vp);
+
+	VertexBuffer vb;
+	IndexBuffer ib;
+	CreateSphere(vb, ib, 1.0f, 64, 32);
+
+	// Set buffers
+	ctx.SetVertexBuffer(vb);
+	ctx.SetIndexBuffer(ib);
+
 	// Set shaders
 	ctx.SetVertexShader(TransformVS);
 	ctx.SetPixelShader(ColorPS);
@@ -270,36 +266,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ctx.SetTileRenderingState(true);
 	ctx.SetTileSize(16);
 
-	// Set viewport
-	Viewport vp(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f);
-	ctx.SetViewport(vp);
-
-	VertexBuffer vb;
-	IndexBuffer ib;
-
-#if GEOMETRY_TO_RENDER == SIMPLE_TRIANGLE
-	// Define triangle vertices in object space
-	// A triangle with different colors at each vertex
-	vb.Add(VertexInput(float3(-1.0f, -1.0f, 0.0f), float3(0, 0, 0), float4(1, 0, 0, 1)));			// red
-	vb.Add(VertexInput(float3(1.0f, -1.0f, 0.0f), float3(0, 0, 0), float4(0, 1, 0, 1)));			// green
-	vb.Add(VertexInput(float3(0.0f, 1.0f, 0.0f), float3(0, 0, 0), float4(0, 0, 1, 1)));				// blue
-
-	// Index buffer
-	ib.Add(0);
-	ib.Add(1);
-	ib.Add(2);
-
-	ctx.SetCullMode(CullMode::None);
-
-#elif GEOMETRY_TO_RENDER == SPHERE
-	CreateSphere(vb, ib, 1.0f, 64, 32);
-#elif GEOMETRY_TO_RENDER == CUBE
-	CreateCube(vb, ib);
-#endif
-
-	// Set buffers
-	ctx.SetVertexBuffer(vb);
-	ctx.SetIndexBuffer(ib);
+	//OptickCapture::Get().Initialize();
 
 	// Main message loop
 	MSG msg = {};
@@ -312,6 +279,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		}
 		else
 		{
+			PROFILE_FRAME("SoftX");
+			//OptickCapture::Get().OnFrame();
 			DrawFrame();
 		}
 	}
@@ -329,6 +298,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE)
 			DestroyWindow(hWnd);
+		//if (wParam == 'P') // захватить 100 кадров
+			//OptickCapture::Get().StartCapturing(100);
+		//if (wParam == 'O') // переключатель
+			//OptickCapture::Get().SwitchProfiler();
 		return 0;
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);

@@ -48,101 +48,108 @@ struct VertexOutput
 
 class VertexBuffer
 {
-private:
-	std::vector<VertexInput> m_data = {};
+  public:
+	using VertexData = std::vector<VertexInput>;
 
-public:
-	VertexBuffer()
+	VertexBuffer() = default;
+	explicit VertexBuffer(std::shared_ptr<const VertexData> data) : m_data(std::move(data))
 	{
-		m_data = {};
 	}
-	VertexBuffer(const std::vector<VertexInput>& data)
+	explicit VertexBuffer(const VertexData& data) : m_data(std::make_shared<const VertexData>(data))
 	{
-		m_data = data;
 	}
-	size_t Size()
+	VertexBuffer(std::initializer_list<VertexInput> list) : m_data(std::make_shared<const VertexData>(list))
 	{
-		return m_data.size();
 	}
-	void Add(const VertexInput& Vertex)
+
+	size_t Size() const
 	{
-		m_data.push_back(Vertex);
-	}
-	void Clear()
-	{
-		m_data.clear();
+		return m_data ? m_data->size() : 0;
 	}
 	bool IsEmpty() const
 	{
-		return m_data.empty();
+		return !m_data || m_data->empty();
 	}
-	VertexInput GetByIndex(uint32_t index)
+
+	const VertexInput& GetByIndex(uint32_t index) const
 	{
-		return m_data[index];
+		assert(m_data && index < m_data->size());
+		return (*m_data)[index];
 	}
+
+	const VertexData* operator->() const
+	{
+		return m_data.get();
+	}
+	const VertexData& operator*() const
+	{
+		return *m_data;
+	}
+
+  private:
+	std::shared_ptr<const VertexData> m_data;
 };
 
 class IndexBuffer
 {
-private:
-	std::vector<uint32_t> m_data = {};
+  public:
+	using IndexData = std::vector<uint32_t>;
 
-public:
-	IndexBuffer()
+	IndexBuffer() = default;
+	explicit IndexBuffer(std::shared_ptr<const IndexData> data) : m_data(std::move(data))
 	{
-		m_data = {};
 	}
-	IndexBuffer(const std::vector<uint32_t>& data)
+	explicit IndexBuffer(const IndexData& data) : m_data(std::make_shared<const IndexData>(data))
 	{
-		m_data = data;
 	}
-	size_t Size()
+	IndexBuffer(std::initializer_list<uint32_t> list) : m_data(std::make_shared<const IndexData>(list))
 	{
-		return m_data.size();
 	}
-	void Add(const uint32_t& Index)
+
+	size_t Size() const
 	{
-		m_data.push_back(Index);
-	}
-	void Clear()
-	{
-		m_data.clear();
+		return m_data ? m_data->size() : 0;
 	}
 	bool IsEmpty() const
 	{
-		return m_data.empty();
+		return !m_data || m_data->empty();
 	}
-	uint32_t GetByIndex(uint32_t index)
+
+	uint32_t GetByIndex(uint32_t index) const
 	{
-		return m_data[index];
+		assert(m_data && index < m_data->size());
+		return (*m_data)[index];
 	}
+
+  private:
+	std::shared_ptr<const IndexData> m_data;
 };
 
 class ConstantBuffer
 {
-private:
-	const void* m_data;
-	size_t m_size;
+  public:
+	using CBufferData = std::vector<char>;
 
-public:
-	ConstantBuffer()
+	ConstantBuffer() = default;
+	explicit ConstantBuffer(std::shared_ptr<const CBufferData> data) : m_data(std::move(data))
 	{
-		m_data = {};
-		m_size = 0;
 	}
 	ConstantBuffer(const void* data, size_t size)
+		: m_data(std::make_shared<const CBufferData>(static_cast<const char*>(data), static_cast<const char*>(data) + size))
 	{
-		m_data = data;
-		m_size = size;
 	}
-	size_t Size()
+
+	size_t Size() const
 	{
-		return m_size;
+		return m_data ? m_data->size() : 0;
 	}
-	const void* Data()
+	const void* Data() const
 	{
-		return m_data;
+		return m_data ? m_data->data() : nullptr;
 	}
+
+  private:
+	std::shared_ptr<const CBufferData> m_data;
 };
 
 struct Viewport
