@@ -47,7 +47,7 @@ VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb)
 	VertexOutput output;
 	// Transform position: clipPos = MVP * float4(objectPos, 1.0f)
 	float4 objectPos(input.Position.x, input.Position.y, input.Position.z, 1.0f);
-	output.Position = data->modelViewProjection * objectPos;
+	output.Position = objectPos * data->modelViewProjection;
 
 	// Pass through attributes (they will be interpolated)
 	output.Color = input.Color;
@@ -200,7 +200,7 @@ void DrawFrame()
 	float4x4 model = scaling(2.0f) * rotation_y(angle);
 
 	// Combined MVP matrix
-	float4x4 mvp = projection * view * model;
+	float4x4 mvp = model * view * projection;
 
 	// Create constant buffer with MVP
 	ConstantBufferData cbData;
@@ -264,7 +264,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ctx.SetVertexShader(TransformVS);
 	ctx.SetPixelShader(ColorPS);
 
-	ctx.SetFillMode(FillMode::Wireframe);
+	ctx.SetFillMode(FillMode::Solid);
 	ctx.SetCullMode(CullMode::Back);
 
 	ctx.SetTileRenderingState(true);
