@@ -795,6 +795,45 @@ inline bool operator!=(const float4x4& a, const float4x4& b) noexcept {
 }
 
 // ============================================================================
+
+inline float4x4 operator*(const float3x3& a, const float4x4& b) noexcept {
+    float4x4 result;
+
+    for (int i = 0; i < 3; ++i) {
+        float4 row;
+        for (int j = 0; j < 4; ++j) {
+            float sum = 0.0f;
+            for (int k = 0; k < 3; ++k) {
+                sum += a[i][k] * b[k][j];
+            }
+            row[j] = sum;
+        }
+        result[i] = row;
+    }
+
+    result[3] = b[3];
+
+    return result;
+}
+
+inline float4x4 operator*(const float4x4& a, const float3x3& b) noexcept {
+    float4x4 result;
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            float sum = 0.0f;
+            for (int k = 0; k < 3; ++k) {
+                sum += a[i][k] * b[k][j];
+            }
+            result[i][j] = sum;
+        }
+        result[i][3] = a[i][3];
+    }
+
+    return result;
+}
+
+// ============================================================================
 // Useful Constants
 // ============================================================================
 

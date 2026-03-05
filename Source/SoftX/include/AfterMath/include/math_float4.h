@@ -230,8 +230,6 @@ public:
     float4 zxzw() const noexcept { return float4(z, x, z, w); }
     float4 zyzw() const noexcept { return float4(z, y, z, w); }
 
-    float3 xyz() const noexcept { return float3(y, x, z); }
-
     // Color swizzles (as float4)
     float r() const noexcept { return x; }
     float g() const noexcept { return y; }

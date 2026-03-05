@@ -17,20 +17,6 @@
 
 AFTERMATH_BEGIN
 
-/**
-    * @namespace AfterMathFunctions
-    * @brief Advanced floating-point comparison and mathematical utility functions
-    *
-    * Provides robust floating-point comparison functions using various algorithms:
-    * - Absolute epsilon comparison
-    * - Relative epsilon comparison
-    * - Combined absolute/relative comparison
-    * - ULPs (Units in Last Place) comparison
-    * - Specialized comparisons for angles, colors, etc.
-    */
-namespace AfterMathFunctions 
-{
-
     // ============================================================================
     // Basic Comparison Algorithms
     // ============================================================================
@@ -357,19 +343,5 @@ namespace AfterMathFunctions
         while (angle < -Constants::PI) angle += Constants::TWO_PI;
         return angle;
     }
-
-} // namespace AfterMathFunctions
-
-// ============================================================================
-// Global Using Declarations for Convenience
-// ============================================================================
-
-// Bring commonly used functions into Math namespace
-using AfterMathFunctions::approximately;
-using AfterMathFunctions::approximately_zero;
-using AfterMathFunctions::approximately_angle;
-using AfterMathFunctions::is_finite;
-using AfterMathFunctions::clamp;
-using AfterMathFunctions::lerp;
 
 AFTERMATH_END

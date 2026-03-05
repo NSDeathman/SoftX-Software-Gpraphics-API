@@ -197,7 +197,7 @@ void DrawFrame()
 	angle += 0.01f;
 
 	// Model matrix: identity (object already in world space)
-	float4x4 model = scaling(2.0f) * rotation_y(angle);
+	float3x3 model = float3x3::scaling(2.0f) * float3x3::rotation_y(angle);
 
 	// Combined MVP matrix
 	float4x4 mvp = model * view * projection;

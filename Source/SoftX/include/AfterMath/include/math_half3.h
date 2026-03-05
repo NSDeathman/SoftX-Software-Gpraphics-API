@@ -432,7 +432,7 @@ inline bool approximately_zero(const half3& vec, float epsilon = Constants::Cons
 inline bool is_normalized(const half3& vec, float epsilon = Constants::Constants<float>::Epsilon) noexcept {
     half len_sq = length_sq(vec);
     float adjusted_epsilon = std::max(epsilon, 0.01f);
-    return AfterMathFunctions::approximately(float(len_sq), 1.0f, adjusted_epsilon);
+    return approximately(float(len_sq), 1.0f, adjusted_epsilon);
 }
 
 // ============================================================================

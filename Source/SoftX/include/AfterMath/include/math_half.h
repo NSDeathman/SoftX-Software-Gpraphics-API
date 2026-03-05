@@ -403,12 +403,12 @@ inline half ldexp(half x, int exponent) noexcept { return half(std::ldexp(float(
 
 inline bool approximately(half a, half b, float epsilon = Constants::Constants<float>::Epsilon) noexcept {
     float adjusted_epsilon = std::max(epsilon, 1e-3f);
-    return AfterMathFunctions::approximately(float(a), float(b), adjusted_epsilon);
+    return approximately(float(a), float(b), adjusted_epsilon);
 }
 
 inline bool approximately_zero(half x, float epsilon = Constants::Constants<float>::Epsilon) noexcept {
     float adjusted_epsilon = std::max(epsilon, 1e-3f);
-    return AfterMathFunctions::approximately_zero(float(x), adjusted_epsilon);
+    return approximately_zero(float(x), adjusted_epsilon);
 }
 
 // ============================================================================

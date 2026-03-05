@@ -64,12 +64,12 @@ using AfterMath::Constants::INFINITY;
 using AfterMath::Constants::NAN;
 
 // Math Functions
-using AfterMath::AfterMathFunctions::approximately;
-using AfterMath::AfterMathFunctions::approximately_zero;
-using AfterMath::AfterMathFunctions::approximately_angle;
-using AfterMath::AfterMathFunctions::is_finite;
-using AfterMath::AfterMathFunctions::clamp;
-using AfterMath::AfterMathFunctions::lerp;
+using AfterMath::approximately;
+using AfterMath::approximately_zero;
+using AfterMath::approximately_angle;
+using AfterMath::is_finite;
+using AfterMath::clamp;
+using AfterMath::lerp;
 
 // Fast Math Functions
 using AfterMath::FastMath::fast_sin;
