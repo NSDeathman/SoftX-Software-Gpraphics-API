@@ -113,7 +113,7 @@ public:
 
 	void present(HDC hdc, int2 dstPos, int2 dstSize) const
 	{
-		PROFILE_SCOPE("Present to GDI")
+		PROFILE_SCOPE("Present framebuffer")
 
 		int dstW = (dstSize.x == -1) ? m_width : dstSize.x;
 		int dstH = (dstSize.y == -1) ? m_height : dstSize.y;
@@ -130,8 +130,7 @@ public:
 
 			std::atomic<int> tileCounter(0);
 
-			auto worker = [this, &tileCounter, numTiles, tileSize, &bgra = bgraBuffer, width = m_width,
-						   height = m_height]() {
+			auto worker = [this, &tileCounter, numTiles, tileSize, &bgra = bgraBuffer, width = m_width, height = m_height]() {
 				while (true)
 				{
 					int idx = tileCounter.fetch_add(1);

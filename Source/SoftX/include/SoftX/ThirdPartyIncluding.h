@@ -4,6 +4,8 @@
 #include "../AfterMath/include/AfterMath.h"
 using namespace AfterMath;
 
+#define ENABLE_PROFILER
+
 // Your custom profiler
 #ifdef ENABLE_PROFILER
 #include "../../../Optick/Include/optick.h"

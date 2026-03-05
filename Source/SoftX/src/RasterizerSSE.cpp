@@ -245,13 +245,11 @@ void RasterizerSSE::RasterizeTriangleTile(
     int width = renderTarget.width();
     int height = renderTarget.height();
 
-    // Полный bounding box
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    // Ограничиваем тайлом и экраном
     int iMinX = std::max(tileMin.x, (int)std::floor(minX));
     int iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
     int iMinY = std::max(tileMin.y, (int)std::floor(minY));
@@ -265,7 +263,7 @@ void RasterizerSSE::RasterizeTriangleTile(
     if (cull == CullMode::Front && area2 > 0) return;
     if (std::abs(area2) < 1e-6f) return;
 
-    auto psLocal = ps; // захватим копию, если нужно
+    auto psLocal = ps;
     auto cbLocal = cb;
 
     float4 dx01 = v1.Position - v0.Position;
@@ -296,6 +294,16 @@ void RasterizerSSE::RasterizeTriangleTile(
     __m128 v2cb = _mm_set1_ps(v2.Color.z);
     __m128 v2ca = _mm_set1_ps(v2.Color.w);
 
+    __m128 v0nx = _mm_set1_ps(v0.Normal.x);
+	__m128 v0ny = _mm_set1_ps(v0.Normal.y);
+	__m128 v1nx = _mm_set1_ps(v1.Normal.x);
+	__m128 v1ny = _mm_set1_ps(v1.Normal.y);
+	__m128 v2nx = _mm_set1_ps(v2.Normal.x);
+	__m128 v2ny = _mm_set1_ps(v2.Normal.y);
+	__m128 v0nz = _mm_set1_ps(v0.Normal.z);
+	__m128 v1nz = _mm_set1_ps(v1.Normal.z);
+	__m128 v2nz = _mm_set1_ps(v2.Normal.z);
+
     __m128 v0u = _mm_set1_ps(v0.UV.x);
     __m128 v0v = _mm_set1_ps(v0.UV.y);
     __m128 v1u = _mm_set1_ps(v1.UV.x);
@@ -318,13 +326,16 @@ void RasterizerSSE::RasterizeTriangleTile(
         int x;
         for (x = iMinX; x <= iMaxX - 3; x += 4)
         {
-            // Проверка, пересекается ли блок с тайлом
+            // Проверка пересечения блока с тайлом (уже учтено в iMinX/iMaxX, но может быть частичное перекрытие? 
+            // На самом деле iMinX и iMaxX уже ограничены тайлом, поэтому блок всегда внутри тайла по x.
+            // Однако блок может частично выходить за границы тайла по x, если iMinX не кратен 4? 
+            // Но мы уже ограничили iMinX и iMaxX, поэтому блок полностью внутри тайла, если x и x+3 в пределах.
+            // Для надёжности оставим проверку:
             if (x > tileMax.x || x + 3 < tileMin.x)
                 continue;
 
             __m128 baseX = _mm_set_ps(x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
 
-            // Edge-функции для 4 пикселей
             __m128 f01 = _mm_sub_ps(
                 _mm_mul_ps(_mm_sub_ps(baseX, v0x), dy01v),
                 _mm_mul_ps(_mm_sub_ps(baseY, v0y), dx01v));
@@ -335,7 +346,6 @@ void RasterizerSSE::RasterizeTriangleTile(
                 _mm_mul_ps(_mm_sub_ps(baseX, v2x), dy20v),
                 _mm_mul_ps(_mm_sub_ps(baseY, v2y), dx20v));
 
-            // Маска принадлежности треугольнику
             __m128 zero = _mm_setzero_ps();
             __m128 inside;
             if (area2 > 0)
@@ -351,7 +361,6 @@ void RasterizerSSE::RasterizeTriangleTile(
             int insideMask = _mm_movemask_ps(inside);
             if (insideMask == 0) continue;
 
-            // Барицентрические координаты
             __m128 alpha = _mm_mul_ps(f12, invArea);
             __m128 beta  = _mm_mul_ps(f20, invArea);
             __m128 gamma = _mm_mul_ps(f01, invArea);
@@ -365,7 +374,11 @@ void RasterizerSSE::RasterizeTriangleTile(
             __m128 u = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0u), _mm_mul_ps(beta, v1u)), _mm_mul_ps(gamma, v2u));
             __m128 v = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0v), _mm_mul_ps(beta, v1v)), _mm_mul_ps(gamma, v2v));
 
-            // Загрузка текущей глубины
+            // Нормали (пропустим для краткости, но добавим)
+            __m128 nx = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0nx), _mm_mul_ps(beta, v1nx)), _mm_mul_ps(gamma, v2nx));
+            __m128 ny = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0ny), _mm_mul_ps(beta, v1ny)), _mm_mul_ps(gamma, v2ny));
+            __m128 nz = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0nz), _mm_mul_ps(beta, v1nz)), _mm_mul_ps(gamma, v2nz));
+
             int idx0 = y * width + x;
             __m128 depths = _mm_loadu_ps(&depthBuffer.at(idx0));
 
@@ -373,17 +386,19 @@ void RasterizerSSE::RasterizeTriangleTile(
             int depthMask = _mm_movemask_ps(depthCmp) & insideMask;
             if (depthMask == 0) continue;
 
-            // Сохраняем барицентрические координаты для каждого пикселя
-            float alphaArr[4], betaArr[4], gammaArr[4];
-            _mm_storeu_ps(alphaArr, alpha);
-            _mm_storeu_ps(betaArr, beta);
-            _mm_storeu_ps(gammaArr, gamma);
-
-            // Также можно сохранить интерполированные атрибуты для каждого пикселя,
-            // но мы будем использовать trilerp с барицентрическими координатами,
-            // чтобы избежать дублирования кода. Это немного медленнее, но проще.
-            // Альтернатива: сохранить все атрибуты и передать в шейдер без вызова trilerp.
-            // Для простоты оставим как в оригинале: вызываем trilerp для каждого пикселя.
+            // Сохраняем интерполированные значения в массивы
+            float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4], uArr[4], vArr[4];
+            float nxArr[4], nyArr[4], nzArr[4];
+            _mm_storeu_ps(zArr, z);
+            _mm_storeu_ps(rArr, r);
+            _mm_storeu_ps(gArr, g);
+            _mm_storeu_ps(bArr, b);
+            _mm_storeu_ps(aArr, a);
+            _mm_storeu_ps(uArr, u);
+            _mm_storeu_ps(vArr, v);
+            _mm_storeu_ps(nxArr, nx);
+            _mm_storeu_ps(nyArr, ny);
+            _mm_storeu_ps(nzArr, nz);
 
             for (int i = 0; i < 4; ++i)
             {
@@ -397,10 +412,13 @@ void RasterizerSSE::RasterizeTriangleTile(
                     int py = y;
                     int idx = py * width + px;
 
-                    // Интерполяция через trilerp
-					VertexOutput frag = RasterizerCommon::trilerp(v0, v1, v2, alphaArr[i], betaArr[i], gammaArr[i]);
-                    frag.Position = float4((float)px, (float)py, frag.Position.z, 1.0f);
-                    depthBuffer.at(idx) = frag.Position.z;
+                    depthBuffer.at(idx) = zArr[i];
+
+                    VertexOutput frag;
+                    frag.Position = float4((float)px, (float)py, zArr[i], 1.0f);
+                    frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
+                    frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
+                    frag.UV = float2(uArr[i], vArr[i]);
 
                     float4 finalColor = ps(frag, cb);
                     renderTarget.set_pixel(int2(px, py), finalColor);
@@ -408,16 +426,16 @@ void RasterizerSSE::RasterizeTriangleTile(
             }
         }
 
-        // Скалярный доводчик для оставшихся пикселей в строке
+        // Скалярный доводчик для оставшихся пикселей
         for (; x <= iMaxX; ++x)
         {
             if (x < tileMin.x || x > tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);
-			float f0 = RasterizerCommon::edgeFunction(v1.Position, v2.Position, p);
-			float f1 = RasterizerCommon::edgeFunction(v2.Position, v0.Position, p);
-			float f2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, p);
+            float f0 = RasterizerCommon::edgeFunction(v1.Position, v2.Position, p);
+            float f1 = RasterizerCommon::edgeFunction(v2.Position, v0.Position, p);
+            float f2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, p);
 
             if (f0 * area2 < 0 || f1 * area2 < 0 || f2 * area2 < 0)
                 continue;

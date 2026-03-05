@@ -237,8 +237,8 @@
     <ClCompile Include="CPUDetector.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="DeviceContext.cpp" />
-    <ClCompile Include="DeviceContextRasterization.cpp" />
-    <ClCompile Include="DeviceContextTiledRendering.cpp" />
+    <ClCompile Include="DeviceContextDraw.cpp" />
+    <ClCompile Include="DeviceContextDrawTiled.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

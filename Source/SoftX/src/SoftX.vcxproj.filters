@@ -1,43 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClInclude Include="..\include\SoftX\DepthBuffer.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\SoftX\Device.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\FrameBuffer.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\LibInternal.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RenderTargetInterface.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RenderTargetTexture.h">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\include\SoftX\SoftX.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\SoftX\Texture.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\Types.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\ThreadPool.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\SoftX\DeviceContext.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\ThreadPoolManager.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\ThirdPartyIncluding.h">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\include\AfterMath\include\AfterMath.h">
@@ -106,39 +76,69 @@
     <ClInclude Include="..\include\AfterMath\include\math_template_vector4.h">
       <Filter>Third-Party\AfterMath</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerInterface.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerScalar.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\CPUDetector.h">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerFactory.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="pch.h">
       <Filter>Src\Library kernel</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerSSE.h">
-      <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="RasterizerCommon.h">
       <Filter>Src\Rasterizer</Filter>
     </ClInclude>
     <ClInclude Include="..\include\SoftX\RasterizerAVX.h">
-      <Filter>Include</Filter>
+      <Filter>Include\Rasterizer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerInterface.h">
+      <Filter>Include\Rasterizer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerFactory.h">
+      <Filter>Include\Rasterizer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerScalar.h">
+      <Filter>Include\Rasterizer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerSSE.h">
+      <Filter>Include\Rasterizer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\CPUDetector.h">
+      <Filter>Include\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\LibInternal.h">
+      <Filter>Include\Library kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\ThirdPartyIncluding.h">
+      <Filter>Include\Library kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\DepthBuffer.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\FrameBuffer.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\Types.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\Texture.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RenderTargetInterface.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RenderTargetTexture.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\ThreadPool.h">
+      <Filter>Include\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\ThreadPoolManager.h">
+      <Filter>Include\Tools</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Device.cpp">
       <Filter>Src</Filter>
     </ClCompile>
-    <ClCompile Include="DeviceContextRasterization.cpp">
+    <ClCompile Include="DeviceContextDraw.cpp">
       <Filter>Src</Filter>
     </ClCompile>
-    <ClCompile Include="DeviceContextTiledRendering.cpp">
+    <ClCompile Include="DeviceContextDrawTiled.cpp">
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="SoftX.cpp">
@@ -190,6 +190,18 @@
     </Filter>
     <Filter Include="Src\Tools">
       <UniqueIdentifier>{c9c78706-64e6-4b7f-afdf-275f8d0c823a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Rasterizer">
+      <UniqueIdentifier>{02c1fc7c-4a1e-4b05-8da7-d90272d12b1b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Tools">
+      <UniqueIdentifier>{f1c2a1c4-1393-4da3-8db6-bf2b694a6e34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Library kernel">
+      <UniqueIdentifier>{b4f4c9ec-fc2d-489b-8448-3d518fe62573}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Resources">
+      <UniqueIdentifier>{35b70c0c-d052-47ae-a192-33e9dd03fce5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
