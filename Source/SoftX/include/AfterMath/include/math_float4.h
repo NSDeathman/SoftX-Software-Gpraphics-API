@@ -219,6 +219,7 @@ public:
     // Swizzle Operations (HLSL style) - float4 returns
     // ============================================================================
 
+    float4 xyzw() const noexcept { return float4(x, y, z, w); }
     float4 yxzw() const noexcept { return float4(y, x, z, w); }
     float4 zxyw() const noexcept { return float4(z, x, y, w); }
     float4 zyxw() const noexcept { return float4(z, y, x, w); }
@@ -229,6 +230,17 @@ public:
     float4 yzyw() const noexcept { return float4(y, z, y, w); }
     float4 zxzw() const noexcept { return float4(z, x, z, w); }
     float4 zyzw() const noexcept { return float4(z, y, z, w); }
+
+    float3 xyz() const noexcept { return float3(x, y, z); }
+    float3 yxz() const noexcept { return float3(y, x, z); }
+    float3 zxy() const noexcept { return float3(z, x, y); }
+    float3 zyx() const noexcept { return float3(z, y, x); }
+    float3 xyx() const noexcept { return float3(x, y, x); }
+    float3 xzx() const noexcept { return float3(x, z, x); }
+    float3 yxy() const noexcept { return float3(y, x, y); }
+    float3 yzy() const noexcept { return float3(y, z, y); }
+    float3 zxz() const noexcept { return float3(z, x, z); }
+    float3 zyz() const noexcept { return float3(z, y, z); }
 
     // Color swizzles (as float4)
     float r() const noexcept { return x; }
