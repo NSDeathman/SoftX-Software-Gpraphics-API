@@ -195,49 +195,42 @@ bool DeviceContext::Validate(std::string* errorMsg) const
 {
 	bool bCheckResult = true;
 
-	// Проверка вершинного шейдера
 	if (!m_VertexShader)
 	{
 		if (errorMsg)
 			*errorMsg = "Vertex shader not set ";
 		bCheckResult = false;
 	}
-	// Проверка пиксельного шейдера
 	if (!m_PixelShader)
 	{
 		if (errorMsg)
 			*errorMsg += "Pixel shader not set ";
 		bCheckResult = false;
 	}
-	// Проверка вершинного буфера
 	if (m_VertexBuffer.IsEmpty())
 	{
 		if (errorMsg)
 			*errorMsg += "Vertex buffer is empty ";
 		bCheckResult = false;
 	}
-	// Проверка индексного буфера
 	if (m_IndexBuffer.IsEmpty())
 	{
 		if (errorMsg)
 			*errorMsg += "Index buffer is empty ";
 		bCheckResult = false;
 	}
-	// Проверка рендертаргета
 	if (m_RenderTarget == nullptr)
 	{
 		if (errorMsg)
 			*errorMsg += "Render target not set ";
 		bCheckResult = false;
 	}
-	// Проверка viewport (размеры должны быть положительными)
 	if (m_Viewport.size.x <= 0.0f || m_Viewport.size.y <= 0.0f)
 	{
 		if (errorMsg)
 			*errorMsg += "Viewport has non-positive size ";
 		bCheckResult = false;
 	}
-	// Проверка размера тайла (для тайлового рендеринга)
 	if (m_TileSize == 0)
 	{
 		if (errorMsg)

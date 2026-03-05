@@ -25,13 +25,11 @@ public:
                         tasks.pop();
                         ++activeTasks;
                     }
-                    // Выполняем задачу без блокировки мьютекса
                     task();
                     {
                         std::unique_lock<std::mutex> lock(queueMutex);
                         --activeTasks;
                     }
-                    // Уведомляем ожидающие потоки (например, wait)
                     condition.notify_all();
                 }
             });
@@ -71,7 +69,7 @@ private:
     std::mutex queueMutex;
     std::condition_variable condition;
     bool stop;
-    int activeTasks; // защищается queueMutex
+    int activeTasks;
 };
 
 SOFTX_END

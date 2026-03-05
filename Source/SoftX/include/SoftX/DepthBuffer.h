@@ -12,11 +12,10 @@ class SOFTX_API DepthBuffer
 {
   public:
 	DepthBuffer(int2 size)
-		: m_width(size.x), m_height(size.y), m_depths(size.x * size.y, 1.0f) // по умолчанию 1.0 (дальнее)
+		: m_width(size.x), m_height(size.y), m_depths(size.x * size.y, 1.0f)
 	{
 	}
 
-	// Очистка заданным значением глубины
 	void clear(float depth)
 	{
 		float* data = m_depths.data();
@@ -41,7 +40,6 @@ class SOFTX_API DepthBuffer
 	}
 
 
-	// Чтение глубины по координатам
 	float read(int2 coords) const
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -51,7 +49,6 @@ class SOFTX_API DepthBuffer
 		return 1.0f; // за границами возвращаем дальнее
 	}
 
-	// Запись глубины по координатам (без проверки, для внутреннего использования)
 	void write(int2 coords, float depth)
 	{
 		if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -60,7 +57,6 @@ class SOFTX_API DepthBuffer
 		}
 	}
 
-	// Прямой доступ к данным (для быстрой пакетной записи)
 	float* data()
 	{
 		return m_depths.data();
@@ -94,7 +90,6 @@ class SOFTX_API DepthBuffer
 		return m_depths[index];
 	}
 
-	// Размеры
 	int width() const
 	{
 		return m_width;

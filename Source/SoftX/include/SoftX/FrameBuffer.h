@@ -19,13 +19,12 @@ public:
     Framebuffer(int2 size)
         : m_width(size.x), m_height(size.y), m_pixels(size.x * size.y)
     {
-        clear(float4(0,0,0,1)); // чёрный непрозрачный
+        clear(float4(0,0,0,1));
     }
 
-    // Очистка цветом float4 (компоненты в порядке RGBA)
     void clear(const float4& color) override
     {
-        __m128 col = color.get_simd(); // используем SSE-вектор
+        __m128 col = color.get_simd();
         __m128* data = m_pixels.data();
         size_t count = m_pixels.size();
         size_t i = 0;
@@ -44,7 +43,6 @@ public:
         }
     }
 
-    // Установка пикселя по координатам (float4 цвет) – быстрая потоковая запись
     void set_pixel(int2 coords, const float4& color) override
     {
         if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -55,7 +53,6 @@ public:
         }
     }
 
-    // Установка пикселя готовым __m128 (для внутреннего использования)
     void set_pixel(int2 coords, __m128 color)
     {
         if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -66,7 +63,6 @@ public:
         }
     }
 
-    // Чтение пикселя как float4 (возвращает __m128)
     __m128 read(int2 coords) const
     {
         if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
@@ -76,7 +72,6 @@ public:
         return _mm_setzero_ps();
     }
 
-    // Размеры
     int width() const override { return m_width; }
     int height() const override { return m_height; }
     int2 size() const override { return int2(m_width, m_height); }
@@ -116,7 +111,6 @@ public:
 		}
 	}
 
-    // Вывод на GDI-контекст – преобразование в BGRA и отправка
 	void present(HDC hdc, int2 dstPos, int2 dstSize) const
 	{
 		PROFILE_SCOPE("Present to GDI")
@@ -172,7 +166,6 @@ public:
 		}
 	}
 
-    // Сохранение в TGA (порядок BGRA) – аналогично, но можно оставить как есть или тоже оптимизировать
     bool saveTGA(const char* filename) const
     {
         std::ofstream file(filename, std::ios::binary);
@@ -188,7 +181,7 @@ public:
         header[17] = 8 | (1 << 5);
         file.write(reinterpret_cast<const char*>(header), 18);
 
-        // Преобразуем в BGRA
+        // Converting to BGRA
         std::vector<uint32_t> bgraPixels(m_width * m_height);
         const __m128* src = m_pixels.data();
         uint32_t* dst = bgraPixels.data();
@@ -201,7 +194,7 @@ public:
             uint8_t g = (uint8_t)(std::clamp(rgba[1], 0.0f, 1.0f) * 255.0f);
             uint8_t b = (uint8_t)(std::clamp(rgba[2], 0.0f, 1.0f) * 255.0f);
             uint8_t a = (uint8_t)(std::clamp(rgba[3], 0.0f, 1.0f) * 255.0f);
-            dst[i] = (a << 24) | (b << 16) | (g << 8) | r; // TGA порядок BGRA (0xAABBGGRR в little-endian)
+            dst[i] = (a << 24) | (b << 16) | (g << 8) | r; // TGA order - BGRA (0xAABBGGRR in little-endian)
         }
 
         file.write(reinterpret_cast<const char*>(dst), m_pixels.size() * 4);

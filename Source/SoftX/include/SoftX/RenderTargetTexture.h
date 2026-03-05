@@ -16,7 +16,6 @@ class SOFTX_API RenderTargetTexture : public IRenderTarget
 
 	void clear(const float4& color) override
 	{
-		// Заполняем текстуру цветом
 		int w = m_texture.width();
 		int h = m_texture.height();
 		__m128 col = _mm_set_ps(color.w, color.z, color.y, color.x); // float4 RGBA -> __m128 (w,z,y,x)
@@ -24,7 +23,7 @@ class SOFTX_API RenderTargetTexture : public IRenderTarget
 		{
 			for (int x = 0; x < w; ++x)
 			{
-				m_texture.stream_write(int2(x, y), col); // можно использовать обычную запись
+				m_texture.stream_write(int2(x, y), col);
 			}
 		}
 	}
@@ -48,7 +47,6 @@ class SOFTX_API RenderTargetTexture : public IRenderTarget
 		return int2(width(), height());
 	}
 
-	// Доступ к текстуре для использования в шейдерах
 	const TextureRGBA32F& texture() const
 	{
 		return m_texture;

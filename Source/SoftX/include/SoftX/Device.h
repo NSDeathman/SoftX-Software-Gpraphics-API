@@ -27,13 +27,10 @@ public:
 	void SetIndexBuffer(const IndexBuffer& buffer);
 	void SetConstantBuffer(ConstantBuffer cbuffer);
 
-    // Презентация: копирует задний буфер в окно
     void Present();
 
-    // Доступ к заднему буферу для рисования (прямое манипулирование пикселями)
     Framebuffer& GetBackBuffer();
 
-    // Геттеры для параметров
     PresentParameters& GetPresentParams();
 
 private:

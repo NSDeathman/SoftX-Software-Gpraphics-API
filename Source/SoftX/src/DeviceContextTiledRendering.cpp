@@ -9,8 +9,6 @@
 
 SOFTX_BEGIN
 
-// ========== Методы для работы с тайлами ==========
-
 void DeviceContext::buildTiles(int width, int height)
 {
 	PROFILE_SCOPE("DeviceContext::buildTiles");
@@ -35,13 +33,13 @@ void DeviceContext::binTriangles(const std::vector<VertexOutput>& verts, const s
 {
 	PROFILE_SCOPE("DeviceContext::binTriangles");
 
-    // Очищаем списки треугольников для каждого тайла
     for (auto& tile : m_tiles)
         tile.triangleIndices.clear();
 
     int tileSize = m_TileSize;
     IRenderTarget* rt = m_RenderTarget;
-    if (!rt) return;   // если нет рендертаргета – выходим
+    if (!rt) return;
+
     int rtWidth = rt->width();
     int rtHeight = rt->height();
 
@@ -57,7 +55,6 @@ void DeviceContext::binTriangles(const std::vector<VertexOutput>& verts, const s
 		float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y}) - 0.5f;
 		float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y}) + 0.5f;
 
-        // Преобразуем в индексы тайлов
         int tileX0 = std::max(0, (int)(minX / tileSize));
         int tileY0 = std::max(0, (int)(minY / tileSize));
         int tileX1 = std::min((int)(maxX / tileSize), (rtWidth - 1) / tileSize);
@@ -132,7 +129,6 @@ void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOu
 	int width = rt->width();
 	int height = rt->height();
 
-	// Вычисляем полный bounding box треугольника (как в обычной растеризации)
 	float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
 	float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
 	float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
@@ -143,7 +139,6 @@ void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOu
 	int iMinY = std::max(0, (int)std::floor(minY));
 	int iMaxY = std::min(height - 1, (int)std::ceil(maxY));
 
-	// Площадь треугольника и culling
 	float area2 = edgeFunction(v0.Position, v1.Position, v2.Position);
 	CullMode cull = m_cullMode;
 	if (cull == CullMode::Back && area2 < 0)
@@ -156,12 +151,10 @@ void DeviceContext::RasterizeTriangleTile(const VertexOutput& v0, const VertexOu
 	auto ps = m_PixelShader;
 	auto cb = m_ConstantBuffer;
 
-	// Проходим по всем пикселям bounding box
 	for (int y = iMinY; y <= iMaxY; ++y)
 	{
 		for (int x = iMinX; x <= iMaxX; ++x)
 		{
-			// Проверяем, принадлежит ли пиксель данному тайлу
 			if (x < tileMin.x || x > tileMax.x || y < tileMin.y || y > tileMax.y)
 				continue;
 
@@ -203,7 +196,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
     int width = rt->width();
     int height = rt->height();
 
-    // Полный bounding box треугольника
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
@@ -214,7 +206,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
     int iMinY = std::max(0, (int)std::floor(minY));
     int iMaxY = std::min(height - 1, (int)std::ceil(maxY));
 
-    // Площадь и culling
     float area2 = edgeFunction(v0.Position, v1.Position, v2.Position);
     if (m_cullMode == CullMode::Back && area2 < 0) return;
     if (m_cullMode == CullMode::Front && area2 > 0) return;
@@ -223,7 +214,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
     auto ps = m_PixelShader;
     auto cb = m_ConstantBuffer;
 
-    // Предвычисляем константы для edge-функций (как в RasterizeTriangleSSE)
     float4 dx01 = v1.Position - v0.Position;
     float4 dx12 = v2.Position - v1.Position;
     float4 dx20 = v0.Position - v2.Position;
@@ -271,17 +261,14 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
     {
         __m128 baseY = _mm_set1_ps(y + 0.5f);
 
-        // Обрабатываем строку блоками по 4 пикселя
         int x;
         for (x = iMinX; x <= iMaxX - 3; x += 4)
         {
-            // Проверяем, пересекается ли блок с тайлом
             if (x > tileMax.x || x + 3 < tileMin.x)
                 continue;
 
             __m128 baseX = _mm_set_ps(x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
 
-            // Edge-функции
             __m128 f01 = _mm_sub_ps(
                 _mm_mul_ps(_mm_sub_ps(baseX, v0x), dy01v),
                 _mm_mul_ps(_mm_sub_ps(baseY, v0y), dx01v));
@@ -292,7 +279,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
                 _mm_mul_ps(_mm_sub_ps(baseX, v2x), dy20v),
                 _mm_mul_ps(_mm_sub_ps(baseY, v2y), dx20v));
 
-            // Маска принадлежности треугольнику с учётом знака площади
             __m128 zero = _mm_setzero_ps();
             __m128 inside;
             if (area2 > 0)
@@ -308,12 +294,10 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
             int insideMask = _mm_movemask_ps(inside);
             if (insideMask == 0) continue;
 
-            // Барицентрические координаты
             __m128 alpha = _mm_mul_ps(f12, invArea);
             __m128 beta  = _mm_mul_ps(f20, invArea);
             __m128 gamma = _mm_mul_ps(f01, invArea);
 
-            // Интерполяция
             __m128 z = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0z), _mm_mul_ps(beta, v1z)), _mm_mul_ps(gamma, v2z));
             __m128 r = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0cr), _mm_mul_ps(beta, v1cr)), _mm_mul_ps(gamma, v2cr));
             __m128 g = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0cg), _mm_mul_ps(beta, v1cg)), _mm_mul_ps(gamma, v2cg));
@@ -322,7 +306,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
             __m128 u = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0u), _mm_mul_ps(beta, v1u)), _mm_mul_ps(gamma, v2u));
             __m128 v = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0v), _mm_mul_ps(beta, v1v)), _mm_mul_ps(gamma, v2v));
 
-            // Загрузка глубины
             int idx0 = y * width + x;
             __m128 depths = _mm_loadu_ps(&m_DepthBuffer->at(idx0));
 
@@ -330,7 +313,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
             int depthMask = _mm_movemask_ps(depthCmp) & insideMask;
             if (depthMask == 0) continue;
 
-            // Распаковка
             float aArr[4], bArr[4], cArr[4];
 			_mm_storeu_ps(aArr, alpha);
 			_mm_storeu_ps(bArr, beta);
@@ -348,7 +330,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
 					int py = y;
 					int idx = py * width + px;
 
-					// Интерполяция всех атрибутов через trilerp
 					VertexOutput frag = trilerp(v0, v1, v2, aArr[i], bArr[i], cArr[i]);
 					frag.Position = float4((float)px, (float)py, frag.Position.z, 1.0f);
 					m_DepthBuffer->at(idx) = frag.Position.z;
@@ -359,10 +340,8 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
 			}
         }
 
-        // Скалярный доводчик для оставшихся пикселей
 		for (; x <= iMaxX; ++x)
 		{
-			// Проверка на тайл
 			if (x < tileMin.x || x > tileMax.x)
 				continue;
 
@@ -379,7 +358,6 @@ void DeviceContext::RasterizeTriangleTileSSE(const VertexOutput& v0, const Verte
 			float b = f1 / area2;
 			float c = f2 / area2;
 
-			// Интерполяция всех атрибутов через trilerp
 			VertexOutput frag = trilerp(v0, v1, v2, a, b, c);
 
 			int idx = y * width + x;
@@ -412,7 +390,7 @@ void DeviceContext::renderTileQuad(int tileIndex, float invW, float invH)
 	if (!rt)
 		return;
 
-	int w = rt->width(); // не используется для UV, но может понадобиться для других целей
+	int w = rt->width();
 	VertexOutput input = {};
 	auto ps = m_PixelShader;
 	auto cb = m_ConstantBuffer;

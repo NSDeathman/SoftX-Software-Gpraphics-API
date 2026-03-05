@@ -16,7 +16,6 @@ class SOFTX_API DeviceContext
 	DeviceContext(DeviceContext&&) = default;
 	DeviceContext& operator=(DeviceContext&&) = default;
 
-	// Сеттеры и геттеры для шейдеров
 	void SetVertexShader(VertexShader shader);
 	VertexShader GetVertexShader() const;
 
@@ -26,7 +25,6 @@ class SOFTX_API DeviceContext
 	void SetPixelShader(PixelShader shader);
 	PixelShader GetPixelShader() const;
 
-	// Сеттеры и геттеры для буферов
 	void SetVertexBuffer(const VertexBuffer& buffer);
 	VertexBuffer GetVertexBuffer() const;
 
@@ -36,7 +34,6 @@ class SOFTX_API DeviceContext
 	void SetConstantBuffer(const ConstantBuffer& buffer);
 	ConstantBuffer GetConstantBuffer() const;
 
-	// Сеттеры и геттеры для рендертаргета
 	void SetRenderTarget(IRenderTarget* target);
 	void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);
 	IRenderTarget* GetRenderTarget() const;
@@ -45,30 +42,24 @@ class SOFTX_API DeviceContext
 	void SetDepthBuffer(DepthBuffer* depthBuffer);
 	DepthBuffer* GetDepthBuffer() const;
 
-	void Clear(const float4& color);	 // очистка render target
-	void ClearDepth(float depth = 1.0f); // очистка depth buffer
+	void Clear(const float4& color);
+	void ClearDepth(float depth = 1.0f);
 
-	// Режимы отсечения и заполнения
 	void SetCullMode(CullMode mode);
 	CullMode GetCullMode() const;
 
 	void SetFillMode(FillMode mode);
 	FillMode GetFillMode() const;
 
-	// Вьюпорт
 	void SetViewport(const Viewport& vp);
 	Viewport GetViewport() const;
 
-	// Тайловый рендеринг
 	void SetTileRenderingState(bool enable);
 	bool GetTileRenderingState() const;
 
 	void SetTileSize(uint32_t size);
 	uint32_t GetTileSize() const;
 
-	// Проверка корректности текущего состояния
-	// Возвращает true, если состояние готово к рисованию
-	// Если передан указатель на строку, в неё будет записано описание ошибки (при false)
 	bool Validate(std::string* errorMsg = nullptr) const;
 
 	void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
@@ -96,12 +87,10 @@ class SOFTX_API DeviceContext
 	bool m_EnableTiledRendering;
 	uint32_t m_TileSize;
 
-	// Данные для тайлового рендера
     std::vector<Tile> m_tiles;
     std::vector<VertexOutput> m_transformedVerts;
     std::vector<int3> m_triangles;
 
-    // Внутренние методы тайлового рендера
     void buildTiles(int width, int height);
     void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
     void renderTilesMultithreaded();
@@ -109,7 +98,6 @@ class SOFTX_API DeviceContext
 	void renderTile(int tileIndex);
 	void renderTileQuad(int tileIndex, float invW, float invH);
 
-    // Методы растеризации
 	void DrawPoint(int x, int y, float z, const float4& color);
     void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
     void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);

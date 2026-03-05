@@ -11,14 +11,14 @@ SOFTX_BEGIN
 
 struct PresentParameters
 {
-	int2 BackBufferSize; // размер заднего буфера (framebuffer)
-	HWND hDeviceWindow;	 // окно для вывода
-	bool Windowed;		 // всегда true для нашего софтверного рендерера
+	int2 BackBufferSize;
+	HWND hDeviceWindow;
+	bool Windowed;
 };
 
 struct VertexInput
 {
-	float3 Position; // локальные координаты
+	float3 Position;
 	float3 Normal;
 	float4 Color;
 	float2 UV;
@@ -33,7 +33,7 @@ struct VertexInput
 
 struct VertexOutput
 {
-	float4 Position; // clip space coordinates (x,y,z,w)
+	float4 Position;
 	float4 Color;
 	float3 Normal;
 	float2 UV;
@@ -147,9 +147,9 @@ public:
 
 struct Viewport
 {
-	float2 pos;			 // верхний левый угол в пикселях
-	int2 size;		 // размеры в пикселях
-	float minZ, maxZ;	 // диапазон глубины (обычно 0..1)
+	float2 pos;
+	int2 size;
+	float minZ, maxZ;
 
 	Viewport() : pos(float2(0.0f, 0.0f)), size(int2(0, 0)), minZ(0), maxZ(1)
 	{
@@ -166,9 +166,9 @@ struct Viewport
 
 struct Tile
 {
-	int2 min;						  // левый верхний угол в пикселях
-	int2 max;						  // правый нижний угол (включительно)
-	std::vector<int> triangleIndices; // индексы треугольников, попадающих в тайл
+	int2 min;
+	int2 max;
+	std::vector<int> triangleIndices;
 
 	Tile(int2 min, int2 max) : min(min), max(max)
 	{
@@ -181,16 +181,16 @@ using GeometryShader = std::function<void(const VertexOutput[3], std::vector<Ver
 
 enum class CullMode
 {
-	None,  // не отсекать грани
-	Front, // отсекать лицевые грани
-	Back   // отсекать тыльные грани (обычно используется)
+	None,
+	Front,
+	Back
 };
 
 enum class FillMode
 {
-	Point,	   // только вершины
-	Wireframe, // только рёбра
-	Solid	   // закрашенные треугольники
+	Point,
+	Wireframe,
+	Solid
 };
 
 SOFTX_END
