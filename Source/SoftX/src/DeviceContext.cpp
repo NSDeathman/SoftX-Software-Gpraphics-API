@@ -17,7 +17,8 @@ DeviceContext::DeviceContext() :
 	m_fillMode(FillMode::Solid), 
 	m_Viewport(),
 	m_EnableTiledRendering(true), 
-	m_TileSize(64)
+	m_TileSize(64),
+	m_Rasterizer(CreateBestRasterizer())
 {
 }
 

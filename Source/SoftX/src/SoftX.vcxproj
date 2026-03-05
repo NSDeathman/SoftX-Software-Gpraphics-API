@@ -211,11 +211,17 @@
     <ClInclude Include="..\include\AfterMath\include\math_template_vector2.h" />
     <ClInclude Include="..\include\AfterMath\include\math_template_vector3.h" />
     <ClInclude Include="..\include\AfterMath\include\math_template_vector4.h" />
+    <ClInclude Include="..\include\SoftX\CPUDetector.h" />
     <ClInclude Include="..\include\SoftX\DepthBuffer.h" />
     <ClInclude Include="..\include\SoftX\Device.h" />
     <ClInclude Include="..\include\SoftX\DeviceContext.h" />
     <ClInclude Include="..\include\SoftX\FrameBuffer.h" />
     <ClInclude Include="..\include\SoftX\LibInternal.h" />
+    <ClInclude Include="..\include\SoftX\RasterizerAVX.h" />
+    <ClInclude Include="..\include\SoftX\RasterizerInterface.h" />
+    <ClInclude Include="..\include\SoftX\RasterizerFactory.h" />
+    <ClInclude Include="..\include\SoftX\RasterizerScalar.h" />
+    <ClInclude Include="..\include\SoftX\RasterizerSSE.h" />
     <ClInclude Include="..\include\SoftX\RenderTargetInterface.h" />
     <ClInclude Include="..\include\SoftX\RenderTargetTexture.h" />
     <ClInclude Include="..\include\SoftX\SoftX.h" />
@@ -225,8 +231,10 @@
     <ClInclude Include="..\include\SoftX\ThreadPoolManager.h" />
     <ClInclude Include="..\include\SoftX\Types.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="RasterizerCommon.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CPUDetector.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="DeviceContext.cpp" />
     <ClCompile Include="DeviceContextRasterization.cpp" />
@@ -237,6 +245,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="RasterizerAVX.cpp" />
+    <ClCompile Include="RasterizerFactory.cpp" />
+    <ClCompile Include="RasterizerScalar.cpp" />
+    <ClCompile Include="RasterizerSSE.cpp" />
     <ClCompile Include="SoftX.cpp" />
     <ClCompile Include="ThreadPoolManager.cpp" />
   </ItemGroup>

@@ -4,6 +4,7 @@
 #include "LibInternal.h"
 #include "Types.h"
 #include "RenderTargetInterface.h"
+#include "RasterizerInterface.h"
 
 SOFTX_BEGIN
 
@@ -79,6 +80,8 @@ class SOFTX_API DeviceContext
 	DepthBuffer* m_DepthBuffer;
 	IRenderTarget* m_RenderTarget;
 
+	std::unique_ptr<IRasterizer> m_Rasterizer;
+
 	CullMode m_cullMode;
 	FillMode m_fillMode;
 
@@ -93,29 +96,14 @@ class SOFTX_API DeviceContext
 
     void buildTiles(int width, int height);
     void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
-    void renderTilesMultithreaded();
-    void renderTilesSingleThreaded();
+    void renderTiles();
 	void renderTile(int tileIndex);
 	void renderTileQuad(int tileIndex, float invW, float invH);
 
 	void DrawPoint(int x, int y, float z, const float4& color);
     void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
-    void RasterizeTriangle(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
-    void RasterizeTriangleSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2);
-    void RasterizeTriangleTile(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
-    void RasterizeTriangleTileSSE(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, int2 tileMin, int2 tileMax);
 
 	float4 ClipToScreen(const float4& clipPos) const;
-	VertexOutput trilerp(const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2, float a, float b, float c);
-
-	inline float edgeFunction(const float4& a, const float4& b, const float2& c)
-	{
-		return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
-	}
-	inline float edgeFunction(const float4& a, const float4& b, const float4& c)
-	{
-		return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
-	}
 };
 
 SOFTX_END
