@@ -241,25 +241,25 @@ public:
     static float3x3 rotation_x(float angle) noexcept {
         float s = std::sin(angle);
         float c = std::cos(angle);
-        return float3x3(float3(1.0f, 0.0f, 0.0f),
-            float3(0.0f, c, -s),
-            float3(0.0f, s, c));
+        return  float3x3(float3(1.0f, 0.0f, 0.0f),
+                         float3(0.0f, c,    s),
+                         float3(0.0f, -s,   c));
     }
 
     static float3x3 rotation_y(float angle) noexcept {
         float s = std::sin(angle);
         float c = std::cos(angle);
-        return float3x3(float3(c, 0.0f, s),
-            float3(0.0f, 1.0f, 0.0f),
-            float3(-s, 0.0f, c));
+        return  float3x3(float3(c,    0.0f, -s),
+                         float3(0.0f, 1.0f, 0.0f),
+                         float3(s,    0.0f, c));
     }
 
     static float3x3 rotation_z(float angle) noexcept {
         float s = std::sin(angle);
         float c = std::cos(angle);
-        return float3x3(float3(c, -s, 0.0f),
-            float3(s, c, 0.0f),
-            float3(0.0f, 0.0f, 1.0f));
+        return  float3x3(float3(c,    s,    0.0f),
+                         float3(-s,   c,    0.0f),
+                         float3(0.0f, 0.0f, 1.0f));
     }
 
     /*static float3x3 rotation_axis(const float3& axis, float angle) noexcept;*/
@@ -269,15 +269,17 @@ public:
     }
 
     static float3x3 skew_symmetric(const float3& vec) noexcept {
-        return float3x3(float3(0.0f, -vec.z, vec.y),
-            float3(vec.z, 0.0f, -vec.x),
-            float3(-vec.y, vec.x, 0.0f));
+        return  float3x3(
+                float3(0.0f, vec.z, -vec.y),     // row 0: (0, vz, -vy)
+                float3(-vec.z, 0.0f, vec.x),     // row 1: (-vz, 0, vx)
+                float3(vec.y, -vec.x, 0.0f)      // row 2: (vy, -vx, 0)
+        );
     }
 
     static float3x3 outer_product(const float3& u, const float3& v) noexcept {
-        return float3x3(float3(u.x * v.x, u.x * v.y, u.x * v.z),
-            float3(u.y * v.x, u.y * v.y, u.y * v.z),
-            float3(u.z * v.x, u.z * v.y, u.z * v.z));
+        return  float3x3(float3(u.x * v.x, u.x * v.y, u.x * v.z),
+                float3(u.y * v.x, u.y * v.y, u.y * v.z),
+                float3(u.z * v.x, u.z * v.y, u.z * v.z));
     }
 };
 
@@ -322,14 +324,6 @@ inline float3x3 operator/(float3x3 mat, float scalar) noexcept {
 }
 
 // Matrix-vector multiplication
-inline float3 operator*(const float3x3& mat, const float3& vec) noexcept {
-    return float3(
-        dot(mat.row0, vec),
-        dot(mat.row1, vec),
-        dot(mat.row2, vec)
-    );
-}
-
 inline float3 operator*(const float3& vec, const float3x3& mat) noexcept {
     return float3(
         vec.x * mat(0, 0) + vec.y * mat(1, 0) + vec.z * mat(2, 0),
@@ -421,11 +415,11 @@ inline float3x3 skew_symmetric_part(const float3x3& mat) noexcept {
 }
 
 inline float3 transform_vector(const float3x3& mat, const float3& vec) noexcept {
-    return mat * vec;
+    return vec * mat;
 }
 
 inline float3 transform_point(const float3x3& mat, const float3& point) noexcept {
-    return mat * point;
+    return point * mat;
 }
 
 inline bool is_orthonormal(const float3x3& mat, float epsilon = 1e-6f) noexcept {
@@ -443,7 +437,7 @@ inline bool is_orthonormal(const float3x3& mat, float epsilon = 1e-6f) noexcept 
 
 inline float3 transform_normal(const float3x3& mat, const float3& normal) noexcept {
     if (is_orthonormal(mat, 1e-4f)) {
-        return mat * normal;
+        return normal * mat;
     }
 
     float3x3 inv = inverse(mat);
@@ -485,17 +479,16 @@ inline bool approximately_zero(const float3x3& mat, float epsilon = 1e-6f) noexc
 
 inline float3x3 normal_matrix(const float3x3& model) noexcept {
     float3x3 inv = inverse(model);
-    float3x3 result = transpose(inv);
+    float3x3 result = transpose(inv); // это (M^{-1})^T
 
-    float3 col0 = normalize(result.col0());
-    float3 col1 = normalize(result.col1());
-    float3 col2 = normalize(result.col2());
-
-    return float3x3(col0, col1, col2);
+    float3 r0 = normalize(result.row0);
+    float3 r1 = normalize(result.row1);
+    float3 r2 = normalize(result.row2);
+    return float3x3(r0, r1, r2);
 }
 
 inline float3 extract_scale(const float3x3& mat) noexcept {
-    return float3(length(mat.col0()), length(mat.col1()), length(mat.col2()));
+    return float3(length(mat.row0), length(mat.row1), length(mat.row2));
 }
 
 inline float3x3 extract_rotation(const float3x3& mat) noexcept {
@@ -503,12 +496,12 @@ inline float3x3 extract_rotation(const float3x3& mat) noexcept {
         return mat;
     }
 
-    float3 c0 = normalize(mat.col0());
-    float3 c1 = mat.col1();
-    c1 = normalize(c1 - c0 * dot(c1, c0));
-    float3 c2 = cross(c0, c1);
+    float3 r0 = normalize(mat.row0);
+    float3 r1 = mat.row1 - r0 * dot(mat.row1, r0);
+    r1 = normalize(r1);
+    float3 r2 = cross(r0, r1);
 
-    return float3x3(c0, c1, c2);
+    return float3x3(r0, r1, r2);
 }
 
 // HLSL-like functions
@@ -518,10 +511,6 @@ inline float3x3 mul(const float3x3& a, const float3x3& b) noexcept {
 
 inline float3 mul(const float3& vec, const float3x3& mat) noexcept {
     return vec * mat;
-}
-
-inline float3 mul(const float3x3& mat, const float3& vec) noexcept {
-    return mat * vec;
 }
 
 // Comparison operators

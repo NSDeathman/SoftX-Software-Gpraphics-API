@@ -166,39 +166,42 @@ inline quaternion quaternion_euler(const float3& euler_angles) noexcept
 
 inline quaternion quaternion_from_matrix(const float3x3& m) noexcept
 {
-    float trace = m(0, 0) + m(1, 1) + m(2, 2);
+    float3x3 t = transpose(m);
+
+    float trace = t(0, 0) + t(1, 1) + t(2, 2);
     quaternion q;
 
     if (trace > 0.0f) {
         float s = 0.5f / std::sqrt(trace + 1.0f);
         q.w = 0.25f / s;
-        q.x = (m(2, 1) - m(1, 2)) * s;
-        q.y = (m(0, 2) - m(2, 0)) * s;
-        q.z = (m(1, 0) - m(0, 1)) * s;
+        q.x = (t(2, 1) - t(1, 2)) * s;
+        q.y = (t(0, 2) - t(2, 0)) * s;
+        q.z = (t(1, 0) - t(0, 1)) * s;
     }
     else {
-        if (m(0, 0) > m(1, 1) && m(0, 0) > m(2, 2)) {
-            float s = 2.0f * std::sqrt(1.0f + m(0, 0) - m(1, 1) - m(2, 2));
-            q.w = (m(2, 1) - m(1, 2)) / s;
+        if (t(0, 0) > t(1, 1) && t(0, 0) > t(2, 2)) {
+            float s = 2.0f * std::sqrt(1.0f + t(0, 0) - t(1, 1) - t(2, 2));
+            q.w = (t(2, 1) - t(1, 2)) / s;
             q.x = 0.25f * s;
-            q.y = (m(0, 1) + m(1, 0)) / s;
-            q.z = (m(0, 2) + m(2, 0)) / s;
+            q.y = (t(0, 1) + t(1, 0)) / s;
+            q.z = (t(0, 2) + t(2, 0)) / s;
         }
-        else if (m(1, 1) > m(2, 2)) {
-            float s = 2.0f * std::sqrt(1.0f + m(1, 1) - m(0, 0) - m(2, 2));
-            q.w = (m(0, 2) - m(2, 0)) / s;
-            q.x = (m(0, 1) + m(1, 0)) / s;
+        else if (t(1, 1) > t(2, 2)) {
+            float s = 2.0f * std::sqrt(1.0f + t(1, 1) - t(0, 0) - t(2, 2));
+            q.w = (t(0, 2) - t(2, 0)) / s;
+            q.x = (t(0, 1) + t(1, 0)) / s;
             q.y = 0.25f * s;
-            q.z = (m(1, 2) + m(2, 1)) / s;
+            q.z = (t(1, 2) + t(2, 1)) / s;
         }
         else {
-            float s = 2.0f * std::sqrt(1.0f + m(2, 2) - m(0, 0) - m(1, 1));
-            q.w = (m(1, 0) - m(0, 1)) / s;
-            q.x = (m(0, 2) + m(2, 0)) / s;
-            q.y = (m(1, 2) + m(2, 1)) / s;
+            float s = 2.0f * std::sqrt(1.0f + t(2, 2) - t(0, 0) - t(1, 1));
+            q.w = (t(1, 0) - t(0, 1)) / s;
+            q.x = (t(0, 2) + t(2, 0)) / s;
+            q.y = (t(1, 2) + t(2, 1)) / s;
             q.z = 0.25f * s;
         }
     }
+
     float len_sq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
     if (len_sq > Constants::Constants<float>::Epsilon && std::isfinite(len_sq)) {
         float inv_len = 1.0f / std::sqrt(len_sq);
@@ -257,7 +260,7 @@ inline quaternion quaternion_look_rotation(const float3& forward, const float3& 
     u = normalize(cross(f, r));
 
     float3x3 rot_mat(r, u, f);
-    return quaternion_from_matrix(transpose(rot_mat));
+    return quaternion_from_matrix(rot_mat);
 }
 
 inline quaternion quaternion_rotation_x(float angle) noexcept {
@@ -461,9 +464,9 @@ inline float3x3 quaternion_to_matrix3x3(const quaternion& q) noexcept
     float wx = n.w * n.x, wy = n.w * n.y, wz = n.w * n.z;
 
     return float3x3(
-        float3(1.0f - 2.0f * (yy + zz), 2.0f * (xy - wz), 2.0f * (xz + wy)),
-        float3(2.0f * (xy + wz), 1.0f - 2.0f * (xx + zz), 2.0f * (yz - wx)),
-        float3(2.0f * (xz - wy), 2.0f * (yz + wx), 1.0f - 2.0f * (xx + yy))
+        float3(1.0f - 2.0f * (yy + zz), 2.0f * (xy + wz), 2.0f * (xz - wy)),
+        float3(2.0f * (xy - wz), 1.0f - 2.0f * (xx + zz), 2.0f * (yz + wx)),
+        float3(2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (xx + yy))
     );
 }
 
