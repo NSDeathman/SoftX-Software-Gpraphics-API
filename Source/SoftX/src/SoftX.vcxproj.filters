@@ -138,7 +138,7 @@
     <ClCompile Include="DeviceContextDraw.cpp">
       <Filter>Src</Filter>
     </ClCompile>
-    <ClCompile Include="DeviceContextDrawTiled.cpp">
+    <ClCompile Include="DeviceContextDrawTiling.cpp">
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="SoftX.cpp">
@@ -167,6 +167,9 @@
     </ClCompile>
     <ClCompile Include="RasterizerAVX.cpp">
       <Filter>Src\Rasterizer</Filter>
+    </ClCompile>
+    <ClCompile Include="DeviceContextDebug.cpp">
+      <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

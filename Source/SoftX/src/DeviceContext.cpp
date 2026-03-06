@@ -16,7 +16,6 @@ DeviceContext::DeviceContext() :
 	m_cullMode(CullMode::Back), 
 	m_fillMode(FillMode::Solid), 
 	m_Viewport(),
-	m_EnableTiledRendering(true), 
 	m_TileSize(64),
 	m_Rasterizer(CreateBestRasterizer())
 {
@@ -170,16 +169,6 @@ void DeviceContext::SetViewport(const Viewport& vp)
 Viewport DeviceContext::GetViewport() const
 {
 	return m_Viewport;
-}
-
-void DeviceContext::SetTileRenderingState(bool enable)
-{
-	m_EnableTiledRendering = enable;
-}
-
-bool DeviceContext::GetTileRenderingState() const
-{
-	return m_EnableTiledRendering;
 }
 
 void DeviceContext::SetTileSize(uint32_t size)

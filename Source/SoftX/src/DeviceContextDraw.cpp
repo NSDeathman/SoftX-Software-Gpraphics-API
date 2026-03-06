@@ -4,13 +4,12 @@
 
 #include <SoftX/SoftX.h>
 #include <SoftX/ThreadPoolManager.h>
+#include "RasterizerCommon.h"
 
 SOFTX_BEGIN
 
 void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 {
-	PROFILE_SCOPE("DeviceContext::DrawPoint");
-
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
 
@@ -29,8 +28,6 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 
 void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
-	PROFILE_SCOPE("DeviceContext::DrawLine");
-
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
 
@@ -62,22 +59,6 @@ void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1,
         }
         z += zStep;
     }
-}
-
-float4 DeviceContext::ClipToScreen(const float4& clipPos) const
-{
-	Viewport vp = m_Viewport;
-
-	float invW = 1.0f / clipPos.w;
-	float xNDC = clipPos.x * invW;
-	float yNDC = clipPos.y * invW;
-	float zNDC = clipPos.z * invW;
-
-	float screenX = vp.pos.x + (xNDC * 0.5f + 0.5f) * vp.size.x;
-	float screenY = vp.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * vp.size.y;
-	float screenZ = vp.minZ + zNDC * (vp.maxZ - vp.minZ);
-
-	return float4(screenX, screenY, screenZ, 1.0f);
 }
 
 void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex) 
@@ -115,7 +96,7 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 
     concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
         VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
-        out.Position = ClipToScreen(out.Position);
+		out.Position = RasterizerCommon::ClipSpaceToScreenSpace(out.Position, m_Viewport);
         m_transformedVerts[idx] = out;
     });
 
@@ -162,27 +143,12 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
     }
 
     if (m_fillMode == FillMode::Solid) {
-    if (m_EnableTiledRendering) {
         buildTiles(width, height);
         binTriangles(m_transformedVerts, m_triangles);
         renderTiles();
-    } else {
-        RasterizerState state;
-        state.cullMode = m_cullMode;
-        state.fillMode = m_fillMode;
-        for (const auto& tri : m_triangles) {
-            m_Rasterizer->RasterizeTriangle(
-                m_transformedVerts[tri.x],
-                m_transformedVerts[tri.y],
-                m_transformedVerts[tri.z],
-                state,
-                *m_DepthBuffer,
-                *m_RenderTarget,
-                m_PixelShader,
-                m_ConstantBuffer
-            );
-        }
-    }
+#ifdef DEBUG_TILING
+		DrawActiveTileBorders();
+#endif
     } else if (m_fillMode == FillMode::Wireframe) {
         float4 wireColor(1,1,1,1);
         for (const auto& tri : m_triangles) {
@@ -230,37 +196,27 @@ void DeviceContext::DrawFullScreenQuad() {
     float invW = 1.0f / (w - 1);
     float invH = 1.0f / (h - 1);
 
-    if (m_EnableTiledRendering) {
-        buildTiles(w, h);
-        int numTiles = (int)m_tiles.size();
-        std::atomic<int> tileIndex(0);
+    buildTiles(w, h);
+    int numTiles = (int)m_tiles.size();
+    std::atomic<int> tileIndex(0);
 
-        auto worker = [this, invW, invH, &tileIndex, numTiles]() {
-            while (true) {
-                int idx = tileIndex.fetch_add(1);
-                if (idx >= numTiles) break;
-                renderTileQuad(idx, invW, invH);
-            }
-        };
+    auto worker = [this, invW, invH, &tileIndex, numTiles]() {
+        while (true) {
+            int idx = tileIndex.fetch_add(1);
+            if (idx >= numTiles) break;
+            renderTileQuad(idx, invW, invH);
+        }
+    };
 
-        auto& pool = ThreadPoolManager::Get();
-        int numThreads = (int)pool.threadCount();
-        for (int i = 0; i < numThreads; ++i) {
-            pool.enqueue(worker);
-        }
-        pool.wait();
-    } else {
-        VertexOutput input;
-        for (int y = 0; y < h; ++y) {
-            float v = y * invH;
-            for (int x = 0; x < w; ++x) {
-                float u = x * invW;
-                input.UV = float2(u, v);
-                float4 color = m_PixelShader(input, m_ConstantBuffer);
-                rt->set_pixel(int2(x, y), color);
-            }
-        }
+    auto& pool = ThreadPoolManager::Get();
+    int numThreads = (int)pool.threadCount();
+    for (int i = 0; i < numThreads; ++i) {
+        pool.enqueue(worker);
     }
+    pool.wait();
+#ifdef DEBUG_TILING
+    DrawActiveTileBorders();
+#endif
 }
 
 SOFTX_END

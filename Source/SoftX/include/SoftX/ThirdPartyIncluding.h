@@ -4,7 +4,7 @@
 #include "../AfterMath/include/AfterMath.h"
 using namespace AfterMath;
 
-#define ENABLE_PROFILER
+//#define ENABLE_PROFILER
 
 // Your custom profiler
 #ifdef ENABLE_PROFILER

@@ -55,9 +55,6 @@ class SOFTX_API DeviceContext
 	void SetViewport(const Viewport& vp);
 	Viewport GetViewport() const;
 
-	void SetTileRenderingState(bool enable);
-	bool GetTileRenderingState() const;
-
 	void SetTileSize(uint32_t size);
 	uint32_t GetTileSize() const;
 
@@ -87,7 +84,6 @@ class SOFTX_API DeviceContext
 
 	Viewport m_Viewport;
 
-	bool m_EnableTiledRendering;
 	uint32_t m_TileSize;
 
     std::vector<Tile> m_tiles;
@@ -103,7 +99,9 @@ class SOFTX_API DeviceContext
 	void DrawPoint(int x, int y, float z, const float4& color);
     void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
 
-	float4 ClipToScreen(const float4& clipPos) const;
+	void DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color);
+	void DrawTileBorders();
+	void DrawActiveTileBorders();
 };
 
 SOFTX_END

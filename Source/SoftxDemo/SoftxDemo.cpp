@@ -263,8 +263,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	ctx.SetFillMode(FillMode::Solid);
 	ctx.SetCullMode(CullMode::Back);
 
-	ctx.SetTileRenderingState(true);
-	ctx.SetTileSize(16);
+	ctx.SetTileSize(64);
 
 	//OptickCapture::Get().Initialize();
 

@@ -118,7 +118,7 @@ void DeviceContext::renderTile(int tileIndex)
     for (int triIdx : tile.triangleIndices)
     {
         const auto& tri = m_triangles[triIdx];
-        m_Rasterizer->RasterizeTriangleTile(
+        m_Rasterizer->RasterizeTriangle(
             m_transformedVerts[tri.x],
             m_transformedVerts[tri.y],
             m_transformedVerts[tri.z],
