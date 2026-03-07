@@ -103,43 +103,42 @@ void RasterizerAVX::RasterizeTriangle(
         __m256 baseY = _mm256_set1_ps(y + 0.5f);
 
         int x;
-		for (x = iMinX; x + 7 < width && x <= iMaxX - 7; x += 8)
-        {
-            // Проверка, пересекается ли блок из 8 пикселей с тайлом
-            if (x > tileMax.x || x + 7 < tileMin.x)
-                continue;
+		int simdStartX = (iMinX / 8) * 8; // выравниваем вниз до кратного 8
+		for (x = simdStartX; x + 7 < width && x <= iMaxX - 7; x += 8)
+		{
+			// Проверка, пересекается ли блок из 8 пикселей с тайлом
+			if (x > tileMax.x || x + 7 < tileMin.x)
+				continue;
 
-            __m256 baseX = _mm256_set_ps(x + 7.5f, x + 6.5f, x + 5.5f, x + 4.5f,
-                                          x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
+			__m256 baseX =
+				_mm256_set_ps(x + 7.5f, x + 6.5f, x + 5.5f, x + 4.5f, x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
 
-            __m256 f01 = _mm256_sub_ps(
-                _mm256_mul_ps(_mm256_sub_ps(baseX, v0x), dy01v),
-                _mm256_mul_ps(_mm256_sub_ps(baseY, v0y), dx01v));
-            __m256 f12 = _mm256_sub_ps(
-                _mm256_mul_ps(_mm256_sub_ps(baseX, v1x), dy12v),
-                _mm256_mul_ps(_mm256_sub_ps(baseY, v1y), dx12v));
-            __m256 f20 = _mm256_sub_ps(
-                _mm256_mul_ps(_mm256_sub_ps(baseX, v2x), dy20v),
-                _mm256_mul_ps(_mm256_sub_ps(baseY, v2y), dx20v));
+			__m256 f01 = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(baseX, v0x), dy01v),
+									   _mm256_mul_ps(_mm256_sub_ps(baseY, v0y), dx01v));
+			__m256 f12 = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(baseX, v1x), dy12v),
+									   _mm256_mul_ps(_mm256_sub_ps(baseY, v1y), dx12v));
+			__m256 f20 = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(baseX, v2x), dy20v),
+									   _mm256_mul_ps(_mm256_sub_ps(baseY, v2y), dx20v));
 
-            __m256 zero = _mm256_setzero_ps();
-            __m256 inside;
-            if (area2 > 0)
-            {
-                inside = _mm256_and_ps(_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_GE_OQ),
-                                                     _mm256_cmp_ps(f12, zero, _CMP_GE_OQ)),
-                                       _mm256_cmp_ps(f20, zero, _CMP_GE_OQ));
-            }
-            else
-            {
-                inside = _mm256_and_ps(_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_LE_OQ),
-                                                     _mm256_cmp_ps(f12, zero, _CMP_LE_OQ)),
-                                       _mm256_cmp_ps(f20, zero, _CMP_LE_OQ));
-            }
-            int insideMask = _mm256_movemask_ps(inside);
-            if (insideMask == 0) continue;
+			__m256 zero = _mm256_setzero_ps();
+			__m256 inside;
+			if (area2 > 0)
+			{
+				inside = _mm256_and_ps(
+					_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_GE_OQ), _mm256_cmp_ps(f12, zero, _CMP_GE_OQ)),
+					_mm256_cmp_ps(f20, zero, _CMP_GE_OQ));
+			}
+			else
+			{
+				inside = _mm256_and_ps(
+					_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_LE_OQ), _mm256_cmp_ps(f12, zero, _CMP_LE_OQ)),
+					_mm256_cmp_ps(f20, zero, _CMP_LE_OQ));
+			}
+			int insideMask = _mm256_movemask_ps(inside);
+			if (insideMask == 0)
+				continue;
 
-                        __m256 alpha = _mm256_mul_ps(f12, invArea);
+			__m256 alpha = _mm256_mul_ps(f12, invArea);
 			__m256 beta = _mm256_mul_ps(f20, invArea);
 			__m256 gamma = _mm256_mul_ps(f01, invArea);
 
@@ -182,10 +181,13 @@ void RasterizerAVX::RasterizeTriangle(
 
 #undef PLERP256
 
-            int idx0 = y * width + x;
-            __m256 depths = _mm256_loadu_ps(&depthBuffer.at(idx0));
+			// ── Depth read: два __m128 блока → __m256 ─────────────────────
+			// x кратен 8 → x и x+4 оба кратны 4, read4 корректен
+			__m128 d_lo = depthBuffer.read4(int2(x, y));
+			__m128 d_hi = depthBuffer.read4(int2(x + 4, y));
+			__m256 depths = _mm256_set_m128(d_hi, d_lo);
 
-            __m256 depthCmp;
+			__m256 depthCmp;
 			switch (state.depthFunc)
 			{
 			case ComparisonFunc::Never:
@@ -214,47 +216,53 @@ void RasterizerAVX::RasterizeTriangle(
 				break;
 			}
 
-            int depthMask = _mm256_movemask_ps(depthCmp) & insideMask;
-            if (depthMask == 0) continue;
+			// Комбинируем с маской покрытия тайла
+			__m256i inside8i =
+				_mm256_set_epi32((insideMask & 128) ? -1 : 0, (insideMask & 64) ? -1 : 0, (insideMask & 32) ? -1 : 0,
+								 (insideMask & 16) ? -1 : 0, (insideMask & 8) ? -1 : 0, (insideMask & 4) ? -1 : 0,
+								 (insideMask & 2) ? -1 : 0, (insideMask & 1) ? -1 : 0);
+			__m256 finalMask = _mm256_and_ps(depthCmp, _mm256_castsi256_ps(inside8i));
 
-            alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
-            alignas(32) float nxArr[8], nyArr[8], nzArr[8];
-            alignas(32) float uArr[8], vArr[8];
-            _mm256_store_ps(zArr, z);
-            _mm256_store_ps(rArr, r);
-            _mm256_store_ps(gArr, g);
-            _mm256_store_ps(bArr, b);
-            _mm256_store_ps(aArr, a);
-            _mm256_store_ps(nxArr, nx);
-            _mm256_store_ps(nyArr, ny);
-            _mm256_store_ps(nzArr, nz);
-            _mm256_store_ps(uArr, u);
-            _mm256_store_ps(vArr, v);
+			int depthMask = _mm256_movemask_ps(finalMask);
+			if (depthMask == 0)
+				continue;
 
-            for (int i = 0; i < 8; ++i)
-            {
-                int px = x + i;
-                if (px < tileMin.x || px > tileMax.x)
-                    continue;
+			// ── Depth write: разбиваем __m256 обратно на два __m128 блока ─
+			__m128 mask_lo = _mm256_castps256_ps128(finalMask);
+			__m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
+			depthBuffer.write4(int2(x, y), _mm256_castps256_ps128(z), mask_lo);
+			depthBuffer.write4(int2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
 
-                if (depthMask & (1 << i))
-                {
-                    int py = y;
-                    int idx = py * width + px;
+			// ── Скалярный цикл только для шейдинга ───────────────────────
+			alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
+			alignas(32) float uArr[8], vArr[8], nxArr[8], nyArr[8], nzArr[8];
+			_mm256_store_ps(zArr, z);
+			_mm256_store_ps(rArr, r);
+			_mm256_store_ps(gArr, g);
+			_mm256_store_ps(bArr, b);
+			_mm256_store_ps(aArr, a);
+			_mm256_store_ps(uArr, u);
+			_mm256_store_ps(vArr, v);
+			_mm256_store_ps(nxArr, nx);
+			_mm256_store_ps(nyArr, ny);
+			_mm256_store_ps(nzArr, nz);
 
-                    depthBuffer.at(idx) = zArr[i];
+			for (int i = 0; i < 8; ++i)
+			{
+				if (!(depthMask & (1 << i)))
+					continue;
+				int px = x + i;
+				if (px < tileMin.x || px > tileMax.x)
+					continue;
 
-                    VertexOutput frag;
-                    frag.Position = float4((float)px, (float)py, zArr[i], 1.0f);
-                    frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
-                    frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
-                    frag.UV = float2(uArr[i], vArr[i]);
-
-                    float4 finalColor = ps(frag, cb, *tt);
-                    renderTarget.set_pixel(int2(px, py), finalColor);
-                }
-            }
-        }
+				VertexOutput frag;
+				frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
+				frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
+				frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
+				frag.UV = float2(uArr[i], vArr[i]);
+				renderTarget.set_pixel(int2(px, y), ps(frag, cb, *tt));
+			}
+		}
 
         // Скалярный доводчик для оставшихся пикселей
         for (; x <= iMaxX; ++x)

@@ -263,6 +263,11 @@ struct TextureBinding
 		else
 			return m_texture->sample(wrapped);
 	}
+
+	int2 GetDimensions() const
+	{
+		return int2(m_texture->width(), m_texture->height());
+	}
 };
 
 // ── Таблица биндингов ─────────────────────────────────────────────────────

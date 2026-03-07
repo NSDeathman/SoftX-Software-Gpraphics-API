@@ -98,9 +98,7 @@ VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb, const Text
 
 float4 UVCheckerPSNearest(const VertexOutput& input, ConstantBuffer cb, const TextureTable& tex)
 {
-	float u = input.UV.x - std::floor(input.UV.x); // wrap [0,1]
-	float v = input.UV.y - std::floor(input.UV.y);
-	return tex[1].Sample(float2(u, v));
+	return tex[1].Sample(input.UV);
 }
 
 float4 UVCheckerPSBillinear(const VertexOutput& input, ConstantBuffer cb, const TextureTable& tex)
@@ -108,9 +106,7 @@ float4 UVCheckerPSBillinear(const VertexOutput& input, ConstantBuffer cb, const 
 	if (tex[0].IsEmpty())
 		return float4(1.0f, 0.0f, 1.0f, 1.0f); // маджента — нет текстуры
 
-	float u = input.UV.x - std::floor(input.UV.x); // wrap [0,1]
-	float v = input.UV.y - std::floor(input.UV.y);
-	return tex[0].Sample(float2(u, v));
+	return tex[0].Sample(input.UV);
 }
 
 // ============================================================

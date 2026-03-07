@@ -103,44 +103,43 @@ void RasterizerSSE::RasterizeTriangle(
         __m128 baseY = _mm_set1_ps(y + 0.5f);
 
         int x;
-		for (x = iMinX; x + 3 < width && x <= iMaxX - 3; x += 4)
-        {
-            // Проверка пересечения блока с тайлом (уже учтено в iMinX/iMaxX, но может быть частичное перекрытие? 
-            // На самом деле iMinX и iMaxX уже ограничены тайлом, поэтому блок всегда внутри тайла по x.
-            // Однако блок может частично выходить за границы тайла по x, если iMinX не кратен 4? 
-            // Но мы уже ограничили iMinX и iMaxX, поэтому блок полностью внутри тайла, если x и x+3 в пределах.
-            // Для надёжности оставим проверку:
-            if (x > tileMax.x || x + 3 < tileMin.x)
-                continue;
+		int simdStartX = (iMinX / 4) * 4; // выравниваем вниз до кратного 4
+		for (x = simdStartX; x + 3 < width && x <= iMaxX - 3; x += 4)
+		{
+			// Проверка пересечения блока с тайлом (уже учтено в iMinX/iMaxX, но может быть частичное перекрытие?
+			// На самом деле iMinX и iMaxX уже ограничены тайлом, поэтому блок всегда внутри тайла по x.
+			// Однако блок может частично выходить за границы тайла по x, если iMinX не кратен 4?
+			// Но мы уже ограничили iMinX и iMaxX, поэтому блок полностью внутри тайла, если x и x+3 в пределах.
+			// Для надёжности оставим проверку:
+			if (x > tileMax.x || x + 3 < tileMin.x)
+				continue;
 
-            __m128 baseX = _mm_set_ps(x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
+			__m128 baseX = _mm_set_ps(x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
 
-            __m128 f01 = _mm_sub_ps(
-                _mm_mul_ps(_mm_sub_ps(baseX, v0x), dy01v),
-                _mm_mul_ps(_mm_sub_ps(baseY, v0y), dx01v));
-            __m128 f12 = _mm_sub_ps(
-                _mm_mul_ps(_mm_sub_ps(baseX, v1x), dy12v),
-                _mm_mul_ps(_mm_sub_ps(baseY, v1y), dx12v));
-            __m128 f20 = _mm_sub_ps(
-                _mm_mul_ps(_mm_sub_ps(baseX, v2x), dy20v),
-                _mm_mul_ps(_mm_sub_ps(baseY, v2y), dx20v));
+			__m128 f01 =
+				_mm_sub_ps(_mm_mul_ps(_mm_sub_ps(baseX, v0x), dy01v), _mm_mul_ps(_mm_sub_ps(baseY, v0y), dx01v));
+			__m128 f12 =
+				_mm_sub_ps(_mm_mul_ps(_mm_sub_ps(baseX, v1x), dy12v), _mm_mul_ps(_mm_sub_ps(baseY, v1y), dx12v));
+			__m128 f20 =
+				_mm_sub_ps(_mm_mul_ps(_mm_sub_ps(baseX, v2x), dy20v), _mm_mul_ps(_mm_sub_ps(baseY, v2y), dx20v));
 
-            __m128 zero = _mm_setzero_ps();
-            __m128 inside;
-            if (area2 > 0)
-            {
-                inside = _mm_and_ps(_mm_and_ps(_mm_cmpge_ps(f01, zero), _mm_cmpge_ps(f12, zero)),
-                                    _mm_cmpge_ps(f20, zero));
-            }
-            else
-            {
-                inside = _mm_and_ps(_mm_and_ps(_mm_cmple_ps(f01, zero), _mm_cmple_ps(f12, zero)),
-                                    _mm_cmple_ps(f20, zero));
-            }
-            int insideMask = _mm_movemask_ps(inside);
-            if (insideMask == 0) continue;
+			__m128 zero = _mm_setzero_ps();
+			__m128 inside;
+			if (area2 > 0)
+			{
+				inside =
+					_mm_and_ps(_mm_and_ps(_mm_cmpge_ps(f01, zero), _mm_cmpge_ps(f12, zero)), _mm_cmpge_ps(f20, zero));
+			}
+			else
+			{
+				inside =
+					_mm_and_ps(_mm_and_ps(_mm_cmple_ps(f01, zero), _mm_cmple_ps(f12, zero)), _mm_cmple_ps(f20, zero));
+			}
+			int insideMask = _mm_movemask_ps(inside);
+			if (insideMask == 0)
+				continue;
 
-            __m128 alpha = _mm_mul_ps(f12, invArea);
+			__m128 alpha = _mm_mul_ps(f12, invArea);
 			__m128 beta = _mm_mul_ps(f20, invArea);
 			__m128 gamma = _mm_mul_ps(f01, invArea);
 
@@ -176,10 +175,10 @@ void RasterizerSSE::RasterizeTriangle(
 
 #undef PLERP128
 
-            int idx0 = y * width + x;
-            __m128 depths = _mm_loadu_ps(&depthBuffer.at(idx0));
+			// ── Depth read через блочный API ──────────────────────────────
+			__m128 depths = depthBuffer.read4(int2(x, y));
 
-            __m128 depthCmp;
+			__m128 depthCmp;
 			switch (state.depthFunc)
 			{
 			case ComparisonFunc::Never:
@@ -204,51 +203,52 @@ void RasterizerSSE::RasterizeTriangle(
 				depthCmp = _mm_cmpge_ps(z, depths);
 				break;
 			case ComparisonFunc::Always:
-				depthCmp = _mm_castsi128_ps(_mm_set1_epi32(-1)); // все единицы
+				depthCmp = _mm_castsi128_ps(_mm_set1_epi32(-1));
 				break;
 			}
-            int depthMask = _mm_movemask_ps(depthCmp) & insideMask;
-            if (depthMask == 0) continue;
 
-            // Сохраняем интерполированные значения в массивы
-            float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4], uArr[4], vArr[4];
-            float nxArr[4], nyArr[4], nzArr[4];
-            _mm_storeu_ps(zArr, z);
-            _mm_storeu_ps(rArr, r);
-            _mm_storeu_ps(gArr, g);
-            _mm_storeu_ps(bArr, b);
-            _mm_storeu_ps(aArr, a);
-            _mm_storeu_ps(uArr, u);
-            _mm_storeu_ps(vArr, v);
-            _mm_storeu_ps(nxArr, nx);
-            _mm_storeu_ps(nyArr, ny);
-            _mm_storeu_ps(nzArr, nz);
+			// Комбинируем depth mask с маской покрытия тайла
+			__m128 inside4 = _mm_castsi128_ps(_mm_set_epi32((insideMask & 8) ? -1 : 0, (insideMask & 4) ? -1 : 0,
+															(insideMask & 2) ? -1 : 0, (insideMask & 1) ? -1 : 0));
+			__m128 finalMask = _mm_and_ps(depthCmp, inside4);
 
-            for (int i = 0; i < 4; ++i)
-            {
-                int px = x + i;
-                if (px < tileMin.x || px > tileMax.x)
-                    continue;
+			int depthMask = _mm_movemask_ps(finalMask);
+			if (depthMask == 0)
+				continue;
 
-                int bit = 1 << i;
-                if (depthMask & bit)
-                {
-                    int py = y;
-                    int idx = py * width + px;
+			// ── Depth write под маской — одна SIMD операция ───────────────
+			depthBuffer.write4(int2(x, y), z, finalMask);
 
-                    depthBuffer.at(idx) = zArr[i];
+			// ── Скалярный цикл только для шейдинга ───────────────────────
+			alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
+			alignas(16) float uArr[4], vArr[4], nxArr[4], nyArr[4], nzArr[4];
+			_mm_store_ps(zArr, z);
+			_mm_store_ps(rArr, r);
+			_mm_store_ps(gArr, g);
+			_mm_store_ps(bArr, b);
+			_mm_store_ps(aArr, a);
+			_mm_store_ps(uArr, u);
+			_mm_store_ps(vArr, v);
+			_mm_store_ps(nxArr, nx);
+			_mm_store_ps(nyArr, ny);
+			_mm_store_ps(nzArr, nz);
 
-                    VertexOutput frag;
-                    frag.Position = float4((float)px, (float)py, zArr[i], 1.0f);
-                    frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
-                    frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
-                    frag.UV = float2(uArr[i], vArr[i]);
+			for (int i = 0; i < 4; ++i)
+			{
+				if (!(depthMask & (1 << i)))
+					continue;
+				int px = x + i;
+				if (px < tileMin.x || px > tileMax.x)
+					continue;
 
-                    float4 finalColor = ps(frag, cb, *tt);
-                    renderTarget.set_pixel(int2(px, py), finalColor);
-                }
-            }
-        }
+				VertexOutput frag;
+				frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
+				frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
+				frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
+				frag.UV = float2(uArr[i], vArr[i]);
+				renderTarget.set_pixel(int2(px, y), ps(frag, cb, *tt));
+			}
+		}
 
         // Скалярный доводчик для оставшихся пикселей
         for (; x <= iMaxX; ++x)
