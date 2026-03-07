@@ -1,52 +1,68 @@
 ﻿#include "pch.h"
+
 #include <SoftX/SoftX.h>
-#include <atomic>
 
 SOFTX_BEGIN
 
 Device::Device(const PresentParameters& params)
-    : m_params(params)
-    , m_backBuffer(params.BackBufferSize)
-    , m_depthBuffer(params.BackBufferSize)
+    : presentParams(params), 
+    backBuffer(params.BackBufferSize), 
+    depthBuffer(params.BackBufferSize)
 {
 }
 
 void Device::SetDeviceContext(DeviceContext ctx)
 {
-	m_DeviceContext = std::move(ctx);
+    immediateContext = std::move(ctx);
 }
 
 DeviceContext& Device::GetDeviceContext()
 {
-	return m_DeviceContext;
+    return immediateContext;
+}
+
+const DeviceContext& Device::GetDeviceContext() const
+{
+    return immediateContext;
 }
 
 std::unique_ptr<DeviceContext> Device::CreateDeferredContext()
 {
-	return std::make_unique<DeviceContext>();
+    return std::make_unique<DeviceContext>();
 }
 
 Framebuffer& Device::GetBackBuffer()
 {
-    return m_backBuffer;
+    return backBuffer;
+}
+
+const Framebuffer& Device::GetBackBuffer() const
+{
+    return backBuffer;
 }
 
 PresentParameters& Device::GetPresentParams()
 {
-    return m_params;
+    return presentParams;
+}
+
+const PresentParameters& Device::GetPresentParams() const
+{
+    return presentParams;
 }
 
 void Device::Present()
 {
-	PROFILE_SCOPE("Device::Present");
+    PROFILE_SCOPE("Device::Present");
 
-    HDC hdc = GetDC(m_params.hDeviceWindow);
-    if (hdc) {
+    HDC hdc = GetDC(presentParams.hDeviceWindow);
+    if (hdc)
+    {
         RECT clientRect;
-        GetClientRect(m_params.hDeviceWindow, &clientRect);
+        GetClientRect(presentParams.hDeviceWindow, &clientRect);
         int2 dstSize(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
-        m_backBuffer.present(hdc, int2(0, 0), dstSize);
-        ReleaseDC(m_params.hDeviceWindow, hdc);
+        backBuffer.Present(hdc, int2(0, 0), dstSize);
+        ReleaseDC(presentParams.hDeviceWindow, hdc);
     }
 }
 

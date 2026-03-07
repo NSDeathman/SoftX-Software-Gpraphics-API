@@ -10,7 +10,7 @@
 
 SOFTX_BEGIN
 
-void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
+void DeviceContext::DrawPoint(uint x, uint y, float z, const float4& color)
 {
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
@@ -18,17 +18,17 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
     if (!m_DepthBuffer)
 		return;
 
-    if (x < 0 || x >= rt->width() || y < 0 || y >= rt->height())
+    if (x < 0 || x >= rt->Width() || y < 0 || y >= rt->Height())
         return;
-    int idx = y * rt->width() + x;
-    if (z < m_DepthBuffer->at(idx))
+    int idx = y * rt->Width() + x;
+    if (z < m_DepthBuffer->At(idx))
     {
-		m_DepthBuffer->at(idx) = z;
-        rt->set_pixel(int2(x, y), color);
+		m_DepthBuffer->At(idx) = z;
+        rt->SetPixel(int2(x, y), color);
     }
 }
 
-void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
+void DeviceContext::DrawLine(uint x0, uint y0, uint x1, uint y1, float z0, float z1, const float4& color)
 {
     IRenderTarget* rt = m_RenderTarget;
     if (!rt) return;
@@ -36,19 +36,19 @@ void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1,
     if (!m_DepthBuffer)
 		return;
 
-    int dx = std::abs(x1 - x0);
-    int dy = -std::abs(y1 - y0);
+    uint dx = std::abs((int)x1 - (int)x0);
+    uint dy = -std::abs((int)y1 - (int)y0);
     int sx = (x0 < x1) ? 1 : -1;
     int sy = (y0 < y1) ? 1 : -1;
-    int err = dx + dy;
-    int steps = std::max(dx, -dy);
+    uint err = dx + dy;
+    int steps = std::max((int)dx, -(int)dy);
     float zStep = (steps > 0) ? (z1 - z0) / steps : 0.0f;
     float z = z0;
-    int x = x0, y = y0;
+    uint x = x0, y = y0;
     for (int i = 0; i <= steps; ++i)
     {
         DrawPoint(x, y, z, color);
-        int e2 = 2 * err;
+        uint e2 = 2u * err;
         if (e2 >= dy)
         {
             err += dy;
@@ -63,7 +63,7 @@ void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1,
     }
 }
 
-void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
+void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
     PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
@@ -73,26 +73,26 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
         return;
 
     // ── Step 1: VS → clip space (без perspective divide) ─────────────────
-    std::vector<uint32_t> uniqueIndices;
+    std::vector<uint> uniqueIndices;
     {
         std::vector<bool> visited(m_VertexBuffer.Size(), false);
-        for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
+        for (uint i = startIndex; i < startIndex + indexCount; ++i)
         {
-            uint32_t idx = m_IndexBuffer.GetByIndex(i);
+            uint idx = m_IndexBuffer.GetByIndex(i);
             if (!visited[idx]) { visited[idx] = true; uniqueIndices.push_back(idx); }
         }
     }
 
     std::vector<VertexOutput> clipVerts(m_VertexBuffer.Size());
     concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(),
-        [&](uint32_t idx) {
+        [&](uint idx) {
             // Только VS — ClipSpaceToScreenSpace пока НЕ вызываем
             clipVerts[idx] = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer, m_TextureTable);
         });
 
     // ── Step 2: Собрать исходные треугольники ─────────────────────────────
     std::vector<int3> sourceTriangles;
-    for (uint32_t i = startIndex; i + 2 < startIndex + indexCount; i += 3)
+    for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
     {
         sourceTriangles.push_back({
             (int)m_IndexBuffer.GetByIndex(i),
@@ -158,8 +158,8 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
     }
 
     // ── Step 6: Рендер ────────────────────────────────────────────────────
-    int width  = m_RenderTarget->width();
-    int height = m_RenderTarget->height();
+    int width  = m_RenderTarget->Width();
+    int height = m_RenderTarget->Height();
 
     if (m_fillMode == FillMode::Solid)
     {
@@ -219,7 +219,7 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 
 void DeviceContext::DrawIndexed()
 {
-	uint32_t count = (uint32_t)m_IndexBuffer.Size();
+    uint count = (uint)m_IndexBuffer.Size();
 	DrawIndexed(count, 0);
 }
 
@@ -243,7 +243,7 @@ void DeviceContext::renderTileQuad(const Tile& tile, float invW, float invH)
 			float u = x * invW;
 			input.UV = float2(u, v);
 			float4 color = ps(input, cb, tt);
-			rt->set_pixel(int2(x, y), color);
+			rt->SetPixel(int2(x, y), color);
 		}
 	}
 }
@@ -256,8 +256,8 @@ void DeviceContext::DrawFullScreenQuad()
 		return;
 
 	IRenderTarget* rt = m_RenderTarget;
-	int w = rt->width();
-	int h = rt->height();
+	int w = rt->Width();
+	int h = rt->Height();
 	float invW = 1.0f / (w - 1);
 	float invH = 1.0f / (h - 1);
 

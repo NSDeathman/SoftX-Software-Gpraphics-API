@@ -1,22 +1,22 @@
 ﻿#pragma once
 
-#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
+#include "ThirdPartyIncluding.h"
 
 #include "CPUDetector.h"
 #include "Types.h"
 
-#include "Framebuffer.h"
 #include "DepthBuffer.h"
+#include "Framebuffer.h"
 #include "RenderTargetTexture.h"
 
-#include "RasterizerInterface.h"
-#include "RasterizerFactory.h"
-#include "RasterizerScalar.h"
-#include "RasterizerSSE.h"
 #include "RasterizerAVX.h"
+#include "RasterizerFactory.h"
+#include "RasterizerInterface.h"
+#include "RasterizerSSE.h"
+#include "RasterizerScalar.h"
 
 #include "Renderer.h"
 
-#include "DeviceContext.h"
 #include "Device.h"
+#include "DeviceContext.h"

@@ -44,7 +44,7 @@ static const float4 CHECKER_PALETTE[4] = {
 
 TextureRGBA32F CreateUVCheckerTexture()
 {
-	auto tex = new TextureRGBA32F(int2(CHECKER_SIZE, CHECKER_SIZE));
+	auto tex = new TextureRGBA32F(uint2(CHECKER_SIZE, CHECKER_SIZE));
 	const int cellSize = CHECKER_SIZE / CHECKER_CELLS;
 
 	for (int y = 0; y < CHECKER_SIZE; ++y)
@@ -75,7 +75,7 @@ TextureRGBA32F CreateUVCheckerTexture()
 			}
 
 			__m128 c = _mm_set_ps(color.w, color.z, color.y, color.x);
-			tex->stream_write(int2(x, y), c);
+			tex->StreamWrite(int2(x, y), c);
 		}
 	}
 	return *tex;
@@ -115,7 +115,7 @@ float4 UVCheckerPSBillinear(const VertexOutput& input, ConstantBuffer cb, const 
 void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, int stacks)
 {
 	std::vector<VertexInput> vertices;
-	std::vector<uint32_t> indices;
+    std::vector<uint> indices;
 
 	for (int stack = 0; stack <= stacks; ++stack)
 	{
@@ -154,7 +154,7 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, i
 void CreateCube(VertexBuffer& vb, IndexBuffer& ib, float size = 1.0f)
 {
 	std::vector<VertexInput> vertices;
-	std::vector<uint32_t> indices;
+    std::vector<uint> indices;
 
 	float half = size * 0.5f;
 	float3 corners[8] = {float3(-half, -half, -half), float3(half, -half, -half), float3(half, half, -half),
@@ -276,7 +276,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 	// ── SoftX Device ─────────────────────────────────────────
 	PresentParameters params;
-	params.BackBufferSize = int2(WINDOW_WIDTH, WINDOW_HEIGHT);
+	params.BackBufferSize = uint2(WINDOW_WIDTH, WINDOW_HEIGHT);
 	params.hDeviceWindow = g_hWnd;
 	params.Windowed = true;
 

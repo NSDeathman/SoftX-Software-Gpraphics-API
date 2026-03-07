@@ -18,12 +18,12 @@ void DeviceContext::DrawDebugLine(int x0, int y0, int x1, int y1, const float4& 
 	int sx = (x0 < x1) ? 1 : -1;
 	int sy = (y0 < y1) ? 1 : -1;
 	int err = dx + dy;
-	int x = x0, y = y0;
+	uint x = x0, y = y0;
 	while (true)
 	{
-		if (x >= 0 && x < rt->width() && y >= 0 && y < rt->height())
+		if (x >= 0 && x < rt->Width() && y >= 0 && y < rt->Height())
 		{
-			rt->set_pixel(int2(x, y), color);
+			rt->SetPixel(int2(x, y), color);
 		}
 		if (x == x1 && y == y1)
 			break;
@@ -46,8 +46,8 @@ void DeviceContext::DrawTileBorders()
 	IRenderTarget* rt = m_RenderTarget;
 	if (!rt)
 		return;
-	int w = rt->width();
-	int h = rt->height();
+	int w = rt->Width();
+	int h = rt->Height();
 	float4 borderColor(0.0f, 1.0f, 0.0f, 1.0f);
 
 	for (int x = m_TileSize; x < w; x += m_TileSize)

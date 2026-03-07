@@ -12,7 +12,7 @@ SOFTX_BEGIN
 
 struct PresentParameters
 {
-	int2 BackBufferSize;
+	uint2 BackBufferSize;
 	HWND hDeviceWindow;
 	bool Windowed;
 };
@@ -72,7 +72,7 @@ class VertexBuffer
 		return !m_data || m_data->empty();
 	}
 
-	const VertexInput& GetByIndex(uint32_t index) const
+	const VertexInput& GetByIndex(uint index) const
 	{
 		assert(m_data && index < m_data->size());
 		return (*m_data)[index];
@@ -94,7 +94,7 @@ class VertexBuffer
 class IndexBuffer
 {
   public:
-	using IndexData = std::vector<uint32_t>;
+	using IndexData = std::vector<uint>;
 
 	IndexBuffer() = default;
 	explicit IndexBuffer(std::shared_ptr<const IndexData> data) : m_data(std::move(data))
@@ -103,7 +103,7 @@ class IndexBuffer
 	explicit IndexBuffer(const IndexData& data) : m_data(std::make_shared<const IndexData>(data))
 	{
 	}
-	IndexBuffer(std::initializer_list<uint32_t> list) : m_data(std::make_shared<const IndexData>(list))
+    IndexBuffer(std::initializer_list<uint> list) : m_data(std::make_shared<const IndexData>(list))
 	{
 	}
 
@@ -116,7 +116,7 @@ class IndexBuffer
 		return !m_data || m_data->empty();
 	}
 
-	uint32_t GetByIndex(uint32_t index) const
+	uint GetByIndex(uint index) const
 	{
 		assert(m_data && index < m_data->size());
 		return (*m_data)[index];
@@ -259,14 +259,14 @@ struct TextureBinding
 		float2 wrapped = m_sampler.applyWrap(uv);
 
 		if (m_sampler.filter == Filter::Bilinear)
-			return m_texture->sample_bilinear(wrapped);
+			return m_texture->SampleBillinear(wrapped);
 		else
-			return m_texture->sample(wrapped);
+			return m_texture->Sample(wrapped);
 	}
 
 	int2 GetDimensions() const
 	{
-		return int2(m_texture->width(), m_texture->height());
+		return int2(m_texture->Width(), m_texture->Height());
 	}
 };
 

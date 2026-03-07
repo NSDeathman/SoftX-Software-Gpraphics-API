@@ -20,8 +20,8 @@ void RasterizerAVX::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerAVX::RasterizeTriangle");
 
-    int width  = renderTarget.width();
-    int height = renderTarget.height();
+    int width  = renderTarget.Width();
+    int height = renderTarget.Height();
 
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
@@ -204,8 +204,8 @@ void RasterizerAVX::RasterizeTriangle(
 
             // ── Depth read: два __m128 блока → __m256 ─────────────────────
             // x кратен 8 → x и x+4 оба кратны 4, read4 корректен
-            __m128 d_lo = depthBuffer.read4(int2(x,     y));
-            __m128 d_hi = depthBuffer.read4(int2(x + 4, y));
+            __m128 d_lo = depthBuffer.Read4(int2(x,     y));
+            __m128 d_hi = depthBuffer.Read4(int2(x + 4, y));
             __m256 depths = _mm256_set_m128(d_hi, d_lo);
 
             __m256 depthCmp;
@@ -230,8 +230,8 @@ void RasterizerAVX::RasterizeTriangle(
             // ── Depth write: разбиваем __m256 обратно на два __m128 блока ─
             __m128 mask_lo = _mm256_castps256_ps128(finalMask);
             __m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
-            depthBuffer.write4(int2(x,     y), _mm256_castps256_ps128(z), mask_lo);
-            depthBuffer.write4(int2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
+            depthBuffer.Write4(int2(x,     y), _mm256_castps256_ps128(z), mask_lo);
+            depthBuffer.Write4(int2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
 
             // ── Скалярный цикл только для шейдинга ───────────────────────
             alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
@@ -254,7 +254,7 @@ void RasterizerAVX::RasterizeTriangle(
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
                 frag.UV       = float2(uArr[i], vArr[i]);
-                renderTarget.set_pixel(int2(px, y), ps(frag, cb, *tt));
+                renderTarget.SetPixel(int2(px, y), ps(frag, cb, *tt));
             }
         }
 
@@ -288,17 +288,17 @@ void RasterizerAVX::RasterizeTriangle(
             bool depthPass = false;
             switch (state.depthFunc) {
             case ComparisonFunc::Never:        depthPass = false; break;
-            case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.at(idx); break;
-            case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.at(idx); break;
-            case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.at(idx); break;
-            case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.at(idx); break;
-            case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.at(idx); break;
-            case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+            case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.At(idx); break;
+            case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.At(idx); break;
+            case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.At(idx); break;
+            case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.At(idx); break;
+            case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.At(idx); break;
+            case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.At(idx); break;
             case ComparisonFunc::Always:       depthPass = true; break;
             }
             if (depthPass) {
-                depthBuffer.at(idx) = frag.Position.z;
-                renderTarget.set_pixel(int2(x, y), ps(frag, cb, *tt));
+                depthBuffer.At(idx) = frag.Position.z;
+                renderTarget.SetPixel(int2(x, y), ps(frag, cb, *tt));
             }
         }
     }

@@ -20,8 +20,8 @@ void RasterizerScalar::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerScalar::RasterizeTriangleTile");
 
-    int width = renderTarget.width();
-    int height = renderTarget.height();
+    int width = renderTarget.Width();
+    int height = renderTarget.Height();
 
     // Полный bounding box треугольника
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
@@ -66,18 +66,18 @@ void RasterizerScalar::RasterizeTriangle(
             bool depthPass = false;
             switch (state.depthFunc) {
                 case ComparisonFunc::Never:         depthPass = false; break;
-                case ComparisonFunc::Less:          depthPass = frag.Position.z < depthBuffer.at(idx); break;
-                case ComparisonFunc::Equal:         depthPass = frag.Position.z == depthBuffer.at(idx); break;
-                case ComparisonFunc::LessEqual:     depthPass = frag.Position.z <= depthBuffer.at(idx); break;
-                case ComparisonFunc::Greater:       depthPass = frag.Position.z > depthBuffer.at(idx); break;
-                case ComparisonFunc::NotEqual:      depthPass = frag.Position.z != depthBuffer.at(idx); break;
-                case ComparisonFunc::GreaterEqual:  depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+                case ComparisonFunc::Less:          depthPass = frag.Position.z < depthBuffer.At(idx); break;
+                case ComparisonFunc::Equal:         depthPass = frag.Position.z == depthBuffer.At(idx); break;
+                case ComparisonFunc::LessEqual:     depthPass = frag.Position.z <= depthBuffer.At(idx); break;
+                case ComparisonFunc::Greater:       depthPass = frag.Position.z > depthBuffer.At(idx); break;
+                case ComparisonFunc::NotEqual:      depthPass = frag.Position.z != depthBuffer.At(idx); break;
+                case ComparisonFunc::GreaterEqual:  depthPass = frag.Position.z >= depthBuffer.At(idx); break;
                 case ComparisonFunc::Always:        depthPass = true; break;
             }
             if (depthPass) {
-                depthBuffer.at(idx) = frag.Position.z;
+                depthBuffer.At(idx) = frag.Position.z;
                 float4 finalColor = ps(frag, cb, *tt);
-                renderTarget.set_pixel(int2(x, y), finalColor);
+                renderTarget.SetPixel(int2(x, y), finalColor);
             }
         }
     }

@@ -1,41 +1,49 @@
 ﻿#pragma once
 
-#include <windows.h>
 #include <functional>
+#include <windows.h>
 
-#include "ThirdPartyIncluding.h"
-#include "LibInternal.h"
-#include "ThreadPool.h"
 #include "DeviceContext.h"
+#include "LibInternal.h"
+#include "ThirdPartyIncluding.h"
+#include "ThreadPool.h"
 
 SOFTX_BEGIN
 
-class SOFTX_API Device {
+class SOFTX_API Device
+{
 public:
-    Device(const PresentParameters& params);
+    explicit Device(const PresentParameters& params);
     ~Device() = default;
 
-	void SetDeviceContext(const DeviceContext ctx);
-	DeviceContext& GetDeviceContext();
+    void SetDeviceContext(DeviceContext ctx);
+    DeviceContext& GetDeviceContext();
+    const DeviceContext& GetDeviceContext() const;
 
-    DeviceContext& GetImmediateContext() { return m_DeviceContext; }
-    const DeviceContext& GetImmediateContext() const { return m_DeviceContext; }
+    DeviceContext& GetImmediateContext()
+    {
+        return immediateContext;
+    }
+    const DeviceContext& GetImmediateContext() const
+    {
+        return immediateContext;
+    }
 
-	std::unique_ptr<DeviceContext> CreateDeferredContext();
+    std::unique_ptr<DeviceContext> CreateDeferredContext();
 
     void Present();
 
     Framebuffer& GetBackBuffer();
+    const Framebuffer& GetBackBuffer() const;
 
     PresentParameters& GetPresentParams();
+    const PresentParameters& GetPresentParams() const;
 
 private:
-    PresentParameters m_params;
-
-    Framebuffer m_backBuffer;
-    DepthBuffer m_depthBuffer;
-
-	DeviceContext m_DeviceContext;
+    PresentParameters presentParams;
+    Framebuffer backBuffer;
+    DepthBuffer depthBuffer;
+    DeviceContext immediateContext;
 };
 
 SOFTX_END

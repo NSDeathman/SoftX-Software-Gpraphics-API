@@ -10,54 +10,54 @@ SOFTX_BEGIN
 class SOFTX_API RenderTargetTexture : public IRenderTarget
 {
   public:
-	RenderTargetTexture(int2 size) : m_texture(size)
+	RenderTargetTexture(uint2 size) : texture(size)
 	{
 	}
 
-	void clear(const float4& color) override
+	void Clear(const float4& color) override
 	{
-		int w = m_texture.width();
-		int h = m_texture.height();
+		int w = texture.Width();
+		int h = texture.Height();
 		__m128 col = _mm_set_ps(color.w, color.z, color.y, color.x); // float4 RGBA -> __m128 (w,z,y,x)
 		for (int y = 0; y < h; ++y)
 		{
 			for (int x = 0; x < w; ++x)
 			{
-				m_texture.stream_write(int2(x, y), col);
+                texture.StreamWrite(int2(x, y), col);
 			}
 		}
 	}
 
-	void set_pixel(int2 coords, const float4& color) override
+	void SetPixel(int2 coords, const float4& color) override
 	{
 		__m128 col = _mm_set_ps(color.w, color.z, color.y, color.x);
-		m_texture.stream_write(coords, col);
+		texture.StreamWrite(coords, col);
 	}
 
-	int width() const override
+	uint Width() const override
 	{
-		return m_texture.width();
+		return texture.Width();
 	}
-	int height() const override
+	uint Height() const override
 	{
-		return m_texture.height();
+		return texture.Height();
 	}
-	int2 size() const override
+	uint2 Size() const override
 	{
-		return int2(width(), height());
+		return uint2(Width(), Height());
 	}
 
-	const TextureRGBA32F& texture() const
+	const TextureRGBA32F& Texture() const
 	{
-		return m_texture;
+		return texture;
 	}
-	TextureRGBA32F& texture()
+	TextureRGBA32F& Texture()
 	{
-		return m_texture;
+		return texture;
 	}
 
   private:
-	TextureRGBA32F m_texture;
+	TextureRGBA32F texture;
 };
 
 SOFTX_END

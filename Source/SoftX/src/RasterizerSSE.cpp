@@ -21,8 +21,8 @@ void RasterizerSSE::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerSSE::RasterizeTriangleTile");
 
-    int width  = renderTarget.width();
-    int height = renderTarget.height();
+    int width  = renderTarget.Width();
+    int height = renderTarget.Height();
 
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
@@ -197,7 +197,7 @@ void RasterizerSSE::RasterizeTriangle(
 #undef PLERP128
 
             // ── Depth read через блочный API ──────────────────────────────
-            __m128 depths = depthBuffer.read4(int2(x, y));
+            __m128 depths = depthBuffer.Read4(int2(x, y));
 
             __m128 depthCmp;
             switch (state.depthFunc)
@@ -219,7 +219,7 @@ void RasterizerSSE::RasterizeTriangle(
                 continue;
 
             // ── Depth write под маской ────────────────────────────────────
-            depthBuffer.write4(int2(x, y), z, finalMask);
+            depthBuffer.Write4(int2(x, y), z, finalMask);
 
             // ── Скалярный цикл только для шейдинга ───────────────────────
             alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
@@ -242,7 +242,7 @@ void RasterizerSSE::RasterizeTriangle(
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
                 frag.UV       = float2(uArr[i], vArr[i]);
-                renderTarget.set_pixel(int2(px, y), ps(frag, cb, *tt));
+                renderTarget.SetPixel(int2(px, y), ps(frag, cb, *tt));
             }
         }
 
@@ -275,17 +275,17 @@ void RasterizerSSE::RasterizeTriangle(
             bool depthPass = false;
             switch (state.depthFunc) {
             case ComparisonFunc::Never:        depthPass = false; break;
-            case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.at(idx); break;
-            case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.at(idx); break;
-            case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.at(idx); break;
-            case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.at(idx); break;
-            case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.at(idx); break;
-            case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+            case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.At(idx); break;
+            case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.At(idx); break;
+            case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.At(idx); break;
+            case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.At(idx); break;
+            case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.At(idx); break;
+            case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.At(idx); break;
             case ComparisonFunc::Always:       depthPass = true; break;
             }
             if (depthPass) {
-                depthBuffer.at(idx) = frag.Position.z;
-                renderTarget.set_pixel(int2(x, y), ps(frag, cb, *tt));
+                depthBuffer.At(idx) = frag.Position.z;
+                renderTarget.SetPixel(int2(x, y), ps(frag, cb, *tt));
             }
         }
     }

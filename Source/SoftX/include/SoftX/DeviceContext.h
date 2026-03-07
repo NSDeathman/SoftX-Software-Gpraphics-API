@@ -60,12 +60,12 @@ class SOFTX_API DeviceContext
 	void SetViewport(const Viewport& vp);
 	Viewport GetViewport() const;
 
-	void SetTileSize(uint32_t size);
-	uint32_t GetTileSize() const;
+	void SetTileSize(uint size);
+    uint GetTileSize() const;
 
 	bool Validate(std::string* errorMsg = nullptr) const;
 
-	void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
+	void DrawIndexed(uint indexCount, uint startIndex);
 	void DrawIndexed();
 
 	void DrawFullScreenQuad();
@@ -96,8 +96,8 @@ class SOFTX_API DeviceContext
 
 	void renderTileQuad(const Tile& tile, float invW, float invH);
 
-	void DrawPoint(int x, int y, float z, const float4& color);
-    void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
+	void DrawPoint(uint x, uint y, float z, const float4& color);
+    void DrawLine(uint x0, uint y0, uint x1, uint y1, float z0, float z1, const float4& color);
 
 	void DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color);
 	void DrawTileBorders();

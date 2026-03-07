@@ -4,9 +4,8 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <cmath>
-#include <vector>
-#include <string>
 #include <future>
+#include <string>
+#include <vector>
 
 #include <SoftX/SoftX.h>
-

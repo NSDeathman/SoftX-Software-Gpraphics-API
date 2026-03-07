@@ -116,8 +116,8 @@ void DeviceContext::SetRenderTarget(IRenderTarget* rt, bool createDepthBuffer)
 	m_RenderTarget = rt;
 	if (createDepthBuffer && rt)
 	{
-		int2 newSize = rt->size();
-		if (!m_OwnDepthBuffer || m_OwnDepthBuffer->size() != newSize)
+		uint2 newSize = rt->Size();
+		if (!m_OwnDepthBuffer || m_OwnDepthBuffer->Size() != newSize)
 		{
 			m_OwnDepthBuffer = std::make_unique<DepthBuffer>(newSize);
 		}
@@ -135,7 +135,7 @@ void DeviceContext::Clear(const float4& color)
 
 	if (m_RenderTarget)
 	{
-		m_RenderTarget->clear(color);
+		m_RenderTarget->Clear(color);
 	}
 }
 
@@ -145,7 +145,7 @@ void DeviceContext::ClearDepth(float depth)
 
 	if (m_DepthBuffer)
 	{
-		m_DepthBuffer->clear(depth);
+		m_DepthBuffer->Clear(depth);
 	}
 }
 
@@ -189,12 +189,12 @@ Viewport DeviceContext::GetViewport() const
 	return m_Viewport;
 }
 
-void DeviceContext::SetTileSize(uint32_t size)
+void DeviceContext::SetTileSize(uint size)
 {
 	m_TileSize = size;
 }
 
-uint32_t DeviceContext::GetTileSize() const
+uint DeviceContext::GetTileSize() const
 {
 	return m_TileSize;
 }

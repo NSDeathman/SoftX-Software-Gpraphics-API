@@ -12,7 +12,7 @@ Renderer::Renderer(
     const ConstantBuffer& cb, 
     const TextureTable* tt,
     const RasterizerState& state, 
-    uint32_t tileSize): 
+    uint tileSize): 
     m_Rasterizer(rasterizer), 
     m_RenderTarget(rt), 
     m_DepthBuffer(db), 
@@ -28,7 +28,7 @@ void Renderer::Execute(const std::vector<VertexOutput>& verts, const std::vector
 {
 	m_Verts = &verts;
 	m_Triangles = &triangles;
-	buildTiles(m_RenderTarget.width(), m_RenderTarget.height());
+	buildTiles(m_RenderTarget.Width(), m_RenderTarget.Height());
 	binTriangles(verts, triangles);
 	renderTiles();
 	m_Verts = nullptr;
@@ -58,8 +58,8 @@ void Renderer::binTriangles(
     for (auto& t : m_Tiles) t.triangleIndices.clear();
 
     int ts      = m_TileSize;
-    int tilesX  = (m_RenderTarget.width()  + ts - 1) / ts;
-    int tilesY  = (m_RenderTarget.height() + ts - 1) / ts;
+    int tilesX  = (m_RenderTarget.Width()  + ts - 1) / ts;
+    int tilesY  = (m_RenderTarget.Height() + ts - 1) / ts;
 
     for (int triIdx = 0; triIdx < (int)triangles.size(); ++triIdx)
     {
