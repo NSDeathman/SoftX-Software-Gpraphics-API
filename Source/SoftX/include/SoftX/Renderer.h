@@ -28,7 +28,6 @@ private:
     void buildTiles(int width, int height);
     void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
     void renderTiles();
-    void renderTile(int tileIndex);
 
     IRasterizer& m_Rasterizer;
     IRenderTarget& m_RenderTarget;

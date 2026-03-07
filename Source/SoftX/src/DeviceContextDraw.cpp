@@ -24,7 +24,7 @@ void DeviceContext::DrawPoint(uint x, uint y, float z, const float4& color)
     if (z < m_DepthBuffer->At(idx))
     {
 		m_DepthBuffer->At(idx) = z;
-        rt->SetPixel(int2(x, y), color);
+        rt->SetPixel(uint2(x, y), color);
     }
 }
 
@@ -158,9 +158,6 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     }
 
     // ── Step 6: Рендер ────────────────────────────────────────────────────
-    int width  = m_RenderTarget->Width();
-    int height = m_RenderTarget->Height();
-
     if (m_fillMode == FillMode::Solid)
     {
         RasterizerState state;
@@ -235,15 +232,15 @@ void DeviceContext::renderTileQuad(const Tile& tile, float invW, float invH)
 	auto cb = m_ConstantBuffer;
 	auto tt = m_TextureTable;
 
-	for (int y = tile.min.y; y <= tile.max.y; ++y)
+	for (uint y = tile.min.y; y <= (uint)tile.max.y; ++y)
 	{
 		float v = y * invH;
-		for (int x = tile.min.x; x <= tile.max.x; ++x)
+        for (uint x = tile.min.x; x <= (uint)tile.max.x; ++x)
 		{
 			float u = x * invW;
 			input.UV = float2(u, v);
 			float4 color = ps(input, cb, tt);
-			rt->SetPixel(int2(x, y), color);
+			rt->SetPixel(uint2(x, y), color);
 		}
 	}
 }
@@ -268,7 +265,7 @@ void DeviceContext::DrawFullScreenQuad()
 		int ts = m_TileSize;
 		int tilesX = (w + ts - 1) / ts;
 		int tilesY = (h + ts - 1) / ts;
-		tiles.reserve(tilesX * tilesY);
+        tiles.reserve(tilesX * tilesY);
 		for (int ty = 0; ty < tilesY; ++ty)
 			for (int tx = 0; tx < tilesX; ++tx)
 			{

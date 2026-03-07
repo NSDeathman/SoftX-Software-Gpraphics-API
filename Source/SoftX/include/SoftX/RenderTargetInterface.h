@@ -12,7 +12,7 @@ class SOFTX_API IRenderTarget
 
 	virtual void Clear(const float4& color) = 0;
 
-	virtual void SetPixel(int2 coords, const float4& color) = 0;
+	virtual void SetPixel(uint2 coords, const float4& color) = 0;
 
 	virtual uint Width() const = 0;
 	virtual uint Height() const = 0;

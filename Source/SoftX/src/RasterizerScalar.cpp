@@ -20,9 +20,6 @@ void RasterizerScalar::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerScalar::RasterizeTriangleTile");
 
-    int width = renderTarget.Width();
-    int height = renderTarget.Height();
-
     // Полный bounding box треугольника
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
@@ -43,6 +40,7 @@ void RasterizerScalar::RasterizeTriangle(
     if (cull == CullMode::Front && area2 > 0) return;
     if (std::abs(area2) < 1e-6f) return;
 
+    uint width = renderTarget.Width();
     for (int y = iMinY; y <= iMaxY; ++y)
     {
         for (int x = iMinX; x <= iMaxX; ++x)
@@ -77,7 +75,7 @@ void RasterizerScalar::RasterizeTriangle(
             if (depthPass) {
                 depthBuffer.At(idx) = frag.Position.z;
                 float4 finalColor = ps(frag, cb, *tt);
-                renderTarget.SetPixel(int2(x, y), finalColor);
+                renderTarget.SetPixel(uint2(x, y), finalColor);
             }
         }
     }

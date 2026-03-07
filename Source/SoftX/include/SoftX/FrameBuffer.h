@@ -42,21 +42,21 @@ public:
         }
     }
 
-    void SetPixel(int2 coords, const float4& color) override
+    void SetPixel(uint2 coords, const float4& color) override
     {
         __m128* data = pixelsStorage.data();
         int index = coords.y * resolution.x + coords.x;
         _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color.get_simd());
     }
 
-    void SetPixel(int2 coords, __m128 color)
+    void SetPixel(uint2 coords, __m128 color)
     {
         __m128* data = pixelsStorage.data();
         int index = coords.y * resolution.x + coords.x;
         _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color);
     }
 
-    __m128 Read(int2 coords) const
+    __m128 Read(uint2 coords) const
     {
         return pixelsStorage[coords.y * resolution.x + coords.x];
     }
@@ -74,7 +74,7 @@ public:
         return resolution;
     }
 
-    void ConvertTile(uint tileIdx, uint tileSize, uint* bgraBuffer, uint tileWidth, uint tileHeight) const
+    void ConvertTile(uint tileIdx, uint tileSize, uint* bgraBuffer) const
     {
         int tilesX = (resolution.x + tileSize - 1) / tileSize;
         int tx = tileIdx % tilesX;
@@ -128,14 +128,14 @@ public:
 
             std::atomic<int> tileCounter(0);
 
-            auto worker = [this, &tileCounter, numTiles, tileSize, &bgra = bgraBuffer, tileWidth = resolution.x, tileHeight = resolution.y]()
+            auto worker = [this, &tileCounter, numTiles, tileSize, &bgra = bgraBuffer]()
             {
                 while (true)
                 {
                     int idx = tileCounter.fetch_add(1);
                     if (idx >= numTiles)
                         break;
-                    ConvertTile(idx, tileSize, bgra.data(), tileWidth, tileHeight);
+                    ConvertTile(idx, tileSize, bgra.data());
                 }
             };
 

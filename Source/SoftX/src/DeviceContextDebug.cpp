@@ -8,26 +8,26 @@
 
 SOFTX_BEGIN
 
-void DeviceContext::DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color)
+void DeviceContext::DrawDebugLine(uint x0, uint y0, uint x1, uint y1, const float4& color)
 {
 	IRenderTarget* rt = m_RenderTarget;
 	if (!rt)
 		return;
-	int dx = std::abs(x1 - x0);
-	int dy = -std::abs(y1 - y0);
+    uint dx = std::abs((int)x1 - (int)x0);
+    uint dy = -std::abs((int)y1 - (int)y0);
 	int sx = (x0 < x1) ? 1 : -1;
 	int sy = (y0 < y1) ? 1 : -1;
-	int err = dx + dy;
+	uint err = dx + dy;
 	uint x = x0, y = y0;
 	while (true)
 	{
 		if (x >= 0 && x < rt->Width() && y >= 0 && y < rt->Height())
 		{
-			rt->SetPixel(int2(x, y), color);
+			rt->SetPixel(uint2(x, y), color);
 		}
 		if (x == x1 && y == y1)
 			break;
-		int e2 = 2 * err;
+		uint e2 = 2 * err;
 		if (e2 >= dy)
 		{
 			err += dy;

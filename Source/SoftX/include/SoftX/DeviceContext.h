@@ -99,7 +99,7 @@ class SOFTX_API DeviceContext
 	void DrawPoint(uint x, uint y, float z, const float4& color);
     void DrawLine(uint x0, uint y0, uint x1, uint y1, float z0, float z1, const float4& color);
 
-	void DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color);
+	void DrawDebugLine(uint x0, uint y0, uint x1, uint y1, const float4& color);
 	void DrawTileBorders();
 	void DrawActiveTileBorders(const std::vector<Tile>& tiles);
 };

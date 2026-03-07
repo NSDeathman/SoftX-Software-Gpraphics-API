@@ -20,18 +20,15 @@ void RasterizerAVX::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerAVX::RasterizeTriangle");
 
-    int width  = renderTarget.Width();
-    int height = renderTarget.Height();
-
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    int iMinX = std::max(tileMin.x, (int)std::floor(minX));
-    int iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
-    int iMinY = std::max(tileMin.y, (int)std::floor(minY));
-    int iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
+    uint iMinX = std::max(tileMin.x, (int)std::floor(minX));
+    uint iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
+    uint iMinY = std::max(tileMin.y, (int)std::floor(minY));
+    uint iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
@@ -135,20 +132,21 @@ void RasterizerAVX::RasterizeTriangle(
                                _mm256_mul_ps(_mm256_sub_ps(initY, v2y), dx20v));
     }
 
-    for (int y = iMinY; y <= iMaxY; ++y)
+    uint width = renderTarget.Width();
+    for (uint y = iMinY; y <= iMaxY; ++y)
     {
-        int x;
+        uint x;
         __m256 f01, f12, f20;
 
         // Инкремент f в for-выражении: continue не нарушает накопление
         for (x = simdStartX, f01 = f01Row, f12 = f12Row, f20 = f20Row;
-             x + 7 < width && x <= iMaxX - 7;
+             x + 7u < width && x <= iMaxX - 7u;
              x += 8,
              f01 = _mm256_add_ps(f01, f01StepX),
              f12 = _mm256_add_ps(f12, f12StepX),
              f20 = _mm256_add_ps(f20, f20StepX))
         {
-            if (x > tileMax.x || x + 7 < tileMin.x)
+            if (x > (uint)tileMax.x || x + 7 < (uint)tileMin.x)
                 continue;
 
             // f01/f12/f20 уже вычислены инкрементально — 3 add вместо 6 mul + 6 sub
@@ -204,8 +202,8 @@ void RasterizerAVX::RasterizeTriangle(
 
             // ── Depth read: два __m128 блока → __m256 ─────────────────────
             // x кратен 8 → x и x+4 оба кратны 4, read4 корректен
-            __m128 d_lo = depthBuffer.Read4(int2(x,     y));
-            __m128 d_hi = depthBuffer.Read4(int2(x + 4, y));
+            __m128 d_lo = depthBuffer.Read4(uint2(x,     y));
+            __m128 d_hi = depthBuffer.Read4(uint2(x + 4, y));
             __m256 depths = _mm256_set_m128(d_hi, d_lo);
 
             __m256 depthCmp;
@@ -219,6 +217,7 @@ void RasterizerAVX::RasterizeTriangle(
             case ComparisonFunc::NotEqual:     depthCmp = _mm256_cmp_ps(z, depths, _CMP_NEQ_OQ); break;
             case ComparisonFunc::GreaterEqual: depthCmp = _mm256_cmp_ps(z, depths, _CMP_GE_OQ); break;
             case ComparisonFunc::Always:       depthCmp = _mm256_castsi256_ps(_mm256_set1_epi32(-1)); break;
+            default:                           depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ); break;
             }
 
             // inside — уже готовая SIMD маска, roundtrip через insideMask убран
@@ -230,8 +229,8 @@ void RasterizerAVX::RasterizeTriangle(
             // ── Depth write: разбиваем __m256 обратно на два __m128 блока ─
             __m128 mask_lo = _mm256_castps256_ps128(finalMask);
             __m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
-            depthBuffer.Write4(int2(x,     y), _mm256_castps256_ps128(z), mask_lo);
-            depthBuffer.Write4(int2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
+            depthBuffer.Write4(uint2(x,     y), _mm256_castps256_ps128(z), mask_lo);
+            depthBuffer.Write4(uint2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
 
             // ── Скалярный цикл только для шейдинга ───────────────────────
             alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
@@ -254,7 +253,7 @@ void RasterizerAVX::RasterizeTriangle(
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
                 frag.UV       = float2(uArr[i], vArr[i]);
-                renderTarget.SetPixel(int2(px, y), ps(frag, cb, *tt));
+                renderTarget.SetPixel(uint2(px, y), ps(frag, cb, *tt));
             }
         }
 
@@ -266,7 +265,7 @@ void RasterizerAVX::RasterizeTriangle(
         // ── Скалярный доводчик для оставшихся пикселей ───────────────────
         for (; x <= iMaxX; ++x)
         {
-            if (x < tileMin.x || x > tileMax.x)
+            if (x < (uint)tileMin.x || x > (uint)tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);
@@ -298,7 +297,7 @@ void RasterizerAVX::RasterizeTriangle(
             }
             if (depthPass) {
                 depthBuffer.At(idx) = frag.Position.z;
-                renderTarget.SetPixel(int2(x, y), ps(frag, cb, *tt));
+                renderTarget.SetPixel(uint2(x, y), ps(frag, cb, *tt));
             }
         }
     }

@@ -21,18 +21,15 @@ void RasterizerSSE::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerSSE::RasterizeTriangleTile");
 
-    int width  = renderTarget.Width();
-    int height = renderTarget.Height();
-
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    int iMinX = std::max(tileMin.x, (int)std::floor(minX));
-    int iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
-    int iMinY = std::max(tileMin.y, (int)std::floor(minY));
-    int iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
+    uint iMinX = std::max(tileMin.x, (int)std::floor(minX));
+    uint iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
+    uint iMinY = std::max(tileMin.y, (int)std::floor(minY));
+    uint iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
@@ -134,20 +131,21 @@ void RasterizerSSE::RasterizeTriangle(
                             _mm_mul_ps(_mm_sub_ps(initY, v2y), dx20v));
     }
 
-    for (int y = iMinY; y <= iMaxY; ++y)
+    uint width = renderTarget.Width();
+    for (uint y = iMinY; y <= iMaxY; ++y)
     {
-        int x;
+        uint x;
         __m128 f01, f12, f20;
 
         // Инкремент f в for-выражении: continue не нарушает накопление
         for (x = simdStartX, f01 = f01Row, f12 = f12Row, f20 = f20Row;
-             x + 3 < width && x <= iMaxX - 3;
+             x + 3u < width && x <= iMaxX - 3u;
              x += 4,
              f01 = _mm_add_ps(f01, f01StepX),
              f12 = _mm_add_ps(f12, f12StepX),
              f20 = _mm_add_ps(f20, f20StepX))
         {
-            if (x > tileMax.x || x + 3 < tileMin.x)
+            if (x > (uint)tileMax.x || x + 3 < (uint)tileMin.x)
                 continue;
 
             // f01/f12/f20 уже вычислены инкрементально — 3 add вместо 6 mul + 6 sub
@@ -197,7 +195,7 @@ void RasterizerSSE::RasterizeTriangle(
 #undef PLERP128
 
             // ── Depth read через блочный API ──────────────────────────────
-            __m128 depths = depthBuffer.Read4(int2(x, y));
+            __m128 depths = depthBuffer.Read4(uint2(x, y));
 
             __m128 depthCmp;
             switch (state.depthFunc)
@@ -210,6 +208,7 @@ void RasterizerSSE::RasterizeTriangle(
             case ComparisonFunc::NotEqual:     depthCmp = _mm_cmpneq_ps(z, depths); break;
             case ComparisonFunc::GreaterEqual: depthCmp = _mm_cmpge_ps(z, depths); break;
             case ComparisonFunc::Always:       depthCmp = _mm_castsi128_ps(_mm_set1_epi32(-1)); break;
+            default:                           depthCmp = _mm_cmplt_ps(z, depths); break;
             }
 
             // inside — уже готовая SIMD маска, roundtrip через insideMask убран
@@ -219,7 +218,7 @@ void RasterizerSSE::RasterizeTriangle(
                 continue;
 
             // ── Depth write под маской ────────────────────────────────────
-            depthBuffer.Write4(int2(x, y), z, finalMask);
+            depthBuffer.Write4(uint2(x, y), z, finalMask);
 
             // ── Скалярный цикл только для шейдинга ───────────────────────
             alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
@@ -242,7 +241,7 @@ void RasterizerSSE::RasterizeTriangle(
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
                 frag.UV       = float2(uArr[i], vArr[i]);
-                renderTarget.SetPixel(int2(px, y), ps(frag, cb, *tt));
+                renderTarget.SetPixel(uint2(px, y), ps(frag, cb, *tt));
             }
         }
 
@@ -254,7 +253,7 @@ void RasterizerSSE::RasterizeTriangle(
         // ── Скалярный доводчик для оставшихся пикселей ───────────────────
         for (; x <= iMaxX; ++x)
         {
-            if (x < tileMin.x || x > tileMax.x)
+            if (x < (uint)tileMin.x || x > (uint)tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);
@@ -285,7 +284,7 @@ void RasterizerSSE::RasterizeTriangle(
             }
             if (depthPass) {
                 depthBuffer.At(idx) = frag.Position.z;
-                renderTarget.SetPixel(int2(x, y), ps(frag, cb, *tt));
+                renderTarget.SetPixel(uint2(x, y), ps(frag, cb, *tt));
             }
         }
     }

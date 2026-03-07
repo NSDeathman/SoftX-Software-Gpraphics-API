@@ -71,21 +71,21 @@ public:
     // ── SIMD блочный доступ ───────────────────────────────────────────────
     // Читает 4 значения глубины начиная с coords (горизонтально).
     // coords.x должен быть кратен 4 — используется в SSE растеризаторе.
-    __m128 Read4(int2 coords) const
+    __m128 Read4(uint2 coords) const
     {
         assert(coords.x % 4 == 0);
-        assert(coords.x >= 0 && coords.x + 3 < m_widthPadded &&
+        assert(coords.x >= 0 && coords.x + 3u < widthPadded &&
                coords.y >= 0 && coords.y < resolution.y);
-        int blockIdx = (coords.y * widthPadded + coords.x) / 4;
+        int blockIdx = (coords.y * widthPadded + coords.x) / 4u;
         return blocks[blockIdx];
     }
 
     // Записывает 4 значения глубины с учётом маски (1 = перезаписать).
     // Используется в SSE растеризаторе после depth test.
-    void Write4(int2 coords, __m128 depths, __m128 mask)
+    void Write4(uint2 coords, __m128 depths, __m128 mask)
     {
         assert(coords.x % 4 == 0);
-        assert(coords.x >= 0 && coords.x + 3 < m_widthPadded &&
+        assert(coords.x >= 0 && coords.x + 3 < widthPadded &&
                coords.y >= 0 && coords.y < resolution.y);
         int     blockIdx = (coords.y * widthPadded + coords.x) / 4;
         __m128& block    = blocks[blockIdx];
@@ -98,7 +98,7 @@ public:
 
     // Depth test для 4 пикселей: возвращает маску прошедших (z < buffer).
     // depth4 — интерполированные z, activeMask — маска покрытия тайла.
-    __m128 Test4(int2 coords, __m128 depth4, __m128 activeMask) const
+    __m128 Test4(uint2 coords, __m128 depth4, __m128 activeMask) const
     {
         __m128 buffered = Read4(coords);
         __m128 passed   = _mm_cmplt_ps(depth4, buffered); // z < bufferZ
@@ -144,7 +144,7 @@ private:
     }
 
     uint2 resolution;
-    int widthPadded;                // кратен 4 — для выравнивания блоков
+    uint widthPadded;                // кратен 4 — для выравнивания блоков
     std::vector<__m128> blocks;     // каждый блок = 4 float глубины
 };
 

@@ -84,20 +84,15 @@ void Renderer::binTriangles(
     }
 }
 
-void Renderer::renderTile(int tileIndex)
-{
-    const Tile& tile = m_Tiles[tileIndex];
-}
-
 void Renderer::renderTiles()
 {
-    int numTiles = (int)m_Tiles.size();
+    uint numTiles = (uint)m_Tiles.size();
     std::atomic<int> tileIndex(0);
 
     auto worker = [this, &tileIndex, numTiles]() {
         while (true)
         {
-            int idx = tileIndex.fetch_add(1);
+            uint idx = (uint)tileIndex.fetch_add(1);
             if (idx >= numTiles) break;
 
             const Tile& tile = m_Tiles[idx];

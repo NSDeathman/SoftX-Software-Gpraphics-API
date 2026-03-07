@@ -14,6 +14,9 @@
 #include "math_functions.h"
 #include "AfterMathInternal.h"
 
+#pragma warning(push)
+#pragma warning(disable : AFTERMATH_DISABLED_WARNINGS)
+
 AFTERMATH_BEGIN
 
 // Forward declarations
@@ -482,3 +485,5 @@ AFTERMATH_INLINE_VAR const float2x2 float2x2_Identity = float2x2::identity();
 AFTERMATH_INLINE_VAR const float2x2 float2x2_Zero = float2x2::zero();
 
 AFTERMATH_END
+
+#pragma warning(pop)

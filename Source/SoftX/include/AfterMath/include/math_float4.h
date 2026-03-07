@@ -16,6 +16,9 @@
 
 #include "AfterMathInternal.h"
 
+#pragma warning(push)
+#pragma warning(disable : AFTERMATH_DISABLED_WARNINGS)
+
 AFTERMATH_BEGIN
 
 // Forward declarations
@@ -598,3 +601,5 @@ AFTERMATH_INLINE_VAR const float4 float4_Brown(0.6f, 0.4f, 0.2f, 1.0f);
 AFTERMATH_INLINE_VAR const float4 float4_Pink(1.0f, 0.75f, 0.8f, 1.0f);
 
 AFTERMATH_END
+
+#pragma warning(pop)

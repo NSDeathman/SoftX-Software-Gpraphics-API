@@ -24,7 +24,7 @@ public:
         }
     }
 
-    __m128 Read(int2 coords) const
+    __m128 Read(uint2 coords) const
     {
         assert(coords.x >= 0 && coords.x < resolution.x && coords.y >= 0 && coords.y < resolution.y);
         return pixels[coords.y * resolution.x + coords.x];
@@ -106,7 +106,7 @@ public:
         return float4(SampleBillinearRaw(uv));
     }
 
-    void StreamWrite(int2 coords, __m128 color)
+    void StreamWrite(uint2 coords, __m128 color)
     {
         assert(coords.x >= 0 && coords.x < resolution.x && coords.y >= 0 && coords.y < resolution.y);
         int index = coords.y * resolution.x + coords.x;
@@ -131,8 +131,8 @@ public:
 
     void SaveToTGA(const TextureRGBA32F& tex, const char* filename) const
     {
-        int w = tex.Width();
-        int h = tex.Height();
+        uint w = tex.Width();
+        uint h = tex.Height();
 
         // TGA header (18 bytes)
         uint8_t header[18] = {0};
@@ -153,11 +153,11 @@ public:
         file.write(reinterpret_cast<char*>(header), 18);
 
         // Pixels writing in BGR (TGA order)
-        for (int y = 0; y < h; ++y)
+        for (uint y = 0; y < h; ++y)
         {
-            for (int x = 0; x < w; ++x)
+            for (uint x = 0; x < w; ++x)
             {
-                __m128 color = tex.Read(int2(x, y));
+                __m128 color = tex.Read(uint2(x, y));
                 float rgba[4];
                 _mm_storeu_ps(rgba, color);
 
