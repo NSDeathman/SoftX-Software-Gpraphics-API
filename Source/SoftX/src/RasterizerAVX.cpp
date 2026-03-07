@@ -20,35 +20,34 @@ void RasterizerAVX::RasterizeTriangle(
 {
     PROFILE_SCOPE("RasterizerAVX::RasterizeTriangle");
 
-    int width = renderTarget.width();
+    int width  = renderTarget.width();
     int height = renderTarget.height();
 
-    // Bounding box треугольника
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    // Ограничиваем bounding box тайлом
     int iMinX = std::max(tileMin.x, (int)std::floor(minX));
     int iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
     int iMinY = std::max(tileMin.y, (int)std::floor(minY));
     int iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
 
-    if (iMinX > iMaxX || iMinY > iMaxY) return;
+    if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
+        return;
 
     float area2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, v2.Position);
     CullMode cull = state.cullMode;
-    if (cull == CullMode::Back && area2 < 0) return;
+    if (cull == CullMode::Back  && area2 < 0) return;
     if (cull == CullMode::Front && area2 > 0) return;
-    if (std::abs(area2) < 1e-6f) return;
+    if (std::abs(area2) < 1e-6f) UNLIKELY return;
 
-    // Предвычисленные константы (аналогично RasterizeTriangle)
+    // ── Рёбра треугольника ────────────────────────────────────────────────
     float4 dx01 = v1.Position - v0.Position;
     float4 dx12 = v2.Position - v1.Position;
     float4 dx20 = v0.Position - v2.Position;
 
-    // Размножение атрибутов (как в RasterizeTriangle)
+    // ── Broadcast вершинных позиций для инициализации edge functions ──────
     __m256 v0x = _mm256_set1_ps(v0.Position.x);
     __m256 v0y = _mm256_set1_ps(v0.Position.y);
     __m256 v1x = _mm256_set1_ps(v1.Position.x);
@@ -91,218 +90,215 @@ void RasterizerAVX::RasterizeTriangle(
     __m256 v2v = _mm256_set1_ps(v2.UV.y);
 
     __m256 invArea = _mm256_set1_ps(1.0f / area2);
-    __m256 dx01v = _mm256_set1_ps(dx01.x);
-    __m256 dy01v = _mm256_set1_ps(dx01.y);
-    __m256 dx12v = _mm256_set1_ps(dx12.x);
-    __m256 dy12v = _mm256_set1_ps(dx12.y);
-    __m256 dx20v = _mm256_set1_ps(dx20.x);
-    __m256 dy20v = _mm256_set1_ps(dx20.y);
+    __m256 dx01v   = _mm256_set1_ps(dx01.x);
+    __m256 dy01v   = _mm256_set1_ps(dx01.y);
+    __m256 dx12v   = _mm256_set1_ps(dx12.x);
+    __m256 dy12v   = _mm256_set1_ps(dx12.y);
+    __m256 dx20v   = _mm256_set1_ps(dx20.x);
+    __m256 dy20v   = _mm256_set1_ps(dx20.y);
+
+    // ── Константы треугольника, вынесены из обоих циклов ─────────────────
+    __m256 v0w  = _mm256_set1_ps(v0.Position.w);
+    __m256 v1w  = _mm256_set1_ps(v1.Position.w);
+    __m256 v2w  = _mm256_set1_ps(v2.Position.w);
+    __m256 ones = _mm256_set1_ps(1.0f);
+    __m256 zero = _mm256_setzero_ps();
+
+    // ── Инкрементальные edge functions ───────────────────────────────────
+    // При x → x+8:  Δf = +8 * dy
+    // При y → y+1:  Δf = -dx
+    __m256 f01StepX = _mm256_set1_ps( 8.0f * dx01.y);
+    __m256 f12StepX = _mm256_set1_ps( 8.0f * dx12.y);
+    __m256 f20StepX = _mm256_set1_ps( 8.0f * dx20.y);
+    __m256 f01StepY = _mm256_set1_ps(-dx01.x);
+    __m256 f12StepY = _mm256_set1_ps(-dx12.x);
+    __m256 f20StepY = _mm256_set1_ps(-dx20.x);
+
+    // ── simdStartX вынесен до y-цикла ────────────────────────────────────
+    const int simdStartX = (iMinX / 8) * 8;
+
+    // ── Инициализация edge functions для первой строки ────────────────────
+    __m256 f01Row, f12Row, f20Row;
+    {
+        __m256 initX = _mm256_set_ps(
+            simdStartX + 7.5f, simdStartX + 6.5f,
+            simdStartX + 5.5f, simdStartX + 4.5f,
+            simdStartX + 3.5f, simdStartX + 2.5f,
+            simdStartX + 1.5f, simdStartX + 0.5f);
+        __m256 initY = _mm256_set1_ps(iMinY + 0.5f);
+
+        f01Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v0x), dy01v),
+                               _mm256_mul_ps(_mm256_sub_ps(initY, v0y), dx01v));
+        f12Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v1x), dy12v),
+                               _mm256_mul_ps(_mm256_sub_ps(initY, v1y), dx12v));
+        f20Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v2x), dy20v),
+                               _mm256_mul_ps(_mm256_sub_ps(initY, v2y), dx20v));
+    }
 
     for (int y = iMinY; y <= iMaxY; ++y)
     {
-        __m256 baseY = _mm256_set1_ps(y + 0.5f);
-
         int x;
-		int simdStartX = (iMinX / 8) * 8; // выравниваем вниз до кратного 8
-		for (x = simdStartX; x + 7 < width && x <= iMaxX - 7; x += 8)
-		{
-			// Проверка, пересекается ли блок из 8 пикселей с тайлом
-			if (x > tileMax.x || x + 7 < tileMin.x)
-				continue;
+        __m256 f01, f12, f20;
 
-			__m256 baseX =
-				_mm256_set_ps(x + 7.5f, x + 6.5f, x + 5.5f, x + 4.5f, x + 3.5f, x + 2.5f, x + 1.5f, x + 0.5f);
+        // Инкремент f в for-выражении: continue не нарушает накопление
+        for (x = simdStartX, f01 = f01Row, f12 = f12Row, f20 = f20Row;
+             x + 7 < width && x <= iMaxX - 7;
+             x += 8,
+             f01 = _mm256_add_ps(f01, f01StepX),
+             f12 = _mm256_add_ps(f12, f12StepX),
+             f20 = _mm256_add_ps(f20, f20StepX))
+        {
+            if (x > tileMax.x || x + 7 < tileMin.x)
+                continue;
 
-			__m256 f01 = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(baseX, v0x), dy01v),
-									   _mm256_mul_ps(_mm256_sub_ps(baseY, v0y), dx01v));
-			__m256 f12 = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(baseX, v1x), dy12v),
-									   _mm256_mul_ps(_mm256_sub_ps(baseY, v1y), dx12v));
-			__m256 f20 = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(baseX, v2x), dy20v),
-									   _mm256_mul_ps(_mm256_sub_ps(baseY, v2y), dx20v));
+            // f01/f12/f20 уже вычислены инкрементально — 3 add вместо 6 mul + 6 sub
+            __m256 inside;
+            if (area2 > 0)
+                inside = _mm256_and_ps(
+                    _mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_GE_OQ),
+                                  _mm256_cmp_ps(f12, zero, _CMP_GE_OQ)),
+                    _mm256_cmp_ps(f20, zero, _CMP_GE_OQ));
+            else
+                inside = _mm256_and_ps(
+                    _mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_LE_OQ),
+                                  _mm256_cmp_ps(f12, zero, _CMP_LE_OQ)),
+                    _mm256_cmp_ps(f20, zero, _CMP_LE_OQ));
 
-			__m256 zero = _mm256_setzero_ps();
-			__m256 inside;
-			if (area2 > 0)
-			{
-				inside = _mm256_and_ps(
-					_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_GE_OQ), _mm256_cmp_ps(f12, zero, _CMP_GE_OQ)),
-					_mm256_cmp_ps(f20, zero, _CMP_GE_OQ));
-			}
-			else
-			{
-				inside = _mm256_and_ps(
-					_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_LE_OQ), _mm256_cmp_ps(f12, zero, _CMP_LE_OQ)),
-					_mm256_cmp_ps(f20, zero, _CMP_LE_OQ));
-			}
-			int insideMask = _mm256_movemask_ps(inside);
-			if (insideMask == 0)
-				continue;
+            __m256 alpha = _mm256_mul_ps(f12, invArea);
+            __m256 beta  = _mm256_mul_ps(f20, invArea);
+            __m256 gamma = _mm256_mul_ps(f01, invArea);
 
-			__m256 alpha = _mm256_mul_ps(f12, invArea);
-			__m256 beta = _mm256_mul_ps(f20, invArea);
-			__m256 gamma = _mm256_mul_ps(f01, invArea);
+            // ── Perspective-correct веса ──────────────────────────────────
+            __m256 pw0 = _mm256_mul_ps(alpha, v0w);
+            __m256 pw1 = _mm256_mul_ps(beta,  v1w);
+            __m256 pw2 = _mm256_mul_ps(gamma, v2w);
 
-			// ── Perspective-correct веса ──────────────────────────────────
-			// Position.w = 1/w (установлено в ClipSpaceToScreenSpace).
-			// Взвешиваем барицентрические координаты на 1/w каждой вершины,
-			// затем нормируем — это даёт корректную интерполяцию в 3D.
-			__m256 v0w = _mm256_set1_ps(v0.Position.w);
-			__m256 v1w = _mm256_set1_ps(v1.Position.w);
-			__m256 v2w = _mm256_set1_ps(v2.Position.w);
+            __m256 pwSum    = _mm256_add_ps(_mm256_add_ps(pw0, pw1), pw2);
+            __m256 invPwSum = _mm256_div_ps(ones, pwSum);
 
-			__m256 pw0 = _mm256_mul_ps(alpha, v0w);
-			__m256 pw1 = _mm256_mul_ps(beta, v1w);
-			__m256 pw2 = _mm256_mul_ps(gamma, v2w);
+            // ── z: линейная интерполяция (perspective correction не нужна) ─
+            __m256 z = _mm256_add_ps(
+                _mm256_add_ps(_mm256_mul_ps(alpha, v0z),
+                              _mm256_mul_ps(beta,  v1z)),
+                              _mm256_mul_ps(gamma, v2z));
 
-			// Точное деление вместо rcp (12-бит) — важно для корректных UV
-			__m256 pwSum = _mm256_add_ps(_mm256_add_ps(pw0, pw1), pw2);
-			__m256 ones = _mm256_set1_ps(1.0f);
-			__m256 invPwSum = _mm256_div_ps(ones, pwSum);
+            // ── Атрибуты: perspective-correct ─────────────────────────────
+#define PLERP256(a0, a1, a2)                                              \
+    _mm256_mul_ps(                                                        \
+        _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(pw0, a0),              \
+                                    _mm256_mul_ps(pw1, a1)),              \
+                                    _mm256_mul_ps(pw2, a2)),              \
+        invPwSum)
 
-			// ── z: линейная интерполяция (perspective correction не нужна) ─
-			__m256 z = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0z), _mm256_mul_ps(beta, v1z)),
-									 _mm256_mul_ps(gamma, v2z));
-
-			// ── Все атрибуты: perspective-correct через pw0/pw1/pw2 ────────
-#define PLERP256(a0, a1, a2)                                                                                           \
-	_mm256_mul_ps(                                                                                                     \
-		_mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(pw0, a0), _mm256_mul_ps(pw1, a1)), _mm256_mul_ps(pw2, a2)),          \
-		invPwSum)
-
-			__m256 r = PLERP256(v0cr, v1cr, v2cr);
-			__m256 g = PLERP256(v0cg, v1cg, v2cg);
-			__m256 b = PLERP256(v0cb, v1cb, v2cb);
-			__m256 a = PLERP256(v0ca, v1ca, v2ca);
-			__m256 nx = PLERP256(v0nx, v1nx, v2nx);
-			__m256 ny = PLERP256(v0ny, v1ny, v2ny);
-			__m256 nz = PLERP256(v0nz, v1nz, v2nz);
-			__m256 u = PLERP256(v0u, v1u, v2u);
-			__m256 v = PLERP256(v0v, v1v, v2v);
+            __m256 r  = PLERP256(v0cr, v1cr, v2cr);
+            __m256 g  = PLERP256(v0cg, v1cg, v2cg);
+            __m256 b  = PLERP256(v0cb, v1cb, v2cb);
+            __m256 a  = PLERP256(v0ca, v1ca, v2ca);
+            __m256 nx = PLERP256(v0nx, v1nx, v2nx);
+            __m256 ny = PLERP256(v0ny, v1ny, v2ny);
+            __m256 nz = PLERP256(v0nz, v1nz, v2nz);
+            __m256 u  = PLERP256(v0u,  v1u,  v2u);
+            __m256 v  = PLERP256(v0v,  v1v,  v2v);
 
 #undef PLERP256
 
-			// ── Depth read: два __m128 блока → __m256 ─────────────────────
-			// x кратен 8 → x и x+4 оба кратны 4, read4 корректен
-			__m128 d_lo = depthBuffer.read4(int2(x, y));
-			__m128 d_hi = depthBuffer.read4(int2(x + 4, y));
-			__m256 depths = _mm256_set_m128(d_hi, d_lo);
+            // ── Depth read: два __m128 блока → __m256 ─────────────────────
+            // x кратен 8 → x и x+4 оба кратны 4, read4 корректен
+            __m128 d_lo = depthBuffer.read4(int2(x,     y));
+            __m128 d_hi = depthBuffer.read4(int2(x + 4, y));
+            __m256 depths = _mm256_set_m128(d_hi, d_lo);
 
-			__m256 depthCmp;
-			switch (state.depthFunc)
-			{
-			case ComparisonFunc::Never:
-				depthCmp = _mm256_setzero_ps();
-				break;
-			case ComparisonFunc::Less:
-				depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ);
-				break;
-			case ComparisonFunc::Equal:
-				depthCmp = _mm256_cmp_ps(z, depths, _CMP_EQ_OQ);
-				break;
-			case ComparisonFunc::LessEqual:
-				depthCmp = _mm256_cmp_ps(z, depths, _CMP_LE_OQ);
-				break;
-			case ComparisonFunc::Greater:
-				depthCmp = _mm256_cmp_ps(z, depths, _CMP_GT_OQ);
-				break;
-			case ComparisonFunc::NotEqual:
-				depthCmp = _mm256_cmp_ps(z, depths, _CMP_NEQ_OQ);
-				break;
-			case ComparisonFunc::GreaterEqual:
-				depthCmp = _mm256_cmp_ps(z, depths, _CMP_GE_OQ);
-				break;
-			case ComparisonFunc::Always:
-				depthCmp = _mm256_castsi256_ps(_mm256_set1_epi32(-1));
-				break;
-			}
+            __m256 depthCmp;
+            switch (state.depthFunc)
+            {
+            case ComparisonFunc::Never:        depthCmp = _mm256_setzero_ps(); break;
+            case ComparisonFunc::Less:         depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ); break;
+            case ComparisonFunc::Equal:        depthCmp = _mm256_cmp_ps(z, depths, _CMP_EQ_OQ); break;
+            case ComparisonFunc::LessEqual:    depthCmp = _mm256_cmp_ps(z, depths, _CMP_LE_OQ); break;
+            case ComparisonFunc::Greater:      depthCmp = _mm256_cmp_ps(z, depths, _CMP_GT_OQ); break;
+            case ComparisonFunc::NotEqual:     depthCmp = _mm256_cmp_ps(z, depths, _CMP_NEQ_OQ); break;
+            case ComparisonFunc::GreaterEqual: depthCmp = _mm256_cmp_ps(z, depths, _CMP_GE_OQ); break;
+            case ComparisonFunc::Always:       depthCmp = _mm256_castsi256_ps(_mm256_set1_epi32(-1)); break;
+            }
 
-			// Комбинируем с маской покрытия тайла
-			__m256i inside8i =
-				_mm256_set_epi32((insideMask & 128) ? -1 : 0, (insideMask & 64) ? -1 : 0, (insideMask & 32) ? -1 : 0,
-								 (insideMask & 16) ? -1 : 0, (insideMask & 8) ? -1 : 0, (insideMask & 4) ? -1 : 0,
-								 (insideMask & 2) ? -1 : 0, (insideMask & 1) ? -1 : 0);
-			__m256 finalMask = _mm256_and_ps(depthCmp, _mm256_castsi256_ps(inside8i));
+            // inside — уже готовая SIMD маска, roundtrip через insideMask убран
+            __m256 finalMask = _mm256_and_ps(depthCmp, inside);
+            int depthMask    = _mm256_movemask_ps(finalMask);
+            if (depthMask == 0)
+                continue;
 
-			int depthMask = _mm256_movemask_ps(finalMask);
-			if (depthMask == 0)
-				continue;
+            // ── Depth write: разбиваем __m256 обратно на два __m128 блока ─
+            __m128 mask_lo = _mm256_castps256_ps128(finalMask);
+            __m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
+            depthBuffer.write4(int2(x,     y), _mm256_castps256_ps128(z), mask_lo);
+            depthBuffer.write4(int2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
 
-			// ── Depth write: разбиваем __m256 обратно на два __m128 блока ─
-			__m128 mask_lo = _mm256_castps256_ps128(finalMask);
-			__m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
-			depthBuffer.write4(int2(x, y), _mm256_castps256_ps128(z), mask_lo);
-			depthBuffer.write4(int2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
+            // ── Скалярный цикл только для шейдинга ───────────────────────
+            alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
+            alignas(32) float uArr[8], vArr[8], nxArr[8], nyArr[8], nzArr[8];
+            _mm256_store_ps(zArr,  z);
+            _mm256_store_ps(rArr,  r);  _mm256_store_ps(gArr,  g);
+            _mm256_store_ps(bArr,  b);  _mm256_store_ps(aArr,  a);
+            _mm256_store_ps(uArr,  u);  _mm256_store_ps(vArr,  v);
+            _mm256_store_ps(nxArr, nx); _mm256_store_ps(nyArr, ny);
+            _mm256_store_ps(nzArr, nz);
 
-			// ── Скалярный цикл только для шейдинга ───────────────────────
-			alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
-			alignas(32) float uArr[8], vArr[8], nxArr[8], nyArr[8], nzArr[8];
-			_mm256_store_ps(zArr, z);
-			_mm256_store_ps(rArr, r);
-			_mm256_store_ps(gArr, g);
-			_mm256_store_ps(bArr, b);
-			_mm256_store_ps(aArr, a);
-			_mm256_store_ps(uArr, u);
-			_mm256_store_ps(vArr, v);
-			_mm256_store_ps(nxArr, nx);
-			_mm256_store_ps(nyArr, ny);
-			_mm256_store_ps(nzArr, nz);
+            for (int i = 0; i < 8; ++i)
+            {
+                if (!(depthMask & (1 << i))) continue;
+                int px = x + i;
+                if (px < tileMin.x || px > tileMax.x) continue;
 
-			for (int i = 0; i < 8; ++i)
-			{
-				if (!(depthMask & (1 << i)))
-					continue;
-				int px = x + i;
-				if (px < tileMin.x || px > tileMax.x)
-					continue;
+                VertexOutput frag;
+                frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
+                frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
+                frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
+                frag.UV       = float2(uArr[i], vArr[i]);
+                renderTarget.set_pixel(int2(px, y), ps(frag, cb, *tt));
+            }
+        }
 
-				VertexOutput frag;
-				frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
-				frag.Color = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
-				frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
-				frag.UV = float2(uArr[i], vArr[i]);
-				renderTarget.set_pixel(int2(px, y), ps(frag, cb, *tt));
-			}
-		}
+        // ── Шаг на следующую строку ───────────────────────────────────────
+        f01Row = _mm256_add_ps(f01Row, f01StepY);
+        f12Row = _mm256_add_ps(f12Row, f12StepY);
+        f20Row = _mm256_add_ps(f20Row, f20StepY);
 
-        // Скалярный доводчик для оставшихся пикселей
+        // ── Скалярный доводчик для оставшихся пикселей ───────────────────
         for (; x <= iMaxX; ++x)
         {
             if (x < tileMin.x || x > tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);
-			float f0 = RasterizerCommon::edgeFunction(v1.Position, v2.Position, p);
-			float f1 = RasterizerCommon::edgeFunction(v2.Position, v0.Position, p);
-			float f2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, p);
+            float f0 = RasterizerCommon::edgeFunction(v1.Position, v2.Position, p);
+            float f1 = RasterizerCommon::edgeFunction(v2.Position, v0.Position, p);
+            float f2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, p);
 
             if ((area2 > 0 && (f0 < 0 || f1 < 0 || f2 < 0)) ||
                 (area2 < 0 && (f0 > 0 || f1 > 0 || f2 > 0)))
-            {
                 continue;
-            }
 
             float a = f0 / area2;
             float b = f1 / area2;
             float c = f2 / area2;
 
             VertexOutput frag = RasterizerCommon::trilerp(v0, v1, v2, a, b, c);
-			int idx = y * width + x;
+            int idx = y * width + x;
 
             bool depthPass = false;
             switch (state.depthFunc) {
-                case ComparisonFunc::Never:         depthPass = false; break;
-                case ComparisonFunc::Less:          depthPass = frag.Position.z < depthBuffer.at(idx); break;
-                case ComparisonFunc::Equal:         depthPass = frag.Position.z == depthBuffer.at(idx); break;
-                case ComparisonFunc::LessEqual:     depthPass = frag.Position.z <= depthBuffer.at(idx); break;
-                case ComparisonFunc::Greater:       depthPass = frag.Position.z > depthBuffer.at(idx); break;
-                case ComparisonFunc::NotEqual:      depthPass = frag.Position.z != depthBuffer.at(idx); break;
-                case ComparisonFunc::GreaterEqual:  depthPass = frag.Position.z >= depthBuffer.at(idx); break;
-                case ComparisonFunc::Always:        depthPass = true; break;
+            case ComparisonFunc::Never:        depthPass = false; break;
+            case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.at(idx); break;
+            case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.at(idx); break;
+            case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.at(idx); break;
+            case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.at(idx); break;
+            case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.at(idx); break;
+            case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+            case ComparisonFunc::Always:       depthPass = true; break;
             }
             if (depthPass) {
                 depthBuffer.at(idx) = frag.Position.z;
-                float4 finalColor = ps(frag, cb, *tt);
-                renderTarget.set_pixel(int2(x, y), finalColor);
+                renderTarget.set_pixel(int2(x, y), ps(frag, cb, *tt));
             }
         }
     }

@@ -59,8 +59,8 @@ class SOFTX_API TextureRGBA32F
 
 	__m128 fetch_raw(int x, int y) const
 	{
-		x = std::clamp(x, 0, m_width - 1);
-		y = std::clamp(y, 0, m_height - 1);
+		x = clamp(x, 0, m_width - 1);
+		y = clamp(y, 0, m_height - 1);
 		return m_pixels[y * m_width + x];
 	}
 
@@ -69,8 +69,8 @@ class SOFTX_API TextureRGBA32F
 		float fx = uv.x * m_width - 0.5f;
 		float fy = uv.y * m_height - 0.5f;
 
-		int x0 = (int)std::floor(fx);
-		int y0 = (int)std::floor(fy);
+		int x0 = (int)floor(fx);
+		int y0 = (int)floor(fy);
 
 		float tx = fx - x0;
 		float ty = fy - y0;
@@ -161,10 +161,10 @@ class SOFTX_API TextureRGBA32F
 				float rgba[4];
 				_mm_storeu_ps(rgba, color);
 
-				uint8_t b = static_cast<uint8_t>(std::clamp(rgba[2] * 255.0f, 0.0f, 255.0f)); // blue
-				uint8_t g = static_cast<uint8_t>(std::clamp(rgba[1] * 255.0f, 0.0f, 255.0f)); // green
-				uint8_t r = static_cast<uint8_t>(std::clamp(rgba[0] * 255.0f, 0.0f, 255.0f)); // red
-				uint8_t a = static_cast<uint8_t>(std::clamp(rgba[3] * 255.0f, 0.0f, 255.0f)); // alpha
+				uint8_t b = static_cast<uint8_t>(clamp(rgba[2] * 255.0f, 0.0f, 255.0f)); // blue
+				uint8_t g = static_cast<uint8_t>(clamp(rgba[1] * 255.0f, 0.0f, 255.0f)); // green
+				uint8_t r = static_cast<uint8_t>(clamp(rgba[0] * 255.0f, 0.0f, 255.0f)); // red
+				uint8_t a = static_cast<uint8_t>(clamp(rgba[3] * 255.0f, 0.0f, 255.0f)); // alpha
 
 				uint8_t pixel[4] = { b, g, r, a }; // TGA order: BGRA
 				file.write(reinterpret_cast<char*>(pixel), 4);

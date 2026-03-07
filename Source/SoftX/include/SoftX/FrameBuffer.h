@@ -92,10 +92,10 @@ public:
 				// Используем SSE для четырёх пикселей, но здесь один, поэтому проще скалярно
 				float rgba[4];
 				_mm_storeu_ps(rgba, c);
-				uint8_t r = (uint8_t)(std::clamp(rgba[0], 0.0f, 1.0f) * 255.0f);
-				uint8_t g = (uint8_t)(std::clamp(rgba[1], 0.0f, 1.0f) * 255.0f);
-				uint8_t b = (uint8_t)(std::clamp(rgba[2], 0.0f, 1.0f) * 255.0f);
-				uint8_t a = (uint8_t)(std::clamp(rgba[3], 0.0f, 1.0f) * 255.0f);
+				uint8_t r = (uint8_t)(clamp(rgba[0], 0.0f, 1.0f) * 255.0f);
+				uint8_t g = (uint8_t)(clamp(rgba[1], 0.0f, 1.0f) * 255.0f);
+				uint8_t b = (uint8_t)(clamp(rgba[2], 0.0f, 1.0f) * 255.0f);
+				uint8_t a = (uint8_t)(clamp(rgba[3], 0.0f, 1.0f) * 255.0f);
 				dstRow[x] = (a << 24) | (b << 16) | (g << 8) | r; // BGRA
 			}
 		}
@@ -179,10 +179,10 @@ public:
         {
             float rgba[4];
             _mm_storeu_ps(rgba, src[i]);
-            uint8_t r = (uint8_t)(std::clamp(rgba[0], 0.0f, 1.0f) * 255.0f);
-            uint8_t g = (uint8_t)(std::clamp(rgba[1], 0.0f, 1.0f) * 255.0f);
-            uint8_t b = (uint8_t)(std::clamp(rgba[2], 0.0f, 1.0f) * 255.0f);
-            uint8_t a = (uint8_t)(std::clamp(rgba[3], 0.0f, 1.0f) * 255.0f);
+            uint8_t r = (uint8_t)(clamp(rgba[0], 0.0f, 1.0f) * 255.0f);
+            uint8_t g = (uint8_t)(clamp(rgba[1], 0.0f, 1.0f) * 255.0f);
+            uint8_t b = (uint8_t)(clamp(rgba[2], 0.0f, 1.0f) * 255.0f);
+            uint8_t a = (uint8_t)(clamp(rgba[3], 0.0f, 1.0f) * 255.0f);
             dst[i] = (a << 24) | (b << 16) | (g << 8) | r; // TGA order - BGRA (0xAABBGGRR in little-endian)
         }
 

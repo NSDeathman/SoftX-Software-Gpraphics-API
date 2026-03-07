@@ -4,6 +4,10 @@
 #define SOFTX_BEGIN namespace SoftX {
 #define SOFTX_END }
 
-#if !_HAS_CXX17
-#error Please enable C++17 :(
+#if _HAS_CXX20
+#define LIKELY [[likely]]
+#define UNLIKELY [[unlikely]]
+#else
+#define LIKELY
+#define UNLIKELY
 #endif

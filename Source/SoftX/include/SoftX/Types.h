@@ -207,7 +207,7 @@ struct SamplerState
 		switch (mode)
 		{
 		case Wrap::Clamp:
-			return std::clamp(uv, 0.0f, 1.0f);
+			return clamp(uv, 0.0f, 1.0f);
 		case Wrap::Mirror: {
 			float t = std::fmod(std::abs(uv), 2.0f);
 			return t > 1.0f ? 2.0f - t : t;

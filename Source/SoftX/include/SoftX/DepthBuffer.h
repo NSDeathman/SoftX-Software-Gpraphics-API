@@ -38,30 +38,20 @@ public:
     // ── Скалярный доступ (обратная совместимость) ─────────────────────────
     float read(int2 coords) const
     {
-        if (coords.x < 0 || coords.x >= m_width ||
-            coords.y < 0 || coords.y >= m_height)
-            return 1.0f;
         return floatPtr()[coords.y * m_widthPadded + coords.x];
     }
 
     void write(int2 coords, float depth)
     {
-        if (coords.x < 0 || coords.x >= m_width ||
-            coords.y < 0 || coords.y >= m_height)
-            return;
         floatPtr()[coords.y * m_widthPadded + coords.x] = depth;
     }
 
     float& at(int2 coords)
     {
-        assert(coords.x >= 0 && coords.x < m_width &&
-               coords.y >= 0 && coords.y < m_height);
         return floatPtr()[coords.y * m_widthPadded + coords.x];
     }
     const float& at(int2 coords) const
     {
-        assert(coords.x >= 0 && coords.x < m_width &&
-               coords.y >= 0 && coords.y < m_height);
         return floatPtr()[coords.y * m_widthPadded + coords.x];
     }
 
