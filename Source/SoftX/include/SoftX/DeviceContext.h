@@ -35,6 +35,8 @@ class SOFTX_API DeviceContext
 	void SetConstantBuffer(const ConstantBuffer& buffer);
 	ConstantBuffer GetConstantBuffer() const;
 
+	void SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{});
+
 	void SetRenderTarget(IRenderTarget* target);
 	void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);
 	IRenderTarget* GetRenderTarget() const;
@@ -76,6 +78,7 @@ class SOFTX_API DeviceContext
 	VertexBuffer m_VertexBuffer;
 	IndexBuffer m_IndexBuffer;
 	ConstantBuffer m_ConstantBuffer;
+	TextureTable m_TextureTable;
 
 	std::unique_ptr<DepthBuffer> m_OwnDepthBuffer;
 	DepthBuffer* m_DepthBuffer;

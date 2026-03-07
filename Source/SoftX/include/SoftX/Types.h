@@ -6,6 +6,7 @@
 
 #include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
+#include "Texture.h"
 
 SOFTX_BEGIN
 
@@ -182,9 +183,110 @@ struct Tile
 	}
 };
 
-using PixelShader = std::function<float4(const VertexOutput& Input, ConstantBuffer ConstantBuffer)>;
-using VertexShader = std::function<VertexOutput(const VertexInput&, ConstantBuffer ConstantBuffer)>;
-using GeometryShader = std::function<void(const VertexOutput[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices)>;
+// ── Sampler state ─────────────────────────────────────────────────────────
+enum class Filter
+{
+	Nearest,
+	Bilinear
+};
+enum class Wrap
+{
+	Repeat,
+	Clamp,
+	Mirror
+};
+
+struct SamplerState
+{
+	Filter filter = Filter::Bilinear;
+	Wrap wrapU = Wrap::Repeat;
+	Wrap wrapV = Wrap::Repeat;
+
+	float applyWrap(float uv, Wrap mode) const
+	{
+		switch (mode)
+		{
+		case Wrap::Clamp:
+			return std::clamp(uv, 0.0f, 1.0f);
+		case Wrap::Mirror: {
+			float t = std::fmod(std::abs(uv), 2.0f);
+			return t > 1.0f ? 2.0f - t : t;
+		}
+		default:
+			return uv - std::floor(uv); // Repeat
+		}
+	}
+
+	float2 applyWrap(float2 uv) const
+	{
+		return {applyWrap(uv.x, wrapU), applyWrap(uv.y, wrapV)};
+	}
+};
+
+// ── Один биндинг: текстура + самплер ─────────────────────────────────────
+struct TextureBinding
+{
+  private:
+	const TextureRGBA32F* m_texture = nullptr;
+	SamplerState m_sampler;
+
+  public:
+	bool IsValid() const
+	{
+		return m_texture != nullptr;
+	}
+
+	bool IsEmpty() const
+	{
+		return !IsValid();
+	}
+
+	void SetTexture(const TextureRGBA32F* texture)
+	{
+		m_texture = texture;
+	}
+
+	void SetSemplerState(SamplerState sampler)
+	{
+		m_sampler = sampler;
+	}
+
+	float4 Sample(float2 uv) const
+	{
+		if (!m_texture)
+			return float4(1.0f, 0.0f, 1.0f, 1.0f); // маджента
+
+		float2 wrapped = m_sampler.applyWrap(uv);
+
+		if (m_sampler.filter == Filter::Bilinear)
+			return m_texture->sample_bilinear(wrapped);
+		else
+			return m_texture->sample(wrapped);
+	}
+};
+
+// ── Таблица биндингов ─────────────────────────────────────────────────────
+static constexpr int MAX_TEXTURE_SLOTS = 16;
+
+struct TextureTable
+{
+	TextureBinding bindings[MAX_TEXTURE_SLOTS];
+
+	TextureBinding& operator[](int i)
+	{
+		assert(i >= 0 && i < MAX_TEXTURE_SLOTS);
+		return bindings[i];
+	}
+	const TextureBinding& operator[](int i) const
+	{
+		assert(i >= 0 && i < MAX_TEXTURE_SLOTS);
+		return bindings[i];
+	}
+};
+
+using PixelShader = std::function<float4(const VertexOutput& Input, ConstantBuffer ConstantBuffer, const TextureTable& tex)>;
+using VertexShader = std::function<VertexOutput(const VertexInput&, ConstantBuffer ConstantBuffer, const TextureTable& tex)>;
+using GeometryShader = std::function<void(const VertexOutput[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices, const TextureTable& tex)>;
 
 enum class CullMode
 {

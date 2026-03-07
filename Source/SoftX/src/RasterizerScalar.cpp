@@ -14,6 +14,7 @@ void RasterizerScalar::RasterizeTriangle(
     IRenderTarget& renderTarget,
     const PixelShader& ps,
     const ConstantBuffer& cb,
+    const TextureTable* tt,
     int2 tileMin,
     int2 tileMax)
 {
@@ -75,7 +76,7 @@ void RasterizerScalar::RasterizeTriangle(
             }
             if (depthPass) {
                 depthBuffer.at(idx) = frag.Position.z;
-                float4 finalColor = ps(frag, cb);
+                float4 finalColor = ps(frag, cb, *tt);
                 renderTarget.set_pixel(int2(x, y), finalColor);
             }
         }

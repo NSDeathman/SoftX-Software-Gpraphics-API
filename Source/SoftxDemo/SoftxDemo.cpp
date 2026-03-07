@@ -42,13 +42,9 @@ static const float4 CHECKER_PALETTE[4] = {
 	float4(0.95f, 0.80f, 0.10f, 1.0f),
 };
 
-// Глобальный объект текстуры — не unique_ptr, чтобы не было
-// проблем с порядком инициализации; создаётся в WinMain явно.
-TextureRGBA32F* g_checkerTexture = nullptr;
-
-TextureRGBA32F* CreateUVCheckerTexture()
+TextureRGBA32F CreateUVCheckerTexture()
 {
-	auto* tex = new TextureRGBA32F(int2(CHECKER_SIZE, CHECKER_SIZE));
+	auto tex = new TextureRGBA32F(int2(CHECKER_SIZE, CHECKER_SIZE));
 	const int cellSize = CHECKER_SIZE / CHECKER_CELLS;
 
 	for (int y = 0; y < CHECKER_SIZE; ++y)
@@ -82,13 +78,13 @@ TextureRGBA32F* CreateUVCheckerTexture()
 			tex->stream_write(int2(x, y), c);
 		}
 	}
-	return tex;
+	return *tex;
 }
 
 // ============================================================
 //  Shaders
 // ============================================================
-VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb)
+VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb, const TextureTable& tex)
 {
 	const ConstantBufferData* data = reinterpret_cast<const ConstantBufferData*>(cb.Data());
 	VertexOutput output;
@@ -100,22 +96,21 @@ VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb)
 	return output;
 }
 
-float4 ColorPS(const VertexOutput& input, ConstantBuffer cb)
+float4 UVCheckerPSNearest(const VertexOutput& input, ConstantBuffer cb, const TextureTable& tex)
 {
-	return input.Color;
+	float u = input.UV.x - std::floor(input.UV.x); // wrap [0,1]
+	float v = input.UV.y - std::floor(input.UV.y);
+	return tex[1].Sample(float2(u, v));
 }
 
-// Текстура берётся напрямую из глобальной переменной —
-// никаких проблем с временем жизни указателя.
-// cb здесь не используется; в будущем заменим на текстурные слоты.
-float4 UVCheckerPS(const VertexOutput& input, ConstantBuffer cb)
+float4 UVCheckerPSBillinear(const VertexOutput& input, ConstantBuffer cb, const TextureTable& tex)
 {
-	if (!g_checkerTexture)
+	if (tex[0].IsEmpty())
 		return float4(1.0f, 0.0f, 1.0f, 1.0f); // маджента — нет текстуры
 
 	float u = input.UV.x - std::floor(input.UV.x); // wrap [0,1]
 	float v = input.UV.y - std::floor(input.UV.y);
-	return g_checkerTexture->sample(float2(u, v));
+	return tex[0].Sample(float2(u, v));
 }
 
 // ============================================================
@@ -236,7 +231,7 @@ void DrawFrame()
 	// ════════════════════════════════════════════════════════
 	ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH / 2, WINDOW_HEIGHT, 0.0f, 1.0f));
 	ctx.SetConstantBuffer(mvpCB);
-	ctx.SetPixelShader(ColorPS);
+	ctx.SetPixelShader(UVCheckerPSNearest);
 	ctx.DrawIndexed();
 
 	// ════════════════════════════════════════════════════════
@@ -245,7 +240,7 @@ void DrawFrame()
 	ctx.SetViewport(Viewport((float)(WINDOW_WIDTH / 2), 0.0f, WINDOW_WIDTH / 2, WINDOW_HEIGHT, 0.0f, 1.0f));
 	ctx.ClearDepth(1.0f);		  // сброс глубины — независимый проход
 	ctx.SetConstantBuffer(mvpCB); // MVP тот же, cb для текстуры не нужен
-	ctx.SetPixelShader(UVCheckerPS);
+	ctx.SetPixelShader(UVCheckerPSBillinear);
 	ctx.DrawIndexed();
 
 	// Восстанавливаем полный viewport на следующий кадр
@@ -281,8 +276,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 	ShowWindow(g_hWnd, nCmdShow);
 	UpdateWindow(g_hWnd);
 
-	// Создаём текстуру до Device — гарантированно живёт дольше всего
-	g_checkerTexture = CreateUVCheckerTexture();
+	TextureRGBA32F checkerTexture = CreateUVCheckerTexture();
 
 	// ── SoftX Device ─────────────────────────────────────────
 	PresentParameters params;
@@ -296,6 +290,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 	DeviceContext& ctx = g_device->GetDeviceContext();
 	ctx.SetRenderTarget(&device.GetBackBuffer(), true);
 	ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
+	ctx.SetTexture(0, &checkerTexture, SamplerState{Filter::Bilinear, Wrap::Repeat, Wrap::Repeat});
+	ctx.SetTexture(1, &checkerTexture, SamplerState{Filter::Nearest, Wrap::Repeat, Wrap::Repeat});
 
 	VertexBuffer vb;
 	IndexBuffer ib;
@@ -305,7 +301,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 	ctx.SetIndexBuffer(ib);
 	ctx.SetVertexShader(TransformVS);
 	ctx.SetCullMode(CullMode::Back);
-	ctx.SetTileSize(64);
+	ctx.SetTileSize(128);
 
 	// ── Message loop ─────────────────────────────────────────
 	MSG msg = {};
@@ -322,10 +318,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 			DrawFrame();
 		}
 	}
-
-	// Освобождаем текстуру после завершения рендера
-	delete g_checkerTexture;
-	g_checkerTexture = nullptr;
 
 	return (int)msg.wParam;
 }

@@ -14,6 +14,7 @@ public:
         DepthBuffer&        depthBuffer,
         const PixelShader&  ps,
         const ConstantBuffer& cb,
+        const TextureTable* tt,
         const RasterizerState& state,
         uint32_t            tileSize
     );
@@ -42,6 +43,7 @@ private:
     DepthBuffer&           m_DepthBuffer;
     const PixelShader&     m_PS;
     const ConstantBuffer&  m_CB;
+	const TextureTable*    m_TT;
     RasterizerState        m_State;
     uint32_t               m_TileSize;
 

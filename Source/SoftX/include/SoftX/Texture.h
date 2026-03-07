@@ -57,6 +57,55 @@ class SOFTX_API TextureRGBA32F
 		return float4(color);
 	}
 
+	__m128 fetch_raw(int x, int y) const
+	{
+		x = std::clamp(x, 0, m_width - 1);
+		y = std::clamp(y, 0, m_height - 1);
+		return m_pixels[y * m_width + x];
+	}
+
+	__m128 sample_bilinear_raw(float2 uv) const
+	{
+		float fx = uv.x * m_width - 0.5f;
+		float fy = uv.y * m_height - 0.5f;
+
+		int x0 = (int)std::floor(fx);
+		int y0 = (int)std::floor(fy);
+
+		float tx = fx - x0;
+		float ty = fy - y0;
+
+		// Загружаем 4 угловых пикселя — каждый уже __m128 (RGBA float)
+		__m128 c00 = fetch_raw(x0, y0);
+		__m128 c10 = fetch_raw(x0 + 1, y0);
+		__m128 c01 = fetch_raw(x0, y0 + 1);
+		__m128 c11 = fetch_raw(x0 + 1, y0 + 1);
+
+		// Веса как __m128 — broadcast скаляра на все 4 канала
+		__m128 wtx = _mm_set1_ps(tx);
+		__m128 wty = _mm_set1_ps(ty);
+		__m128 one = _mm_set1_ps(1.0f);
+		__m128 w1tx = _mm_sub_ps(one, wtx); // (1 - tx)
+		__m128 w1ty = _mm_sub_ps(one, wty); // (1 - ty)
+
+		// Билинейная интерполяция:
+		// result = c00*(1-tx)*(1-ty) + c10*tx*(1-ty) + c01*(1-tx)*ty + c11*tx*ty
+		__m128 w00 = _mm_mul_ps(w1tx, w1ty);
+		__m128 w10 = _mm_mul_ps(wtx, w1ty);
+		__m128 w01 = _mm_mul_ps(w1tx, wty);
+		__m128 w11 = _mm_mul_ps(wtx, wty);
+
+		__m128 result = _mm_add_ps(_mm_add_ps(_mm_mul_ps(c00, w00), _mm_mul_ps(c10, w10)),
+								   _mm_add_ps(_mm_mul_ps(c01, w01), _mm_mul_ps(c11, w11)));
+		return result;
+	}
+
+	// Публичный float4 вариант — делегирует в raw версию
+	float4 sample_bilinear(float2 uv) const
+	{
+		return float4(sample_bilinear_raw(uv));
+	}
+
 	void stream_write(int2 coords, __m128 color)
 	{
 		assert(coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height);

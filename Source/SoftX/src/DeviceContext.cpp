@@ -83,6 +83,14 @@ ConstantBuffer DeviceContext::GetConstantBuffer() const
 	return m_ConstantBuffer;
 }
 
+void DeviceContext::SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler)
+{
+	assert(slot >= 0 && slot < MAX_TEXTURE_SLOTS);
+	auto& b = m_TextureTable[slot];
+	b.SetTexture(texture);
+	b.SetSemplerState(sampler);
+}
+
 void DeviceContext::SetRenderTarget(IRenderTarget* target)
 {
 	m_RenderTarget = target;

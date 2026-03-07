@@ -15,6 +15,7 @@ void RasterizerSSE::RasterizeTriangle(
     IRenderTarget& renderTarget,
     const PixelShader& ps,
     const ConstantBuffer& cb,
+    const TextureTable* tt,
     int2 tileMin,
     int2 tileMax)
 {
@@ -243,7 +244,7 @@ void RasterizerSSE::RasterizeTriangle(
                     frag.Normal = float3(nxArr[i], nyArr[i], nzArr[i]);
                     frag.UV = float2(uArr[i], vArr[i]);
 
-                    float4 finalColor = ps(frag, cb);
+                    float4 finalColor = ps(frag, cb, *tt);
                     renderTarget.set_pixel(int2(px, py), finalColor);
                 }
             }
@@ -283,7 +284,7 @@ void RasterizerSSE::RasterizeTriangle(
             }
             if (depthPass) {
                 depthBuffer.at(idx) = frag.Position.z;
-                float4 finalColor = ps(frag, cb);
+                float4 finalColor = ps(frag, cb, *tt);
                 renderTarget.set_pixel(int2(x, y), finalColor);
             }
         }

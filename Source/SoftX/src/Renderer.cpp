@@ -5,12 +5,24 @@
 SOFTX_BEGIN
 
 Renderer::Renderer(
-    IRasterizer& rasterizer, IRenderTarget& rt, DepthBuffer& db,
-    const PixelShader& ps, const ConstantBuffer& cb,
-    const RasterizerState& state, uint32_t tileSize)
-    : m_Rasterizer(rasterizer), m_RenderTarget(rt), m_DepthBuffer(db)
-    , m_PS(ps), m_CB(cb), m_State(state), m_TileSize(tileSize)
-{}
+    IRasterizer& rasterizer, 
+    IRenderTarget& rt, 
+    DepthBuffer& db,
+    const PixelShader& ps, 
+    const ConstantBuffer& cb, 
+    const TextureTable* tt,
+    const RasterizerState& state, 
+    uint32_t tileSize): 
+    m_Rasterizer(rasterizer), 
+    m_RenderTarget(rt), 
+    m_DepthBuffer(db), 
+    m_PS(ps), 
+    m_CB(cb), 
+    m_TT(tt),
+    m_State(state), 
+    m_TileSize(tileSize)
+{
+}
 
 void Renderer::Execute(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles)
 {
@@ -103,6 +115,7 @@ void Renderer::renderTiles()
                     m_RenderTarget,
                     m_PS,
                     m_CB,
+                    m_TT,
                     tile.min,
                     tile.max);
             }

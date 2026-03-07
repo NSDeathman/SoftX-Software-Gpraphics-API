@@ -63,108 +63,134 @@ void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1,
     }
 }
 
-void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex) 
+void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 {
-	PROFILE_SCOPE("DeviceContext::DrawIndexed");
+    PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
-    if (!m_VertexShader || !m_PixelShader || m_VertexBuffer.IsEmpty() || m_IndexBuffer.IsEmpty() || !m_RenderTarget)
+    if (!m_VertexShader || !m_PixelShader ||
+        m_VertexBuffer.IsEmpty() || m_IndexBuffer.IsEmpty() ||
+        !m_RenderTarget || !m_DepthBuffer)
         return;
 
-    IRenderTarget* rt = m_RenderTarget;
-    DepthBuffer* db = m_DepthBuffer;
-    if (!rt || !db) return;
-
-    int width = rt->width();
-    int height = rt->height();
-
-    std::vector<VertexOutput> transformedVerts;
-	std::vector<int3> triangles;
-
-    transformedVerts.clear();
-	triangles.clear();
-
+    // ── Step 1: VS → clip space (без perspective divide) ─────────────────
     std::vector<uint32_t> uniqueIndices;
     {
         std::vector<bool> visited(m_VertexBuffer.Size(), false);
         for (uint32_t i = startIndex; i < startIndex + indexCount; ++i)
         {
             uint32_t idx = m_IndexBuffer.GetByIndex(i);
-            if (!visited[idx])
-            {
-                visited[idx] = true;
-                uniqueIndices.push_back(idx);
-            }
+            if (!visited[idx]) { visited[idx] = true; uniqueIndices.push_back(idx); }
         }
     }
 
-    transformedVerts.resize(m_VertexBuffer.Size());
+    std::vector<VertexOutput> clipVerts(m_VertexBuffer.Size());
+    concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(),
+        [&](uint32_t idx) {
+            // Только VS — ClipSpaceToScreenSpace пока НЕ вызываем
+            clipVerts[idx] = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer, m_TextureTable);
+        });
 
-    concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
-        VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
-		RasterizerCommon::ClipSpaceToScreenSpace(out, m_Viewport);
-		transformedVerts[idx] = out;
-    });
-
+    // ── Step 2: Собрать исходные треугольники ─────────────────────────────
     std::vector<int3> sourceTriangles;
-    for (uint32_t i = startIndex; i < startIndex + indexCount; i += 3) {
-        if (i + 2 >= startIndex + indexCount) break;
-        uint32_t i0 = m_IndexBuffer.GetByIndex(i);
-        uint32_t i1 = m_IndexBuffer.GetByIndex(i + 1);
-        uint32_t i2 = m_IndexBuffer.GetByIndex(i + 2);
-        sourceTriangles.push_back({(int)i0, (int)i1, (int)i2});
+    for (uint32_t i = startIndex; i + 2 < startIndex + indexCount; i += 3)
+    {
+        sourceTriangles.push_back({
+            (int)m_IndexBuffer.GetByIndex(i),
+            (int)m_IndexBuffer.GetByIndex(i + 1),
+            (int)m_IndexBuffer.GetByIndex(i + 2)
+        });
     }
 
-    if (m_GeometryShader) {
-        std::vector<VertexOutput> finalVerts;
-        std::vector<int3> finalTriangles;
+    // ── Step 3: Near plane clipping в clip space ──────────────────────────
+    std::vector<VertexOutput> finalVerts;
+    std::vector<int3>         finalTriangles;
+    finalVerts.reserve(sourceTriangles.size() * 3);
+    finalTriangles.reserve(sourceTriangles.size() * 2);
 
-        for (const auto& tri : sourceTriangles) {
-            VertexOutput inVerts[3] = {
-                transformedVerts[tri.x],
-                transformedVerts[tri.y],
-                transformedVerts[tri.z]
-            };
+    for (const auto& tri : sourceTriangles)
+    {
+        VertexOutput clipped[2][3];
+        int numTris = RasterizerCommon::ClipTriangleNearPlane(
+            clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
 
-            std::vector<VertexOutput> outVerts;
-            std::vector<int> outIndices;
-            m_GeometryShader(inVerts, outVerts, outIndices);
-
-            int baseIndex = (int)finalVerts.size();
-            finalVerts.insert(finalVerts.end(), outVerts.begin(), outVerts.end());
-
-            for (size_t j = 0; j + 2 < outIndices.size(); j += 3) {
-                finalTriangles.push_back({
-                    baseIndex + outIndices[j],
-                    baseIndex + outIndices[j + 1],
-                    baseIndex + outIndices[j + 2]
-                });
-            }
+        for (int t = 0; t < numTris; ++t)
+        {
+            int base = (int)finalVerts.size();
+            finalVerts.push_back(clipped[t][0]);
+            finalVerts.push_back(clipped[t][1]);
+            finalVerts.push_back(clipped[t][2]);
+            finalTriangles.push_back({ base, base + 1, base + 2 });
         }
-
-        transformedVerts = std::move(finalVerts);
-		triangles = std::move(finalTriangles);
-    } else {
-		triangles = std::move(sourceTriangles);
     }
 
-    if (m_fillMode == FillMode::Solid) {
-		RasterizerState state;
-		state.cullMode = m_cullMode;
-		state.fillMode = m_fillMode;
-		state.depthFunc = m_depthFunc;
+    if (finalTriangles.empty()) return;
 
-		Renderer renderer(*m_Rasterizer, *m_RenderTarget, *m_DepthBuffer, m_PixelShader, m_ConstantBuffer, state, m_TileSize);
+    // ── Step 4: Perspective divide на выживших вершинах ───────────────────
+    for (auto& v : finalVerts)
+        RasterizerCommon::ClipSpaceToScreenSpace(v, m_Viewport);
 
-		renderer.Execute(transformedVerts, triangles);
+    // ── Step 5: Geometry shader (на screen-space вершинах, как раньше) ────
+    if (m_GeometryShader)
+    {
+        std::vector<VertexOutput> gsVerts;
+        std::vector<int3>         gsTriangles;
+
+        for (const auto& tri : finalTriangles)
+        {
+            VertexOutput inVerts[3] = {
+                finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z]
+            };
+            std::vector<VertexOutput> outVerts;
+            std::vector<int>          outIndices;
+			m_GeometryShader(inVerts, outVerts, outIndices, m_TextureTable);
+
+            int base = (int)gsVerts.size();
+            gsVerts.insert(gsVerts.end(), outVerts.begin(), outVerts.end());
+            for (size_t j = 0; j + 2 < outIndices.size(); j += 3)
+                gsTriangles.push_back({
+                    base + outIndices[j],
+                    base + outIndices[j + 1],
+                    base + outIndices[j + 2]
+                });
+        }
+        finalVerts      = std::move(gsVerts);
+        finalTriangles  = std::move(gsTriangles);
+    }
+
+    // ── Step 6: Рендер ────────────────────────────────────────────────────
+    int width  = m_RenderTarget->width();
+    int height = m_RenderTarget->height();
+
+    if (m_fillMode == FillMode::Solid)
+    {
+        RasterizerState state;
+        state.cullMode = m_cullMode;
+        state.fillMode = m_fillMode;
+        state.depthFunc = m_depthFunc;
+
+        Renderer renderer(
+            *m_Rasterizer, 
+            *m_RenderTarget, 
+            *m_DepthBuffer,
+            m_PixelShader, 
+            m_ConstantBuffer,
+            &m_TextureTable,
+            state, 
+            m_TileSize);
+        renderer.Execute(finalVerts, finalTriangles);
+
 #ifdef DEBUG_TILING
-		DrawActiveTileBorders(renderer.GetTiles());
+        DrawActiveTileBorders(renderer.GetTiles());
 #endif
-    } else if (m_fillMode == FillMode::Wireframe) {
-        float4 wireColor(1,1,1,1);
-        for (const auto& tri : triangles) {
-			const auto& v0 = transformedVerts[tri.x];
-			const auto& v1 = transformedVerts[tri.y];
-			const auto& v2 = transformedVerts[tri.z];
+    }
+    else if (m_fillMode == FillMode::Wireframe)
+    {
+        float4 wireColor(1, 1, 1, 1);
+        for (const auto& tri : finalTriangles)
+        {
+            const auto& v0 = finalVerts[tri.x];
+            const auto& v1 = finalVerts[tri.y];
+            const auto& v2 = finalVerts[tri.z];
             DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y),
                      (int)round(v1.Position.x), (int)round(v1.Position.y),
                      v0.Position.z, v1.Position.z, wireColor);
@@ -175,17 +201,19 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
                      (int)round(v0.Position.x), (int)round(v0.Position.y),
                      v2.Position.z, v0.Position.z, wireColor);
         }
-    } else if (m_fillMode == FillMode::Point) {
-		std::vector<bool> drawn(transformedVerts.size(), false);
-        for (const auto& tri : triangles) {
-            for (int idx : {tri.x, tri.y, tri.z}) {
-                if (!drawn[idx]) {
+    }
+    else if (m_fillMode == FillMode::Point)
+    {
+        std::vector<bool> drawn(finalVerts.size(), false);
+        for (const auto& tri : finalTriangles)
+            for (int idx : { tri.x, tri.y, tri.z })
+                if (!drawn[idx])
+                {
                     drawn[idx] = true;
-					const auto& v = transformedVerts[idx];
-                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
+                    const auto& v = finalVerts[idx];
+                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y),
+                              v.Position.z, v.Color);
                 }
-            }
-        }
     }
 }
 
@@ -205,6 +233,7 @@ void DeviceContext::renderTileQuad(const Tile& tile, float invW, float invH)
 	VertexOutput input = {};
 	auto ps = m_PixelShader;
 	auto cb = m_ConstantBuffer;
+	auto tt = m_TextureTable;
 
 	for (int y = tile.min.y; y <= tile.max.y; ++y)
 	{
@@ -213,7 +242,7 @@ void DeviceContext::renderTileQuad(const Tile& tile, float invW, float invH)
 		{
 			float u = x * invW;
 			input.UV = float2(u, v);
-			float4 color = ps(input, cb);
+			float4 color = ps(input, cb, tt);
 			rt->set_pixel(int2(x, y), color);
 		}
 	}

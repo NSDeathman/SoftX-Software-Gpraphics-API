@@ -17,6 +17,7 @@ class SOFTX_API RasterizerScalar : public IRasterizer
         IRenderTarget& renderTarget,
         const PixelShader& ps,
         const ConstantBuffer& cb,
+        const TextureTable* tt,
         int2 tileMin,
         int2 tileMax
     ) override;
