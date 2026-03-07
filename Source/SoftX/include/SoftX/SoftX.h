@@ -16,5 +16,7 @@
 #include "RasterizerSSE.h"
 #include "RasterizerAVX.h"
 
+#include "Renderer.h"
+
 #include "DeviceContext.h"
 #include "Device.h"

@@ -45,31 +45,21 @@ public:
 
     void set_pixel(int2 coords, const float4& color) override
     {
-        if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
-        {
-            __m128* data = m_pixels.data();
-            int index = coords.y * m_width + coords.x;
-			_mm_stream_ps(reinterpret_cast<float*>(&data[index]), color.get_simd());
-        }
+        __m128* data = m_pixels.data();
+        int index = coords.y * m_width + coords.x;
+		_mm_stream_ps(reinterpret_cast<float*>(&data[index]), color.get_simd());
     }
 
     void set_pixel(int2 coords, __m128 color)
     {
-        if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
-        {
-            __m128* data = m_pixels.data();
-            int index = coords.y * m_width + coords.x;
-            _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color);
-        }
+        __m128* data = m_pixels.data();
+        int index = coords.y * m_width + coords.x;
+        _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color);
     }
 
     __m128 read(int2 coords) const
     {
-        if (coords.x >= 0 && coords.x < m_width && coords.y >= 0 && coords.y < m_height)
-        {
-            return m_pixels[coords.y * m_width + coords.x];
-        }
-        return _mm_setzero_ps();
+        return m_pixels[coords.y * m_width + coords.x];
     }
 
     int width() const override { return m_width; }

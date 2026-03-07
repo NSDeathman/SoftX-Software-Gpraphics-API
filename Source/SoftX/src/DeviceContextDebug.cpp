@@ -60,23 +60,40 @@ void DeviceContext::DrawTileBorders()
 	}
 }
 
-void DeviceContext::DrawActiveTileBorders()
+void DeviceContext::DrawActiveTileBorders(const std::vector<Tile>& tiles)
 {
 	if (!m_RenderTarget)
 		return;
-	float4 borderColor(1.0f, 0.0f, 0.0f, 1.0f); // красный для активных тайлов
-	for (const auto& tile : m_tiles)
+
+	float4 borderColor(0.0f, 1.0f, 0.0f, 1.0f);
+
+	// Длина уголка — 25% от размера тайла, но не меньше 4 пикселей
+	const int cornerLen = std::max(4, (int)(m_TileSize * 0.25f));
+
+	for (const auto& tile : tiles)
 	{
 		if (!tile.triangleIndices.empty())
 		{
-			// Верхняя горизонтальная линия
-			DrawDebugLine(tile.min.x, tile.min.y, tile.max.x, tile.min.y, borderColor);
-			// Нижняя горизонтальная линия
-			DrawDebugLine(tile.min.x, tile.max.y, tile.max.x, tile.max.y, borderColor);
-			// Левая вертикальная линия
-			DrawDebugLine(tile.min.x, tile.min.y, tile.min.x, tile.max.y, borderColor);
-			// Правая вертикальная линия
-			DrawDebugLine(tile.max.x, tile.min.y, tile.max.x, tile.max.y, borderColor);
+			int x0 = tile.min.x, y0 = tile.min.y;
+			int x1 = tile.max.x, y1 = tile.max.y;
+			int cx = std::min(cornerLen, (x1 - x0) / 2);
+			int cy = std::min(cornerLen, (y1 - y0) / 2);
+
+			// ┌ верхний левый
+			DrawDebugLine(x0, y0, x0 + cx, y0, borderColor); // горизонталь
+			DrawDebugLine(x0, y0, x0, y0 + cy, borderColor); // вертикаль
+
+			// ┐ верхний правый
+			DrawDebugLine(x1 - cx, y0, x1, y0, borderColor);
+			DrawDebugLine(x1, y0, x1, y0 + cy, borderColor);
+
+			// └ нижний левый
+			DrawDebugLine(x0, y1, x0 + cx, y1, borderColor);
+			DrawDebugLine(x0, y1 - cy, x0, y1, borderColor);
+
+			// ┘ нижний правый
+			DrawDebugLine(x1 - cx, y1, x1, y1, borderColor);
+			DrawDebugLine(x1, y1 - cy, x1, y1, borderColor);
 		}
 	}
 }

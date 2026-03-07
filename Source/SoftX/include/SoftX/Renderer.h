@@ -1,0 +1,53 @@
+#pragma once
+
+#include "LibInternal.h"
+#include "RasterizerInterface.h"
+
+SOFTX_BEGIN
+
+class Renderer
+{
+public:
+    Renderer(
+        IRasterizer&        rasterizer,
+        IRenderTarget&      renderTarget,
+        DepthBuffer&        depthBuffer,
+        const PixelShader&  ps,
+        const ConstantBuffer& cb,
+        const RasterizerState& state,
+        uint32_t            tileSize
+    );
+
+    void Execute(
+        const std::vector<VertexOutput>& verts,
+        const std::vector<int3>&         triangles
+    );
+
+    const std::vector<Tile>& GetTiles() const
+	{
+		return m_Tiles;
+	}
+
+private:
+    void buildTiles(int width, int height);
+    void binTriangles(
+        const std::vector<VertexOutput>& verts,
+        const std::vector<int3>&         triangles
+    );
+    void renderTiles();
+    void renderTile(int tileIndex);
+
+    IRasterizer&           m_Rasterizer;
+    IRenderTarget&         m_RenderTarget;
+    DepthBuffer&           m_DepthBuffer;
+    const PixelShader&     m_PS;
+    const ConstantBuffer&  m_CB;
+    RasterizerState        m_State;
+    uint32_t               m_TileSize;
+
+    std::vector<Tile>      m_Tiles;
+	const std::vector<VertexOutput>* m_Verts = nullptr;
+	const std::vector<int3>* m_Triangles = nullptr;
+};
+
+SOFTX_END

@@ -65,6 +65,7 @@ class SOFTX_API DeviceContext
 
 	void DrawIndexed(uint32_t indexCount, uint32_t startIndex);
 	void DrawIndexed();
+
 	void DrawFullScreenQuad();
 
   private:
@@ -90,22 +91,14 @@ class SOFTX_API DeviceContext
 
 	uint32_t m_TileSize;
 
-    std::vector<Tile> m_tiles;
-    std::vector<VertexOutput> m_transformedVerts;
-    std::vector<int3> m_triangles;
-
-    void buildTiles(int width, int height);
-    void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
-    void renderTiles();
-	void renderTile(int tileIndex);
-	void renderTileQuad(int tileIndex, float invW, float invH);
+	void renderTileQuad(const Tile& tile, float invW, float invH);
 
 	void DrawPoint(int x, int y, float z, const float4& color);
     void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
 
 	void DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color);
 	void DrawTileBorders();
-	void DrawActiveTileBorders();
+	void DrawActiveTileBorders(const std::vector<Tile>& tiles);
 };
 
 SOFTX_END

@@ -6,6 +6,8 @@
 #include <SoftX/ThreadPoolManager.h>
 #include "RasterizerCommon.h"
 
+//#define DEBUG_TILING
+
 SOFTX_BEGIN
 
 void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
@@ -75,8 +77,11 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
     int width = rt->width();
     int height = rt->height();
 
-    m_transformedVerts.clear();
-    m_triangles.clear();
+    std::vector<VertexOutput> transformedVerts;
+	std::vector<int3> triangles;
+
+    transformedVerts.clear();
+	triangles.clear();
 
     std::vector<uint32_t> uniqueIndices;
     {
@@ -92,12 +97,12 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
         }
     }
 
-    m_transformedVerts.resize(m_VertexBuffer.Size());
+    transformedVerts.resize(m_VertexBuffer.Size());
 
     concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
         VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
 		RasterizerCommon::ClipSpaceToScreenSpace(out, m_Viewport);
-        m_transformedVerts[idx] = out;
+		transformedVerts[idx] = out;
     });
 
     std::vector<int3> sourceTriangles;
@@ -115,9 +120,9 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 
         for (const auto& tri : sourceTriangles) {
             VertexOutput inVerts[3] = {
-                m_transformedVerts[tri.x],
-                m_transformedVerts[tri.y],
-                m_transformedVerts[tri.z]
+                transformedVerts[tri.x],
+                transformedVerts[tri.y],
+                transformedVerts[tri.z]
             };
 
             std::vector<VertexOutput> outVerts;
@@ -136,25 +141,30 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
             }
         }
 
-        m_transformedVerts = std::move(finalVerts);
-        m_triangles = std::move(finalTriangles);
+        transformedVerts = std::move(finalVerts);
+		triangles = std::move(finalTriangles);
     } else {
-        m_triangles = std::move(sourceTriangles);
+		triangles = std::move(sourceTriangles);
     }
 
     if (m_fillMode == FillMode::Solid) {
-        buildTiles(width, height);
-        binTriangles(m_transformedVerts, m_triangles);
-        renderTiles();
+		RasterizerState state;
+		state.cullMode = m_cullMode;
+		state.fillMode = m_fillMode;
+		state.depthFunc = m_depthFunc;
+
+		Renderer renderer(*m_Rasterizer, *m_RenderTarget, *m_DepthBuffer, m_PixelShader, m_ConstantBuffer, state, m_TileSize);
+
+		renderer.Execute(transformedVerts, triangles);
 #ifdef DEBUG_TILING
-		DrawActiveTileBorders();
+		DrawActiveTileBorders(renderer.GetTiles());
 #endif
     } else if (m_fillMode == FillMode::Wireframe) {
         float4 wireColor(1,1,1,1);
-        for (const auto& tri : m_triangles) {
-            const auto& v0 = m_transformedVerts[tri.x];
-            const auto& v1 = m_transformedVerts[tri.y];
-            const auto& v2 = m_transformedVerts[tri.z];
+        for (const auto& tri : triangles) {
+			const auto& v0 = transformedVerts[tri.x];
+			const auto& v1 = transformedVerts[tri.y];
+			const auto& v2 = transformedVerts[tri.z];
             DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y),
                      (int)round(v1.Position.x), (int)round(v1.Position.y),
                      v0.Position.z, v1.Position.z, wireColor);
@@ -166,12 +176,12 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
                      v2.Position.z, v0.Position.z, wireColor);
         }
     } else if (m_fillMode == FillMode::Point) {
-        std::vector<bool> drawn(m_transformedVerts.size(), false);
-        for (const auto& tri : m_triangles) {
+		std::vector<bool> drawn(transformedVerts.size(), false);
+        for (const auto& tri : triangles) {
             for (int idx : {tri.x, tri.y, tri.z}) {
                 if (!drawn[idx]) {
                     drawn[idx] = true;
-                    const auto& v = m_transformedVerts[idx];
+					const auto& v = transformedVerts[idx];
                     DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
                 }
             }
@@ -185,37 +195,80 @@ void DeviceContext::DrawIndexed()
 	DrawIndexed(count, 0);
 }
 
-void DeviceContext::DrawFullScreenQuad() {
+void DeviceContext::renderTileQuad(const Tile& tile, float invW, float invH)
+{
+	PROFILE_SCOPE("DeviceContext::renderTileQuad");
+	IRenderTarget* rt = m_RenderTarget;
+	if (!rt)
+		return;
+
+	VertexOutput input = {};
+	auto ps = m_PixelShader;
+	auto cb = m_ConstantBuffer;
+
+	for (int y = tile.min.y; y <= tile.max.y; ++y)
+	{
+		float v = y * invH;
+		for (int x = tile.min.x; x <= tile.max.x; ++x)
+		{
+			float u = x * invW;
+			input.UV = float2(u, v);
+			float4 color = ps(input, cb);
+			rt->set_pixel(int2(x, y), color);
+		}
+	}
+}
+
+void DeviceContext::DrawFullScreenQuad()
+{
 	PROFILE_SCOPE("DeviceContext::DrawFullScreenQuad");
 
-    if (!m_PixelShader || !m_RenderTarget) return;
+	if (!m_PixelShader || !m_RenderTarget)
+		return;
 
-    IRenderTarget* rt = m_RenderTarget;
-    int w = rt->width();
-    int h = rt->height();
-    float invW = 1.0f / (w - 1);
-    float invH = 1.0f / (h - 1);
+	IRenderTarget* rt = m_RenderTarget;
+	int w = rt->width();
+	int h = rt->height();
+	float invW = 1.0f / (w - 1);
+	float invH = 1.0f / (h - 1);
 
-    buildTiles(w, h);
-    int numTiles = (int)m_tiles.size();
-    std::atomic<int> tileIndex(0);
+	// Строим тайлы локально — TiledRenderer здесь не нужен,
+	// renderTileQuad не работает с треугольниками.
+	std::vector<Tile> tiles;
+	{
+		int ts = m_TileSize;
+		int tilesX = (w + ts - 1) / ts;
+		int tilesY = (h + ts - 1) / ts;
+		tiles.reserve(tilesX * tilesY);
+		for (int ty = 0; ty < tilesY; ++ty)
+			for (int tx = 0; tx < tilesX; ++tx)
+			{
+				int2 mn(tx * ts, ty * ts);
+				int2 mx(std::min((tx + 1) * ts - 1, w - 1), std::min((ty + 1) * ts - 1, h - 1));
+				tiles.emplace_back(mn, mx);
+			}
+	}
 
-    auto worker = [this, invW, invH, &tileIndex, numTiles]() {
-        while (true) {
-            int idx = tileIndex.fetch_add(1);
-            if (idx >= numTiles) break;
-            renderTileQuad(idx, invW, invH);
-        }
-    };
+	int numTiles = (int)tiles.size();
+	std::atomic<int> tileIndex(0);
 
-    auto& pool = ThreadPoolManager::Get();
-    int numThreads = (int)pool.threadCount();
-    for (int i = 0; i < numThreads; ++i) {
-        pool.enqueue(worker);
-    }
-    pool.wait();
+	auto worker = [this, &tiles, invW, invH, &tileIndex, numTiles]() {
+		while (true)
+		{
+			int idx = tileIndex.fetch_add(1);
+			if (idx >= numTiles)
+				break;
+			renderTileQuad(tiles[idx], invW, invH);
+		}
+	};
+
+	auto& pool = ThreadPoolManager::Get();
+	for (int i = 0; i < (int)pool.threadCount(); ++i)
+		pool.enqueue(worker);
+	pool.wait();
+
 #ifdef DEBUG_TILING
-    DrawActiveTileBorders();
+	DrawActiveTileBorders(tiles);
 #endif
 }
 
