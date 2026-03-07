@@ -26,21 +26,6 @@ std::unique_ptr<DeviceContext> Device::CreateDeferredContext()
 	return std::make_unique<DeviceContext>();
 }
 
-void Device::SetVertexBuffer(const VertexBuffer& buffer)
-{
-	m_DeviceContext.SetVertexBuffer(buffer);
-}
-
-void Device::SetIndexBuffer(const IndexBuffer& buffer)
-{
-	m_DeviceContext.SetIndexBuffer(buffer);
-}
-
-void Device::SetConstantBuffer(ConstantBuffer cbuffer)
-{
-	m_DeviceContext.SetConstantBuffer(cbuffer);
-}
-
 Framebuffer& Device::GetBackBuffer()
 {
     return m_backBuffer;

@@ -23,10 +23,6 @@ public:
 
 	std::unique_ptr<DeviceContext> CreateDeferredContext();
 
-	void SetVertexBuffer(const VertexBuffer& buffer);
-	void SetIndexBuffer(const IndexBuffer& buffer);
-	void SetConstantBuffer(ConstantBuffer cbuffer);
-
     void Present();
 
     Framebuffer& GetBackBuffer();

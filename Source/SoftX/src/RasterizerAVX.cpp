@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include <SoftX/SoftX.h>
 #include "RasterizerCommon.h"
@@ -22,13 +22,13 @@ void RasterizerAVX::RasterizeTriangle(
     int width = renderTarget.width();
     int height = renderTarget.height();
 
-    // Bounding box ������������
+    // Bounding box треугольника
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    // ������������ bounding box ������
+    // Ограничиваем bounding box тайлом
     int iMinX = std::max(tileMin.x, (int)std::floor(minX));
     int iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
     int iMinY = std::max(tileMin.y, (int)std::floor(minY));
@@ -42,12 +42,12 @@ void RasterizerAVX::RasterizeTriangle(
     if (cull == CullMode::Front && area2 > 0) return;
     if (std::abs(area2) < 1e-6f) return;
 
-    // ��������������� ��������� (���������� RasterizeTriangle)
+    // Предвычисленные константы (аналогично RasterizeTriangle)
     float4 dx01 = v1.Position - v0.Position;
     float4 dx12 = v2.Position - v1.Position;
     float4 dx20 = v0.Position - v2.Position;
 
-    // ����������� ��������� (��� � RasterizeTriangle)
+    // Размножение атрибутов (как в RasterizeTriangle)
     __m256 v0x = _mm256_set1_ps(v0.Position.x);
     __m256 v0y = _mm256_set1_ps(v0.Position.y);
     __m256 v1x = _mm256_set1_ps(v1.Position.x);
@@ -102,9 +102,9 @@ void RasterizerAVX::RasterizeTriangle(
         __m256 baseY = _mm256_set1_ps(y + 0.5f);
 
         int x;
-        for (x = iMinX; x <= iMaxX - 7; x += 8)
+		for (x = iMinX; x + 7 < width && x <= iMaxX - 7; x += 8)
         {
-            // ��������, ������������ �� ���� �� 8 �������� � ������
+            // Проверка, пересекается ли блок из 8 пикселей с тайлом
             if (x > tileMax.x || x + 7 < tileMin.x)
                 continue;
 
@@ -138,48 +138,81 @@ void RasterizerAVX::RasterizeTriangle(
             int insideMask = _mm256_movemask_ps(inside);
             if (insideMask == 0) continue;
 
-            __m256 alpha = _mm256_mul_ps(f12, invArea);
-            __m256 beta  = _mm256_mul_ps(f20, invArea);
-            __m256 gamma = _mm256_mul_ps(f01, invArea);
+                        __m256 alpha = _mm256_mul_ps(f12, invArea);
+			__m256 beta = _mm256_mul_ps(f20, invArea);
+			__m256 gamma = _mm256_mul_ps(f01, invArea);
 
-            __m256 z = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0z),
-                                                   _mm256_mul_ps(beta, v1z)),
-                                     _mm256_mul_ps(gamma, v2z));
+			// ── Perspective-correct веса ──────────────────────────────────
+			// Position.w = 1/w (установлено в ClipSpaceToScreenSpace).
+			// Взвешиваем барицентрические координаты на 1/w каждой вершины,
+			// затем нормируем — это даёт корректную интерполяцию в 3D.
+			__m256 v0w = _mm256_set1_ps(v0.Position.w);
+			__m256 v1w = _mm256_set1_ps(v1.Position.w);
+			__m256 v2w = _mm256_set1_ps(v2.Position.w);
 
-            __m256 r = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0cr),
-                                                   _mm256_mul_ps(beta, v1cr)),
-                                     _mm256_mul_ps(gamma, v2cr));
-            __m256 g = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0cg),
-                                                   _mm256_mul_ps(beta, v1cg)),
-                                     _mm256_mul_ps(gamma, v2cg));
-            __m256 b = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0cb),
-                                                   _mm256_mul_ps(beta, v1cb)),
-                                     _mm256_mul_ps(gamma, v2cb));
-            __m256 a = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0ca),
-                                                   _mm256_mul_ps(beta, v1ca)),
-                                     _mm256_mul_ps(gamma, v2ca));
+			__m256 pw0 = _mm256_mul_ps(alpha, v0w);
+			__m256 pw1 = _mm256_mul_ps(beta, v1w);
+			__m256 pw2 = _mm256_mul_ps(gamma, v2w);
 
-            __m256 nx = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0nx),
-                                                    _mm256_mul_ps(beta, v1nx)),
-                                      _mm256_mul_ps(gamma, v2nx));
-            __m256 ny = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0ny),
-                                                    _mm256_mul_ps(beta, v1ny)),
-                                      _mm256_mul_ps(gamma, v2ny));
-            __m256 nz = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0nz),
-                                                    _mm256_mul_ps(beta, v1nz)),
-                                      _mm256_mul_ps(gamma, v2nz));
+			// Точное деление вместо rcp (12-бит) — важно для корректных UV
+			__m256 pwSum = _mm256_add_ps(_mm256_add_ps(pw0, pw1), pw2);
+			__m256 ones = _mm256_set1_ps(1.0f);
+			__m256 invPwSum = _mm256_div_ps(ones, pwSum);
 
-            __m256 u = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0u),
-                                                   _mm256_mul_ps(beta, v1u)),
-                                     _mm256_mul_ps(gamma, v2u));
-            __m256 v = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0v),
-                                                   _mm256_mul_ps(beta, v1v)),
-                                     _mm256_mul_ps(gamma, v2v));
+			// ── z: линейная интерполяция (perspective correction не нужна) ─
+			__m256 z = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0z), _mm256_mul_ps(beta, v1z)),
+									 _mm256_mul_ps(gamma, v2z));
+
+			// ── Все атрибуты: perspective-correct через pw0/pw1/pw2 ────────
+#define PLERP256(a0, a1, a2)                                                                                           \
+	_mm256_mul_ps(                                                                                                     \
+		_mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(pw0, a0), _mm256_mul_ps(pw1, a1)), _mm256_mul_ps(pw2, a2)),          \
+		invPwSum)
+
+			__m256 r = PLERP256(v0cr, v1cr, v2cr);
+			__m256 g = PLERP256(v0cg, v1cg, v2cg);
+			__m256 b = PLERP256(v0cb, v1cb, v2cb);
+			__m256 a = PLERP256(v0ca, v1ca, v2ca);
+			__m256 nx = PLERP256(v0nx, v1nx, v2nx);
+			__m256 ny = PLERP256(v0ny, v1ny, v2ny);
+			__m256 nz = PLERP256(v0nz, v1nz, v2nz);
+			__m256 u = PLERP256(v0u, v1u, v2u);
+			__m256 v = PLERP256(v0v, v1v, v2v);
+
+#undef PLERP256
 
             int idx0 = y * width + x;
             __m256 depths = _mm256_loadu_ps(&depthBuffer.at(idx0));
 
-            __m256 depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ);
+            __m256 depthCmp;
+			switch (state.depthFunc)
+			{
+			case ComparisonFunc::Never:
+				depthCmp = _mm256_setzero_ps();
+				break;
+			case ComparisonFunc::Less:
+				depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ);
+				break;
+			case ComparisonFunc::Equal:
+				depthCmp = _mm256_cmp_ps(z, depths, _CMP_EQ_OQ);
+				break;
+			case ComparisonFunc::LessEqual:
+				depthCmp = _mm256_cmp_ps(z, depths, _CMP_LE_OQ);
+				break;
+			case ComparisonFunc::Greater:
+				depthCmp = _mm256_cmp_ps(z, depths, _CMP_GT_OQ);
+				break;
+			case ComparisonFunc::NotEqual:
+				depthCmp = _mm256_cmp_ps(z, depths, _CMP_NEQ_OQ);
+				break;
+			case ComparisonFunc::GreaterEqual:
+				depthCmp = _mm256_cmp_ps(z, depths, _CMP_GE_OQ);
+				break;
+			case ComparisonFunc::Always:
+				depthCmp = _mm256_castsi256_ps(_mm256_set1_epi32(-1));
+				break;
+			}
+
             int depthMask = _mm256_movemask_ps(depthCmp) & insideMask;
             if (depthMask == 0) continue;
 
@@ -222,7 +255,7 @@ void RasterizerAVX::RasterizeTriangle(
             }
         }
 
-        // ��������� �������� ��� ���������� ��������
+        // Скалярный доводчик для оставшихся пикселей
         for (; x <= iMaxX; ++x)
         {
             if (x < tileMin.x || x > tileMax.x)
@@ -244,10 +277,20 @@ void RasterizerAVX::RasterizeTriangle(
             float c = f2 / area2;
 
             VertexOutput frag = RasterizerCommon::trilerp(v0, v1, v2, a, b, c);
+			int idx = y * width + x;
 
-            int idx = y * width + x;
-            if (frag.Position.z < depthBuffer.at(idx))
-            {
+            bool depthPass = false;
+            switch (state.depthFunc) {
+                case ComparisonFunc::Never:         depthPass = false; break;
+                case ComparisonFunc::Less:          depthPass = frag.Position.z < depthBuffer.at(idx); break;
+                case ComparisonFunc::Equal:         depthPass = frag.Position.z == depthBuffer.at(idx); break;
+                case ComparisonFunc::LessEqual:     depthPass = frag.Position.z <= depthBuffer.at(idx); break;
+                case ComparisonFunc::Greater:       depthPass = frag.Position.z > depthBuffer.at(idx); break;
+                case ComparisonFunc::NotEqual:      depthPass = frag.Position.z != depthBuffer.at(idx); break;
+                case ComparisonFunc::GreaterEqual:  depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+                case ComparisonFunc::Always:        depthPass = true; break;
+            }
+            if (depthPass) {
                 depthBuffer.at(idx) = frag.Position.z;
                 float4 finalColor = ps(frag, cb);
                 renderTarget.set_pixel(int2(x, y), finalColor);

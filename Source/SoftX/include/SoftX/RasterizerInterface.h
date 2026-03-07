@@ -10,6 +10,7 @@ SOFTX_BEGIN
 struct RasterizerState {
     CullMode cullMode = CullMode::Back;
     FillMode fillMode = FillMode::Solid;
+	ComparisonFunc depthFunc = ComparisonFunc::Less;
 };
 
 class IRasterizer {

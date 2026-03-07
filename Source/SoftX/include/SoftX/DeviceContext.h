@@ -52,6 +52,9 @@ class SOFTX_API DeviceContext
 	void SetFillMode(FillMode mode);
 	FillMode GetFillMode() const;
 
+	void SetDepthFunc(ComparisonFunc func);
+	ComparisonFunc GetDepthFunc() const;
+
 	void SetViewport(const Viewport& vp);
 	Viewport GetViewport() const;
 
@@ -79,8 +82,9 @@ class SOFTX_API DeviceContext
 
 	std::unique_ptr<IRasterizer> m_Rasterizer;
 
-	CullMode m_cullMode;
-	FillMode m_fillMode;
+	CullMode m_cullMode = CullMode::Back;
+	FillMode m_fillMode = FillMode::Solid;
+	ComparisonFunc m_depthFunc = ComparisonFunc::Less;
 
 	Viewport m_Viewport;
 

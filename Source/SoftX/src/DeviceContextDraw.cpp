@@ -96,7 +96,7 @@ void DeviceContext::DrawIndexed(uint32_t indexCount, uint32_t startIndex)
 
     concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(), [&](uint32_t idx) {
         VertexOutput out = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer);
-		out.Position = RasterizerCommon::ClipSpaceToScreenSpace(out.Position, m_Viewport);
+		RasterizerCommon::ClipSpaceToScreenSpace(out, m_Viewport);
         m_transformedVerts[idx] = out;
     });
 

@@ -80,7 +80,7 @@ class SOFTX_API TextureRGBA32F
 		return m_height;
 	}
 
-	void saveToTGA(const TextureRGBA32F& tex, const char* filename)
+	void saveToTGA(const TextureRGBA32F& tex, const char* filename) const
 	{
 		int w = tex.width();
 		int h = tex.height();

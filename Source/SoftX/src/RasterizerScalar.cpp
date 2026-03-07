@@ -60,10 +60,20 @@ void RasterizerScalar::RasterizeTriangle(
             float c = f2 / area2;
 
             VertexOutput frag = RasterizerCommon::trilerp(v0, v1, v2, a, b, c);
-
             int idx = y * width + x;
-            if (frag.Position.z < depthBuffer.at(idx))
-            {
+
+            bool depthPass = false;
+            switch (state.depthFunc) {
+                case ComparisonFunc::Never:         depthPass = false; break;
+                case ComparisonFunc::Less:          depthPass = frag.Position.z < depthBuffer.at(idx); break;
+                case ComparisonFunc::Equal:         depthPass = frag.Position.z == depthBuffer.at(idx); break;
+                case ComparisonFunc::LessEqual:     depthPass = frag.Position.z <= depthBuffer.at(idx); break;
+                case ComparisonFunc::Greater:       depthPass = frag.Position.z > depthBuffer.at(idx); break;
+                case ComparisonFunc::NotEqual:      depthPass = frag.Position.z != depthBuffer.at(idx); break;
+                case ComparisonFunc::GreaterEqual:  depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+                case ComparisonFunc::Always:        depthPass = true; break;
+            }
+            if (depthPass) {
                 depthBuffer.at(idx) = frag.Position.z;
                 float4 finalColor = ps(frag, cb);
                 renderTarget.set_pixel(int2(x, y), finalColor);

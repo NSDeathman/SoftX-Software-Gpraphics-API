@@ -200,4 +200,16 @@ enum class FillMode
 	Solid
 };
 
+enum class ComparisonFunc
+{
+	Never,		  // always false
+	Less,		  // <
+	Equal,		  // ==
+	LessEqual,	  // <=
+	Greater,	  // >
+	NotEqual,	  // !=
+	GreaterEqual, // >=
+	Always		  // always true
+};
+
 SOFTX_END

@@ -161,6 +161,16 @@ FillMode DeviceContext::GetFillMode() const
 	return m_fillMode;
 }
 
+void DeviceContext::SetDepthFunc(ComparisonFunc func)
+{
+	m_depthFunc = func;
+}
+
+ComparisonFunc DeviceContext::GetDepthFunc() const
+{
+	return m_depthFunc;
+}
+
 void DeviceContext::SetViewport(const Viewport& vp)
 {
 	m_Viewport = vp;

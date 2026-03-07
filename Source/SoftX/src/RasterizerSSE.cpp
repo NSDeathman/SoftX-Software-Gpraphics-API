@@ -1,7 +1,8 @@
-#include "pch.h"
+ï»¿#include "pch.h"
 
 #include <SoftX/SoftX.h>
 #include "RasterizerCommon.h"
+#include <xmmintrin.h>
 
 SOFTX_BEGIN
 
@@ -101,13 +102,13 @@ void RasterizerSSE::RasterizeTriangle(
         __m128 baseY = _mm_set1_ps(y + 0.5f);
 
         int x;
-        for (x = iMinX; x <= iMaxX - 3; x += 4)
+		for (x = iMinX; x + 3 < width && x <= iMaxX - 3; x += 4)
         {
-            // Ïðîâåðêà ïåðåñå÷åíèÿ áëîêà ñ òàéëîì (óæå ó÷òåíî â iMinX/iMaxX, íî ìîæåò áûòü ÷àñòè÷íîå ïåðåêðûòèå? 
-            // Íà ñàìîì äåëå iMinX è iMaxX óæå îãðàíè÷åíû òàéëîì, ïîýòîìó áëîê âñåãäà âíóòðè òàéëà ïî x.
-            // Îäíàêî áëîê ìîæåò ÷àñòè÷íî âûõîäèòü çà ãðàíèöû òàéëà ïî x, åñëè iMinX íå êðàòåí 4? 
-            // Íî ìû óæå îãðàíè÷èëè iMinX è iMaxX, ïîýòîìó áëîê ïîëíîñòüþ âíóòðè òàéëà, åñëè x è x+3 â ïðåäåëàõ.
-            // Äëÿ íàä¸æíîñòè îñòàâèì ïðîâåðêó:
+            // ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð¿ÐµÑ€ÐµÑÐµÑ‡ÐµÐ½Ð¸Ñ Ð±Ð»Ð¾ÐºÐ° Ñ Ñ‚Ð°Ð¹Ð»Ð¾Ð¼ (ÑƒÐ¶Ðµ ÑƒÑ‡Ñ‚ÐµÐ½Ð¾ Ð² iMinX/iMaxX, Ð½Ð¾ Ð¼Ð¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ Ñ‡Ð°ÑÑ‚Ð¸Ñ‡Ð½Ð¾Ðµ Ð¿ÐµÑ€ÐµÐºÑ€Ñ‹Ñ‚Ð¸Ðµ? 
+            // ÐÐ° ÑÐ°Ð¼Ð¾Ð¼ Ð´ÐµÐ»Ðµ iMinX Ð¸ iMaxX ÑƒÐ¶Ðµ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ñ‹ Ñ‚Ð°Ð¹Ð»Ð¾Ð¼, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð±Ð»Ð¾Ðº Ð²ÑÐµÐ³Ð´Ð° Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ‚Ð°Ð¹Ð»Ð° Ð¿Ð¾ x.
+            // ÐžÐ´Ð½Ð°ÐºÐ¾ Ð±Ð»Ð¾Ðº Ð¼Ð¾Ð¶ÐµÑ‚ Ñ‡Ð°ÑÑ‚Ð¸Ñ‡Ð½Ð¾ Ð²Ñ‹Ñ…Ð¾Ð´Ð¸Ñ‚ÑŒ Ð·Ð° Ð³Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ Ñ‚Ð°Ð¹Ð»Ð° Ð¿Ð¾ x, ÐµÑÐ»Ð¸ iMinX Ð½Ðµ ÐºÑ€Ð°Ñ‚ÐµÐ½ 4? 
+            // ÐÐ¾ Ð¼Ñ‹ ÑƒÐ¶Ðµ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡Ð¸Ð»Ð¸ iMinX Ð¸ iMaxX, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ Ð±Ð»Ð¾Ðº Ð¿Ð¾Ð»Ð½Ð¾ÑÑ‚ÑŒÑŽ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ‚Ð°Ð¹Ð»Ð°, ÐµÑÐ»Ð¸ x Ð¸ x+3 Ð² Ð¿Ñ€ÐµÐ´ÐµÐ»Ð°Ñ….
+            // Ð”Ð»Ñ Ð½Ð°Ð´Ñ‘Ð¶Ð½Ð¾ÑÑ‚Ð¸ Ð¾ÑÑ‚Ð°Ð²Ð¸Ð¼ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÑƒ:
             if (x > tileMax.x || x + 3 < tileMin.x)
                 continue;
 
@@ -139,31 +140,76 @@ void RasterizerSSE::RasterizeTriangle(
             if (insideMask == 0) continue;
 
             __m128 alpha = _mm_mul_ps(f12, invArea);
-            __m128 beta  = _mm_mul_ps(f20, invArea);
-            __m128 gamma = _mm_mul_ps(f01, invArea);
+			__m128 beta = _mm_mul_ps(f20, invArea);
+			__m128 gamma = _mm_mul_ps(f01, invArea);
 
-            // Èíòåðïîëÿöèÿ àòðèáóòîâ
-            __m128 z = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0z), _mm_mul_ps(beta, v1z)), _mm_mul_ps(gamma, v2z));
-            __m128 r = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0cr), _mm_mul_ps(beta, v1cr)), _mm_mul_ps(gamma, v2cr));
-            __m128 g = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0cg), _mm_mul_ps(beta, v1cg)), _mm_mul_ps(gamma, v2cg));
-            __m128 b = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0cb), _mm_mul_ps(beta, v1cb)), _mm_mul_ps(gamma, v2cb));
-            __m128 a = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0ca), _mm_mul_ps(beta, v1ca)), _mm_mul_ps(gamma, v2ca));
-            __m128 u = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0u), _mm_mul_ps(beta, v1u)), _mm_mul_ps(gamma, v2u));
-            __m128 v = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0v), _mm_mul_ps(beta, v1v)), _mm_mul_ps(gamma, v2v));
+			// â”€â”€ Perspective-correct Ð²ÐµÑÐ° â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+			__m128 v0w = _mm_set1_ps(v0.Position.w);
+			__m128 v1w = _mm_set1_ps(v1.Position.w);
+			__m128 v2w = _mm_set1_ps(v2.Position.w);
 
-            // Íîðìàëè (ïðîïóñòèì äëÿ êðàòêîñòè, íî äîáàâèì)
-            __m128 nx = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0nx), _mm_mul_ps(beta, v1nx)), _mm_mul_ps(gamma, v2nx));
-            __m128 ny = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0ny), _mm_mul_ps(beta, v1ny)), _mm_mul_ps(gamma, v2ny));
-            __m128 nz = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0nz), _mm_mul_ps(beta, v1nz)), _mm_mul_ps(gamma, v2nz));
+			__m128 pw0 = _mm_mul_ps(alpha, v0w);
+			__m128 pw1 = _mm_mul_ps(beta, v1w);
+			__m128 pw2 = _mm_mul_ps(gamma, v2w);
+
+			__m128 pwSum = _mm_add_ps(_mm_add_ps(pw0, pw1), pw2);
+			__m128 ones = _mm_set1_ps(1.0f);
+			__m128 invPwSum = _mm_div_ps(ones, pwSum);
+
+			// â”€â”€ z: Ð»Ð¸Ð½ÐµÐ¹Ð½Ð°Ñ Ð¸Ð½Ñ‚ÐµÑ€Ð¿Ð¾Ð»ÑÑ†Ð¸Ñ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+			__m128 z = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0z), _mm_mul_ps(beta, v1z)), _mm_mul_ps(gamma, v2z));
+
+			// â”€â”€ ÐÑ‚Ñ€Ð¸Ð±ÑƒÑ‚Ñ‹: perspective-correct â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#define PLERP128(a0, a1, a2)                                                                                           \
+	_mm_mul_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(pw0, a0), _mm_mul_ps(pw1, a1)), _mm_mul_ps(pw2, a2)), invPwSum)
+
+			__m128 r = PLERP128(v0cr, v1cr, v2cr);
+			__m128 g = PLERP128(v0cg, v1cg, v2cg);
+			__m128 b = PLERP128(v0cb, v1cb, v2cb);
+			__m128 a = PLERP128(v0ca, v1ca, v2ca);
+			__m128 nx = PLERP128(v0nx, v1nx, v2nx);
+			__m128 ny = PLERP128(v0ny, v1ny, v2ny);
+			__m128 nz = PLERP128(v0nz, v1nz, v2nz);
+			__m128 u = PLERP128(v0u, v1u, v2u);
+			__m128 v = PLERP128(v0v, v1v, v2v);
+
+#undef PLERP128
 
             int idx0 = y * width + x;
             __m128 depths = _mm_loadu_ps(&depthBuffer.at(idx0));
 
-            __m128 depthCmp = _mm_cmplt_ps(z, depths);
+            __m128 depthCmp;
+			switch (state.depthFunc)
+			{
+			case ComparisonFunc::Never:
+				depthCmp = _mm_setzero_ps();
+				break;
+			case ComparisonFunc::Less:
+				depthCmp = _mm_cmplt_ps(z, depths);
+				break;
+			case ComparisonFunc::Equal:
+				depthCmp = _mm_cmpeq_ps(z, depths);
+				break;
+			case ComparisonFunc::LessEqual:
+				depthCmp = _mm_cmple_ps(z, depths);
+				break;
+			case ComparisonFunc::Greater:
+				depthCmp = _mm_cmpgt_ps(z, depths);
+				break;
+			case ComparisonFunc::NotEqual:
+				depthCmp = _mm_cmpneq_ps(z, depths);
+				break;
+			case ComparisonFunc::GreaterEqual:
+				depthCmp = _mm_cmpge_ps(z, depths);
+				break;
+			case ComparisonFunc::Always:
+				depthCmp = _mm_castsi128_ps(_mm_set1_epi32(-1)); // Ð²ÑÐµ ÐµÐ´Ð¸Ð½Ð¸Ñ†Ñ‹
+				break;
+			}
             int depthMask = _mm_movemask_ps(depthCmp) & insideMask;
             if (depthMask == 0) continue;
 
-            // Ñîõðàíÿåì èíòåðïîëèðîâàííûå çíà÷åíèÿ â ìàññèâû
+            // Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÑÐµÐ¼ Ð¸Ð½Ñ‚ÐµÑ€Ð¿Ð¾Ð»Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ Ð² Ð¼Ð°ÑÑÐ¸Ð²Ñ‹
             float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4], uArr[4], vArr[4];
             float nxArr[4], nyArr[4], nzArr[4];
             _mm_storeu_ps(zArr, z);
@@ -203,7 +249,7 @@ void RasterizerSSE::RasterizeTriangle(
             }
         }
 
-        // Ñêàëÿðíûé äîâîä÷èê äëÿ îñòàâøèõñÿ ïèêñåëåé
+        // Ð¡ÐºÐ°Ð»ÑÑ€Ð½Ñ‹Ð¹ Ð´Ð¾Ð²Ð¾Ð´Ñ‡Ð¸Ðº Ð´Ð»Ñ Ð¾ÑÑ‚Ð°Ð²ÑˆÐ¸Ñ…ÑÑ Ð¿Ð¸ÐºÑÐµÐ»ÐµÐ¹
         for (; x <= iMaxX; ++x)
         {
             if (x < tileMin.x || x > tileMax.x)
@@ -222,10 +268,20 @@ void RasterizerSSE::RasterizeTriangle(
             float c = f2 / area2;
 
             VertexOutput frag = RasterizerCommon::trilerp(v0, v1, v2, a, b, c);
-
             int idx = y * width + x;
-            if (frag.Position.z < depthBuffer.at(idx))
-            {
+
+            bool depthPass = false;
+            switch (state.depthFunc) {
+                case ComparisonFunc::Never:         depthPass = false; break;
+                case ComparisonFunc::Less:          depthPass = frag.Position.z < depthBuffer.at(idx); break;
+                case ComparisonFunc::Equal:         depthPass = frag.Position.z == depthBuffer.at(idx); break;
+                case ComparisonFunc::LessEqual:     depthPass = frag.Position.z <= depthBuffer.at(idx); break;
+                case ComparisonFunc::Greater:       depthPass = frag.Position.z > depthBuffer.at(idx); break;
+                case ComparisonFunc::NotEqual:      depthPass = frag.Position.z != depthBuffer.at(idx); break;
+                case ComparisonFunc::GreaterEqual:  depthPass = frag.Position.z >= depthBuffer.at(idx); break;
+                case ComparisonFunc::Always:        depthPass = true; break;
+            }
+            if (depthPass) {
                 depthBuffer.at(idx) = frag.Position.z;
                 float4 finalColor = ps(frag, cb);
                 renderTarget.set_pixel(int2(x, y), finalColor);

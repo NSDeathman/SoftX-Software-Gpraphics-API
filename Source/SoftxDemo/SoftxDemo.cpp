@@ -1,65 +1,126 @@
-﻿// Test program for SoftX with perspective and view matrices
-// Renders a single triangle with transformation
-
-#define WIN32_LEAN_AND_MEAN
+﻿#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 #include <memory>
 #include <vector>
+#include <cmath>
 
-// Include SoftX
 #include <SoftX/SoftX.h>
-
 #pragma comment(lib, "SoftX.lib")
 
 using namespace SoftX;
 using namespace AfterMath;
 
-//#include "OptickCapture.h"
-
-// Window dimensions
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
 
-// Global window handle
 HWND g_hWnd = nullptr;
-
 Device* g_device = nullptr;
 
-// Forward declaration of window procedure
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-// Constant buffer structure
+// ============================================================
+//  Constant buffer
+// ============================================================
 struct ConstantBufferData
 {
-	float4x4 modelViewProjection; // 64 bytes
+	float4x4 modelViewProjection;
 };
 
-// Vertex shader: transforms position by MVP matrix
+// ============================================================
+//  UV Checker — глобальная текстура, живёт всё время программы.
+//  Передаём указатель на неё через глобальную переменную,
+//  пока не реализован полноценный механизм текстурных слотов.
+// ============================================================
+static constexpr int CHECKER_SIZE = 512;
+static constexpr int CHECKER_CELLS = 8;
+
+static const float4 CHECKER_PALETTE[4] = {
+	float4(0.90f, 0.20f, 0.20f, 1.0f),
+	float4(0.20f, 0.60f, 0.90f, 1.0f),
+	float4(0.20f, 0.80f, 0.30f, 1.0f),
+	float4(0.95f, 0.80f, 0.10f, 1.0f),
+};
+
+// Глобальный объект текстуры — не unique_ptr, чтобы не было
+// проблем с порядком инициализации; создаётся в WinMain явно.
+TextureRGBA32F* g_checkerTexture = nullptr;
+
+TextureRGBA32F* CreateUVCheckerTexture()
+{
+	auto* tex = new TextureRGBA32F(int2(CHECKER_SIZE, CHECKER_SIZE));
+	const int cellSize = CHECKER_SIZE / CHECKER_CELLS;
+
+	for (int y = 0; y < CHECKER_SIZE; ++y)
+	{
+		for (int x = 0; x < CHECKER_SIZE; ++x)
+		{
+			int cellX = x / cellSize;
+			int cellY = y / cellSize;
+			float fx = (float)(x % cellSize) / (float)cellSize;
+			float fy = (float)(y % cellSize) / (float)cellSize;
+
+			const float gridWidth = 0.08f;
+			bool isGrid = (fx < gridWidth || fx > 1.0f - gridWidth || fy < gridWidth || fy > 1.0f - gridWidth);
+
+			float4 color;
+			if (isGrid)
+			{
+				color = float4(1.0f, 1.0f, 1.0f, 1.0f);
+			}
+			else
+			{
+				int paletteIdx = (cellX + cellY) % 4;
+				color = CHECKER_PALETTE[paletteIdx];
+				float shade = 0.75f + 0.25f * (fx * 0.5f + fy * 0.5f);
+				color.x *= shade;
+				color.y *= shade;
+				color.z *= shade;
+			}
+
+			__m128 c = _mm_set_ps(color.w, color.z, color.y, color.x);
+			tex->stream_write(int2(x, y), c);
+		}
+	}
+	return tex;
+}
+
+// ============================================================
+//  Shaders
+// ============================================================
 VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb)
 {
-	// Cast constant buffer data
 	const ConstantBufferData* data = reinterpret_cast<const ConstantBufferData*>(cb.Data());
-
 	VertexOutput output;
-	// Transform position: clipPos = MVP * float4(objectPos, 1.0f)
 	float4 objectPos(input.Position.x, input.Position.y, input.Position.z, 1.0f);
 	output.Position = objectPos * data->modelViewProjection;
-
-	// Pass through attributes (they will be interpolated)
 	output.Color = input.Color;
 	output.Normal = input.Normal;
 	output.UV = input.UV;
-
 	return output;
 }
 
-// Simple pixel shader: interpolated vertex color
 float4 ColorPS(const VertexOutput& input, ConstantBuffer cb)
 {
-	return input.Color; // use interpolated color
+	return input.Color;
 }
 
+// Текстура берётся напрямую из глобальной переменной —
+// никаких проблем с временем жизни указателя.
+// cb здесь не используется; в будущем заменим на текстурные слоты.
+float4 UVCheckerPS(const VertexOutput& input, ConstantBuffer cb)
+{
+	if (!g_checkerTexture)
+		return float4(1.0f, 0.0f, 1.0f, 1.0f); // маджента — нет текстуры
+
+	float u = input.UV.x - std::floor(input.UV.x); // wrap [0,1]
+	float v = input.UV.y - std::floor(input.UV.y);
+	return g_checkerTexture->sample(float2(u, v));
+}
+
+// ============================================================
+//  Geometry
+// ============================================================
 void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, int stacks)
 {
 	std::vector<VertexInput> vertices;
@@ -80,9 +141,7 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, i
 			vertices.push_back({pos, norm, color, uv});
 		}
 	}
-
 	for (int stack = 0; stack < stacks; ++stack)
-	{
 		for (int slice = 0; slice < slices; ++slice)
 		{
 			int first = stack * (slices + 1) + slice;
@@ -96,7 +155,6 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib, float radius, int slices, i
 			indices.push_back(fourth);
 			indices.push_back(third);
 		}
-	}
 
 	vb = VertexBuffer(std::move(vertices));
 	ib = IndexBuffer(std::move(indices));
@@ -108,106 +166,99 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, float size = 1.0f)
 	std::vector<uint32_t> indices;
 
 	float half = size * 0.5f;
-
 	float3 corners[8] = {float3(-half, -half, -half), float3(half, -half, -half), float3(half, half, -half),
 						 float3(-half, half, -half),  float3(-half, -half, half), float3(half, -half, half),
 						 float3(half, half, half),	  float3(-half, half, half)};
-
 	float3 normals[6] = {float3(0, 0, -1), float3(0, 0, 1),	 float3(0, -1, 0),
 						 float3(0, 1, 0),  float3(-1, 0, 0), float3(1, 0, 0)};
-
 	float4 colors[6] = {float4(1, 0, 0, 1), float4(0, 1, 0, 1), float4(0, 0, 1, 1),
 						float4(1, 1, 0, 1), float4(1, 0, 1, 1), float4(0, 1, 1, 1)};
-
 	int faceIndices[6][4] = {{0, 1, 2, 3}, {5, 4, 7, 6}, {0, 4, 5, 1}, {3, 2, 6, 7}, {0, 3, 7, 4}, {1, 5, 6, 2}};
+	float2 uvs[4] = {float2(0, 0), float2(1, 0), float2(1, 1), float2(0, 1)};
 
 	for (int f = 0; f < 6; ++f)
 	{
 		int* idx = faceIndices[f];
-		float3 normal = normals[f];
-		float4 color = colors[f];
-
-		float2 uv[4] = {float2(0, 0), float2(1, 0), float2(1, 1), float2(0, 1)};
-
 		int start = (int)vertices.size();
 		for (int v = 0; v < 4; ++v)
-		{
-			vertices.push_back({corners[idx[v]], normal, color, uv[v]});
-		}
+			vertices.push_back({corners[idx[v]], normals[f], colors[f], uvs[v]});
 
+		// CCW winding — исправленный порядок индексов
 		indices.push_back(start);
+		indices.push_back(start + 2);
 		indices.push_back(start + 1);
-		indices.push_back(start + 2);
 		indices.push_back(start);
-		indices.push_back(start + 2);
 		indices.push_back(start + 3);
+		indices.push_back(start + 2);
 	}
 
 	vb = VertexBuffer(std::move(vertices));
 	ib = IndexBuffer(std::move(indices));
 }
 
+// ============================================================
+//  DrawFrame
+// ============================================================
 void DrawFrame()
 {
 	PROFILE_SCOPE("DrawFrame");
 
 	DeviceContext& ctx = g_device->GetImmediateContext();
 
-	{
-		PROFILE_SCOPE("Setup matrices");
-		// Setup matrices (column‑vector convention)
-		float aspect = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+	// ── Матрицы ──────────────────────────────────────────────
+	float aspect = (float)WINDOW_WIDTH * 0.5f / (float)WINDOW_HEIGHT;
 
-		// Projection matrix: perspective, left‑handed, zero‑to‑one depth
-		float4x4 projection = perspective(Constants::degrees_to_radians(30.0f), aspect);
+	// Передаём aspect явно в perspective чтобы избежать сплющивания.
+	// Если сигнатура твоей функции perspective(fovY, aspect) —
+	// проверь что aspect применяется к X, а не Y.
+	float4x4 projection = perspective(Constants::degrees_to_radians(30.0f), aspect);
 
-		// View matrix: camera at (0,0,0) looking down +Z
-		float3 eye(0.0f, 0.0f, -10.0f);
-		float3 target(0.0f, 0.0f, 1.0f);
-		float4x4 view = look_at(eye, target);
+	float3 eye(0.0f, 0.0f, -10.0f);
+	float3 target(0.0f, 0.0f, 1.0f);
+	float4x4 view = look_at(eye, target);
 
-		static float angle = 0.0f;
-		angle += 0.01f;
+	static float angle = 0.0f;
+	angle += 0.01f;
 
-		// Model matrix: identity (object already in world space)
-		float4x4 model = rotation_y(angle) * scaling(2.0f);
+	float4x4 model = rotation_y(angle) * scaling(2.0f);
+	float4x4 mvp = model * view * projection;
 
-		// Combined MVP matrix
-		float4x4 mvp = model * view * projection;
+	ConstantBufferData cbData;
+	cbData.modelViewProjection = mvp;
+	ConstantBuffer mvpCB(&cbData, sizeof(cbData));
 
-		// Create constant buffer with MVP
-		ConstantBufferData cbData;
-		cbData.modelViewProjection = mvp;
+	// ── Очистка — один раз перед обоими проходами ────────────
+	ctx.Clear(float4(0.0f, 0.15f, 0.25f, 1.0f));
+	ctx.ClearDepth(1.0f);
 
-		ConstantBuffer cb(&cbData, sizeof(cbData));
-		ctx.SetConstantBuffer(cb);
-	}
+	// ════════════════════════════════════════════════════════
+	//  Pass 1 — левая половина: цвет вершин
+	// ════════════════════════════════════════════════════════
+	ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH / 2, WINDOW_HEIGHT, 0.0f, 1.0f));
+	ctx.SetConstantBuffer(mvpCB);
+	ctx.SetPixelShader(ColorPS);
+	ctx.DrawIndexed();
 
-	// Clear back buffer and depth buffer
-	{
-		PROFILE_SCOPE("Clearing backbuffer and depth");
+	// ════════════════════════════════════════════════════════
+	//  Pass 2 — правая половина: UV checker текстура
+	// ════════════════════════════════════════════════════════
+	ctx.SetViewport(Viewport((float)(WINDOW_WIDTH / 2), 0.0f, WINDOW_WIDTH / 2, WINDOW_HEIGHT, 0.0f, 1.0f));
+	ctx.ClearDepth(1.0f);		  // сброс глубины — независимый проход
+	ctx.SetConstantBuffer(mvpCB); // MVP тот же, cb для текстуры не нужен
+	ctx.SetPixelShader(UVCheckerPS);
+	ctx.DrawIndexed();
 
-		float4 color = float4(0.000f, 0.250f, 0.000f, 1.0f);
-		ctx.Clear(color);
-		ctx.ClearDepth(1.0f);
-	}
+	// Восстанавливаем полный viewport на следующий кадр
+	ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
 
-	// Draw triangles
-	{
-		PROFILE_SCOPE("Draw");
-		ctx.DrawIndexed();
-	}
-
-	// Present to screen
-	{
-		PROFILE_SCOPE("Present");
-		g_device->Present();
-	}
+	g_device->Present();
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+// ============================================================
+//  WinMain
+// ============================================================
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-	// Register window class
 	WNDCLASSEX wc = {};
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -218,19 +269,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	wc.lpszClassName = L"SoftXTestWindow";
 	RegisterClassEx(&wc);
 
-	// Create window
 	RECT rc = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-	g_hWnd =
-		CreateWindowEx(0, L"SoftXTestWindow", L"SoftX Triangle Test with Matrices", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
-					   CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInstance, nullptr);
+	g_hWnd = CreateWindowEx(0, L"SoftXTestWindow",
+							L"SoftX | Left: Vertex Color  Right: UV Checker  [G] Sphere/Cube  [D] Depth func",
+							WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top,
+							nullptr, nullptr, hInstance, nullptr);
 	if (!g_hWnd)
 		return -1;
 
 	ShowWindow(g_hWnd, nCmdShow);
 	UpdateWindow(g_hWnd);
 
-	// Create SoftX device
+	// Создаём текстуру до Device — гарантированно живёт дольше всего
+	g_checkerTexture = CreateUVCheckerTexture();
+
+	// ── SoftX Device ─────────────────────────────────────────
 	PresentParameters params;
 	params.BackBufferSize = int2(WINDOW_WIDTH, WINDOW_HEIGHT);
 	params.hDeviceWindow = g_hWnd;
@@ -240,34 +294,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	g_device = &device;
 
 	DeviceContext& ctx = g_device->GetDeviceContext();
-
-	// Set render target (back buffer) and depth buffer
 	ctx.SetRenderTarget(&device.GetBackBuffer(), true);
-
-	// Set viewport
-	Viewport vp(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f);
-	ctx.SetViewport(vp);
+	ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
 
 	VertexBuffer vb;
 	IndexBuffer ib;
 	CreateSphere(vb, ib, 1.0f, 64, 32);
 
-	// Set buffers
 	ctx.SetVertexBuffer(vb);
 	ctx.SetIndexBuffer(ib);
-
-	// Set shaders
 	ctx.SetVertexShader(TransformVS);
-	ctx.SetPixelShader(ColorPS);
-
-	ctx.SetFillMode(FillMode::Solid);
 	ctx.SetCullMode(CullMode::Back);
-
 	ctx.SetTileSize(64);
 
-	//OptickCapture::Get().Initialize();
-
-	// Main message loop
+	// ── Message loop ─────────────────────────────────────────
 	MSG msg = {};
 	while (msg.message != WM_QUIT)
 	{
@@ -279,14 +319,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		else
 		{
 			PROFILE_FRAME("SoftX");
-			//OptickCapture::Get().OnFrame();
 			DrawFrame();
 		}
 	}
 
+	// Освобождаем текстуру после завершения рендера
+	delete g_checkerTexture;
+	g_checkerTexture = nullptr;
+
 	return (int)msg.wParam;
 }
 
+// ============================================================
+//  WndProc
+// ============================================================
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
@@ -294,13 +340,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE)
 			DestroyWindow(hWnd);
-		//if (wParam == 'P') // захватить 100 кадров
-			//OptickCapture::Get().StartCapturing(100);
-		//if (wParam == 'O') // переключатель
-			//OptickCapture::Get().SwitchProfiler();
+
+		if (wParam == 'D' && g_device)
+		{
+			static int funcIndex = 0;
+			funcIndex = (funcIndex + 1) % 8;
+			ComparisonFunc funcs[8] = {ComparisonFunc::Never,		 ComparisonFunc::Less,	  ComparisonFunc::Equal,
+									   ComparisonFunc::LessEqual,	 ComparisonFunc::Greater, ComparisonFunc::NotEqual,
+									   ComparisonFunc::GreaterEqual, ComparisonFunc::Always};
+			g_device->GetImmediateContext().SetDepthFunc(funcs[funcIndex]);
+			char title[256];
+			sprintf_s(title, "SoftX - Depth Func: %d", funcIndex);
+			SetWindowTextA(g_hWnd, title);
+		}
+
+		if (wParam == 'G' && g_device)
+		{
+			static bool isSphere = true;
+			isSphere = !isSphere;
+			VertexBuffer vb;
+			IndexBuffer ib;
+			if (isSphere)
+				CreateSphere(vb, ib, 1.0f, 64, 32);
+			else
+				CreateCube(vb, ib, 2.0f);
+			DeviceContext& ctx = g_device->GetImmediateContext();
+			ctx.SetVertexBuffer(vb);
+			ctx.SetIndexBuffer(ib);
+			SetWindowTextA(g_hWnd, isSphere ? "SoftX - Sphere" : "SoftX - Cube");
+		}
 		return 0;
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);
