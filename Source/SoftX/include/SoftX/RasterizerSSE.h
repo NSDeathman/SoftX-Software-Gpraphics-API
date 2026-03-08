@@ -8,19 +8,17 @@ SOFTX_BEGIN
 class SOFTX_API RasterizerSSE : public IRasterizer
 {
   public:
-    void RasterizeTriangle(
-        const VertexOutput& v0,
-        const VertexOutput& v1,
-        const VertexOutput& v2,
-        const RasterizerState& state,
-        DepthBuffer& depthBuffer,
-        IRenderTarget& renderTarget,
-        const PixelShader& ps,
-        const ConstantBuffer& cb,
-        const TextureTable* tt,
-        int2 tileMin,
-        int2 tileMax
-    ) override;
+    void RasterizeTriangle(const VertexOutput& v0,
+                           const VertexOutput& v1,
+                           const VertexOutput& v2,
+                           const RasterizerState& state,
+                           DepthBuffer& depthBuffer,
+                           IRenderTarget& renderTarget,
+                           const PixelShader& ps,
+                           const ConstantBuffer& cb,
+                           const TextureTable* tt,
+                           int2 tileMin,
+                           int2 tileMax) override;
 };
 
 SOFTX_END
