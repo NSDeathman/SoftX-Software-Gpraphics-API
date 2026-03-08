@@ -100,6 +100,9 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
     __m256 ones = _mm256_set1_ps(1.0f);
     __m256 zero = _mm256_setzero_ps();
 
+    __m256 tileMinXv = _mm256_set1_ps((float)tileMin.x);
+    __m256 tileMaxXv = _mm256_set1_ps((float)tileMax.x);
+
     // Incremental edge functions
     // When x → x+8:  Δf = +8 * dy
     // When y → y+1:  Δf = -dx
@@ -220,12 +223,14 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
             }
 
             // inside is already a SIMD mask
-            __m256 finalMask = _mm256_and_ps(depthCmp, inside);
+            __m256 pxf = _mm256_set_ps(float(x+7), float(x+6), float(x+5), float(x+4),
+                                        float(x+3), float(x+2), float(x+1), float(x+0));
+            __m256 tileMask  = _mm256_and_ps(_mm256_cmp_ps(pxf, tileMinXv, _CMP_GE_OQ),
+                                              _mm256_cmp_ps(pxf, tileMaxXv, _CMP_LE_OQ));
+            __m256 finalMask = _mm256_and_ps(_mm256_and_ps(depthCmp, inside), tileMask);
             int depthMask    = _mm256_movemask_ps(finalMask);
             if (depthMask == 0)
                 continue;
-
-            // Depth write: split __m256 back into two __m128 blocks
             __m128 mask_lo = _mm256_castps256_ps128(finalMask);
             __m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
             depthBuffer.Write4(uint2(x,     y), _mm256_castps256_ps128(z), mask_lo);

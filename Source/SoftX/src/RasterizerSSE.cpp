@@ -101,6 +101,10 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     __m128 ones = _mm_set1_ps(1.0f);
     __m128 zero = _mm_setzero_ps();
 
+    // Tile x-boundary masks — hoisted, don't change within the loop
+    __m128 tileMinXv = _mm_set1_ps((float)tileMin.x);
+    __m128 tileMaxXv = _mm_set1_ps((float)tileMax.x);
+
     // Incremental edge functions
     // When x → x+4:  Δf = +4 * dy   (dy = edge delta y)
     // When y → y+1:  Δf = -dx        (dx = edge delta x)
@@ -211,12 +215,12 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             }
 
             // inside is already a SIMD mask
-            __m128 finalMask = _mm_and_ps(depthCmp, inside);
-            int depthMask    = _mm_movemask_ps(finalMask);
+            __m128 pxf = _mm_set_ps(float(x + 3), float(x + 2), float(x + 1), float(x + 0));
+            __m128 tileMask = _mm_and_ps(_mm_cmpge_ps(pxf, tileMinXv), _mm_cmple_ps(pxf, tileMaxXv));
+            __m128 finalMask = _mm_and_ps(_mm_and_ps(depthCmp, inside), tileMask);
+            int depthMask = _mm_movemask_ps(finalMask);
             if (depthMask == 0)
                 continue;
-
-            // Depth write under mask
             depthBuffer.Write4(uint2(x, y), z, finalMask);
 
             // Scalar loop for shading only
