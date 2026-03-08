@@ -1,16 +1,16 @@
 ---
-SoftX C++ Coding Standard
-This document defines the coding style and conventions for the SoftX project.
-The primary inspirations are:
+# SoftX C++ Coding Standard
+## This document defines the coding style and conventions for the SoftX project.
+## The primary inspirations are:
 
-Unreal Engine coding style (brace placement, naming, namespace macros).
+### Unreal Engine coding style (brace placement, naming, namespace macros).
 
-C++ Standard Library best practices (clarity, no abbreviations, modern language features).
+### C++ Standard Library best practices (clarity, no abbreviations, modern language features).
+---
+# All new code must conform to these guidelines to ensure consistency and readability across the codebase.
 
-All new code must conform to these guidelines to ensure consistency and readability across the codebase.
-
-1. Naming
-1.1. General Principles
+## 1. Naming
+### 1.1. General Principles
 Use full, meaningful names without abbreviations.
 Bad: btn, calc, tmp
 Good: button, calculateSum, temporaryBuffer
@@ -20,7 +20,7 @@ English is used for all identifiers.
 Use the types provided by the AfterMath library for vectors:
 int2, uint2, float2, float3, float4. These are used throughout the project for coordinates, colors, etc.
 
-1.2. Namespaces
+### 1.2. Namespaces
 Namespace names use PascalCase.
 Use macros to explicitly mark the beginning and end of a namespace:
 
@@ -39,7 +39,7 @@ SOFTX_BEGIN
 SOFTX_END
 ```
 
-1.3. Classes, Structures, Enumerations
+### 1.3. Classes, Structures, Enumerations
 Type names: PascalCase without prefixes (Unreal‑style prefixes like F, U, etc., may be added only if explicitly agreed upon).
 
 Enumerations: type name in PascalCase, enumerators in PascalCase.
@@ -50,7 +50,7 @@ struct VertexData { ... };
 enum class BlendMode { Normal, Additive, Multiply };
 ```
 
-1.4. Methods and Functions
+### 1.4. Methods and Functions
 PascalCase for all methods (including static and global functions).
 
 Use verbs or verb phrases that describe the action.
@@ -61,7 +61,7 @@ int CalculateFrameRate() const;
 void SetViewportSize(int width, int height);
 ```
 
-1.5. Class/Struct Fields
+### 1.5. Class/Struct Fields
 camelCase without prefixes (no m_ or trailing underscores).
 This improves readability and avoids Hungarian notation.
 
@@ -89,7 +89,7 @@ private:
 };
 ```
 
-1.6. Local Variables and Function Parameters
+### 1.6. Local Variables and Function Parameters
 camelCase (starts with a lowercase letter).
 
 ```cpp
@@ -100,7 +100,7 @@ void ProcessInput(float deltaTime)
 }
 ```
 
-1.7. Macros and Compile-Time Constants
+### 1.7. Macros and Compile-Time Constants
 UPPER_SNAKE_CASE.
 
 ```cpp
@@ -117,8 +117,8 @@ LIKELY / UNLIKELY – branch prediction hints (expand to [[likely]]/[[unlikely]]
 
 PROFILE_SCOPE(name) – profiling annotation (expands to Optick macro or nothing).
 
-2. Formatting
-2.1. Braces
+## 2. Formatting
+### 2.1. Braces
 Opening braces always on a new line (Allman style).
 
 ```cpp
@@ -135,12 +135,12 @@ void MyFunction()
 }
 ```
 
-2.2. Indentation
+### 2.2. Indentation
 Use 4 spaces (no tabs).
 
 Indent nested namespaces and classes.
 
-2.3. Spaces
+### 2.3. Spaces
 One space between a keyword and the opening parenthesis:
 if (condition), for (int i = 0; i < count; ++i)
 
@@ -148,7 +148,7 @@ No spaces inside parentheses: (x + y) * z, func(a, b)
 
 Binary operators are surrounded by spaces: a + b, x == y
 
-2.4. Line Length
+### 2.4. Line Length
 Recommended maximum line length: 120 characters.
 
 When breaking function arguments, place each new argument on a new line, indented.
@@ -159,18 +159,18 @@ void LongFunctionName(int parameter1,
                       float parameter3);
 ```
                       
-2.5. Alignment of SIMD Data
+### 2.5. Alignment of SIMD Data
 Use alignas(16) or alignas(32) for variables that will be used with SSE/AVX intrinsics.
 
 ```cpp
 alignas(16) float zArr[4];
 ```
 
-3. Comments
-3.1. Language
+## 3. Comments
+### 3.1. Language
 All comments must be written in English.
 
-3.2. Documentation Comments
+### 3.2. Documentation Comments
 For public APIs use Doxygen style (/// or /** ... */).
 
 ```cpp
@@ -183,7 +183,7 @@ For public APIs use Doxygen style (/// or /** ... */).
 bool InitializeEngine(int width, int height);
 ```
 
-3.3. Inline Comments
+### 3.3. Inline Comments
 Use // for single‑line comments.
 
 Comment complex or non‑obvious code, but avoid stating the obvious.
@@ -196,7 +196,7 @@ if (IsDataValid(input))
 }
 ```
 
-4. Macros and Preprocessor Directives
+## 4. Macros and Preprocessor Directives
 The macros SOFTX_BEGIN and SOFTX_END are used strictly to delimit the namespace content.
 
 Define macros in header files with proper include guards (#pragma once is preferred).
@@ -218,15 +218,15 @@ Use LIKELY/UNLIKELY for branch prediction hints.
 #endif
 ```
 
-5. Code Organization
-5.1. Header Files
+## 5. Code Organization
+### 5.1. Header Files
 Header file name should match the class/module name: Renderer.h, MathUtils.h.
 
 Each header must start with #pragma once.
 
 Include only what is necessary; prefer forward declarations.
 
-5.2. Implementation Files (.cpp)
+### 5.2. Implementation Files (.cpp)
 Include order:
 
 Corresponding header (e.g., Renderer.cpp starts with #include "Renderer.h").
@@ -254,25 +254,25 @@ SOFTX_BEGIN
 SOFTX_END
 ```
 
-5.3. Namespaces
+### 5.3. Namespaces
 All code must reside inside SOFTX_BEGIN / SOFTX_END (i.e., within namespace SoftX).
 
 For nested namespaces use similar macros or explicit syntax.
 
-6. Encoding and Character Set
+## 6. Encoding and Character Set
 All source files must be saved with UTF-8 encoding.
 
 Stick to regular Unicode characters (primarily ASCII and characters from the Basic Multilingual Plane). Avoid invisible or special Unicode characters (e.g., non‑breaking spaces, directional markers, control characters) that could cause encoding or tooling issues.
 
-7. Additional Recommendations
-7.1. Use of const
+## 7. Additional Recommendations
+### 7.1. Use of const
 Mark methods that do not modify the object as const.
 
 Use const for variables that should not change after initialization.
 
 Prefer const T& for parameters instead of copying unless modification is needed.
 
-7.2. Initialization
+### 7.2. Initialization
 Use uniform initialization ({}) to prevent narrowing conversions.
 
 ```cpp
@@ -280,17 +280,17 @@ int value{42};
 std::vector<int> numbers{1, 2, 3};
 ```
 
-7.3. Error Handling
+### 7.3. Error Handling
 Exceptions are used only in critical cases (team agreement required).
 
 For code that must not throw, use error codes or std::optional.
 
-7.4. Modern C++
+### 7.4. Modern C++
 The project targets C++17 (or later). Prefer standard library facilities over manual resource management.
 
 Use std::unique_ptr, std::shared_ptr for ownership.
 
-7.5. SIMD and Performance
+### 7.5. SIMD and Performance
 When using SSE/AVX intrinsics, ensure data is properly aligned (alignas(16) or alignas(32)).
 
 Use streaming stores (_mm_stream_ps) for large writes to bypass cache.
@@ -302,7 +302,7 @@ Use the profiling macros (PROFILE_SCOPE) to mark performance-critical sections.
 7.6. Unsigned Types for Coordinates
 Use uint, uint2 for pixel coordinates, tile indices, and sizes. This eliminates signed/unsigned mismatches and naturally reflects non‑negative values.
 
-8. Code Example
+## 8. Code Example
 Below are real‑world examples from the SoftX project demonstrating the coding style.
 
 DepthBuffer.h
