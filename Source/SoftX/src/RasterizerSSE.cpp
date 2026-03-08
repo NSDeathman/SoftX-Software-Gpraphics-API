@@ -3,6 +3,7 @@
 #include <SoftX/SoftX.h>
 #include "RasterizerCommon.h"
 #include <xmmintrin.h>
+#include <smmintrin.h>
 
 SOFTX_BEGIN
 
@@ -33,29 +34,71 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
 
-    float area2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, v2.Position);
-    CullMode cull = state.cullMode;
-    if (cull == CullMode::Back  && area2 < 0) return;
-    if (cull == CullMode::Front && area2 > 0) return;
-    if (std::abs(area2) < 1e-6f) UNLIKELY return;
+    // ── Fixed-point vertex coordinates (28.4 — 4 sub-pixel bits = 1/16 pixel) ──
+    // delta_fp range: <= 2 * 3840 * 16 ≈ 2¹⁷, so init E <= 2³⁴ → int64 required.
+    // Steps <= 16 * 2¹⁷ ≈ 2²¹ → int32 is sufficient.
+    // SIMD accumulation over 480 iterations (4K / 8) <= 480 * 2²¹ ≈ 10⁹ < 2³¹ → safe.
+    const int x0fp = RasterizerCommon::ToFixed(v0.Position.x);
+    const int y0fp = RasterizerCommon::ToFixed(v0.Position.y);
+    const int x1fp = RasterizerCommon::ToFixed(v1.Position.x);
+    const int y1fp = RasterizerCommon::ToFixed(v1.Position.y);
+    const int x2fp = RasterizerCommon::ToFixed(v2.Position.x);
+    const int y2fp = RasterizerCommon::ToFixed(v2.Position.y);
 
-    // Triangle edges
-    float4 dx01 = v1.Position - v0.Position;
-    float4 dx12 = v2.Position - v1.Position;
-    float4 dx20 = v0.Position - v2.Position;
+    // Signed area in fixed-point² units (sign matches the float version)
+    int64_t area2Int = RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp, x2fp, y2fp);
 
-    // Broadcast vertex positions for edge function initialization
-    __m128 v0x = _mm_set1_ps(v0.Position.x);
-    __m128 v0y = _mm_set1_ps(v0.Position.y);
-    __m128 v1x = _mm_set1_ps(v1.Position.x);
-    __m128 v1y = _mm_set1_ps(v1.Position.y);
-    __m128 v2x = _mm_set1_ps(v2.Position.x);
-    __m128 v2y = _mm_set1_ps(v2.Position.y);
+    const CullMode cull = state.cullMode;
+    if (cull == CullMode::Back  && area2Int < 0) return;
+    if (cull == CullMode::Front && area2Int > 0) return;
+    if (area2Int == 0) UNLIKELY return;
 
-    __m128 v0z = _mm_set1_ps(v0.Position.z);
-    __m128 v1z = _mm_set1_ps(v1.Position.z);
-    __m128 v2z = _mm_set1_ps(v2.Position.z);
+    // ── Edge function steps ──────────────────────────────────────────────────
+    // Pixel x → x+1:  ΔE = +S * Δy_fp
+    // Row   y → y+1:  ΔE = -S * Δx_fp
+    int stepX01 =  RasterizerCommon::SUBPIXEL_STEP * (y1fp - y0fp);
+    int stepX12 =  RasterizerCommon::SUBPIXEL_STEP * (y2fp - y1fp);
+    int stepX20 =  RasterizerCommon::SUBPIXEL_STEP * (y0fp - y2fp);
+    int stepY01 = -RasterizerCommon::SUBPIXEL_STEP * (x1fp - x0fp);
+    int stepY12 = -RasterizerCommon::SUBPIXEL_STEP * (x2fp - x1fp);
+    int stepY20 = -RasterizerCommon::SUBPIXEL_STEP * (x0fp - x2fp);
 
+    // SIMD start X aligned down to the nearest multiple of 4
+    const int simdStartX = (iMinX / 4) * 4;
+
+    // Edge function values at (simdStartX, iMinY)
+    int64_t f01Row = RasterizerCommon::EdgeFunctionInt(
+        x0fp, y0fp, x1fp, y1fp,
+        RasterizerCommon::PixelCentre(simdStartX),
+        RasterizerCommon::PixelCentre(iMinY));
+    int64_t f12Row = RasterizerCommon::EdgeFunctionInt(
+        x1fp, y1fp, x2fp, y2fp,
+        RasterizerCommon::PixelCentre(simdStartX),
+        RasterizerCommon::PixelCentre(iMinY));
+    int64_t f20Row = RasterizerCommon::EdgeFunctionInt(
+        x2fp, y2fp, x0fp, y0fp,
+        RasterizerCommon::PixelCentre(simdStartX),
+        RasterizerCommon::PixelCentre(iMinY));
+
+    // ── Normalise to CCW — inside test is now always f >= 0 ─────────────────
+    // Negating f and steps together leaves all ratios f/area2Int invariant,
+    // so barycentric coordinates remain correct.
+    const int normSign = (area2Int > 0) ? 1 : -1; // used in the scalar fallback
+    if (area2Int < 0)
+    {
+        area2Int = -area2Int;
+        f01Row = -f01Row; f12Row = -f12Row; f20Row = -f20Row;
+        stepX01 = -stepX01; stepX12 = -stepX12; stepX20 = -stepX20;
+        stepY01 = -stepY01; stepY12 = -stepY12; stepY20 = -stepY20;
+    }
+
+    // ── Float broadcasts of vertex attributes (needed for interpolation) ─────
+    __m128 v0z  = _mm_set1_ps(v0.Position.z);
+    __m128 v1z  = _mm_set1_ps(v1.Position.z);
+    __m128 v2z  = _mm_set1_ps(v2.Position.z);
+    __m128 v0w  = _mm_set1_ps(v0.Position.w);
+    __m128 v1w  = _mm_set1_ps(v1.Position.w);
+    __m128 v2w  = _mm_set1_ps(v2.Position.w);
     __m128 v0cr = _mm_set1_ps(v0.Color.x);
     __m128 v0cg = _mm_set1_ps(v0.Color.y);
     __m128 v0cb = _mm_set1_ps(v0.Color.z);
@@ -68,7 +111,6 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     __m128 v2cg = _mm_set1_ps(v2.Color.y);
     __m128 v2cb = _mm_set1_ps(v2.Color.z);
     __m128 v2ca = _mm_set1_ps(v2.Color.w);
-
     __m128 v0nx = _mm_set1_ps(v0.Normal.x);
     __m128 v0ny = _mm_set1_ps(v0.Normal.y);
     __m128 v0nz = _mm_set1_ps(v0.Normal.z);
@@ -78,99 +120,86 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     __m128 v2nx = _mm_set1_ps(v2.Normal.x);
     __m128 v2ny = _mm_set1_ps(v2.Normal.y);
     __m128 v2nz = _mm_set1_ps(v2.Normal.z);
+    __m128 v0u  = _mm_set1_ps(v0.UV.x);
+    __m128 v0v  = _mm_set1_ps(v0.UV.y);
+    __m128 v1u  = _mm_set1_ps(v1.UV.x);
+    __m128 v1v  = _mm_set1_ps(v1.UV.y);
+    __m128 v2u  = _mm_set1_ps(v2.UV.x);
+    __m128 v2v  = _mm_set1_ps(v2.UV.y);
 
-    __m128 v0u = _mm_set1_ps(v0.UV.x);
-    __m128 v0v = _mm_set1_ps(v0.UV.y);
-    __m128 v1u = _mm_set1_ps(v1.UV.x);
-    __m128 v1v = _mm_set1_ps(v1.UV.y);
-    __m128 v2u = _mm_set1_ps(v2.UV.x);
-    __m128 v2v = _mm_set1_ps(v2.UV.y);
+    // Constants hoisted out of all loops
+    const __m128 ones      = _mm_set1_ps(1.0f);
+    // f_int / area2Int == f_float / area2_float — the S² factor cancels out
+    const __m128 invAreaV  = _mm_set1_ps(1.0f / float(area2Int));
+    const __m128 tileMinXv = _mm_set1_ps(float(tileMin.x));
+    const __m128 tileMaxXv = _mm_set1_ps(float(tileMax.x));
 
-    __m128 invArea = _mm_set1_ps(1.0f / area2);
-    __m128 dx01v   = _mm_set1_ps(dx01.x);
-    __m128 dy01v   = _mm_set1_ps(dx01.y);
-    __m128 dx12v   = _mm_set1_ps(dx12.x);
-    __m128 dy12v   = _mm_set1_ps(dx12.y);
-    __m128 dx20v   = _mm_set1_ps(dx20.x);
-    __m128 dy20v   = _mm_set1_ps(dx20.y);
+    // Integer SIMD steps (4 lanes × step)
+    const __m128i s01X4    = _mm_set1_epi32(4 * stepX01);
+    const __m128i s12X4    = _mm_set1_epi32(4 * stepX12);
+    const __m128i s20X4    = _mm_set1_epi32(4 * stepX20);
+    // Inside test: f >= 0  ↔  f > -1 (one cmpgt instead of two cmpge/cmple)
+    const __m128i minusOne = _mm_set1_epi32(-1);
 
-    // Triangle constants, hoisted out of loops
-    __m128 v0w  = _mm_set1_ps(v0.Position.w);
-    __m128 v1w  = _mm_set1_ps(v1.Position.w);
-    __m128 v2w  = _mm_set1_ps(v2.Position.w);
-    __m128 ones = _mm_set1_ps(1.0f);
-    __m128 zero = _mm_setzero_ps();
+    const uint width = renderTarget.Width();
 
-    // Tile x-boundary masks — hoisted, don't change within the loop
-    __m128 tileMinXv = _mm_set1_ps((float)tileMin.x);
-    __m128 tileMaxXv = _mm_set1_ps((float)tileMax.x);
-
-    // Incremental edge functions
-    // When x → x+4:  Δf = +4 * dy   (dy = edge delta y)
-    // When y → y+1:  Δf = -dx        (dx = edge delta x)
-    __m128 f01StepX = _mm_set1_ps( 4.0f * dx01.y);
-    __m128 f12StepX = _mm_set1_ps( 4.0f * dx12.y);
-    __m128 f20StepX = _mm_set1_ps( 4.0f * dx20.y);
-    __m128 f01StepY = _mm_set1_ps(-dx01.x);
-    __m128 f12StepY = _mm_set1_ps(-dx12.x);
-    __m128 f20StepY = _mm_set1_ps(-dx20.x);
-
-    // SIMD start X aligned to multiple of 4
-    const int simdStartX = (iMinX / 4) * 4;
-
-    // Initialize edge functions for the first row
-    __m128 f01Row, f12Row, f20Row;
-    {
-        __m128 initX = _mm_set_ps(
-            simdStartX + 3.5f, simdStartX + 2.5f,
-            simdStartX + 1.5f, simdStartX + 0.5f);
-        __m128 initY = _mm_set1_ps(iMinY + 0.5f);
-
-        f01Row = _mm_sub_ps(_mm_mul_ps(_mm_sub_ps(initX, v0x), dy01v),
-                            _mm_mul_ps(_mm_sub_ps(initY, v0y), dx01v));
-        f12Row = _mm_sub_ps(_mm_mul_ps(_mm_sub_ps(initX, v1x), dy12v),
-                            _mm_mul_ps(_mm_sub_ps(initY, v1y), dx12v));
-        f20Row = _mm_sub_ps(_mm_mul_ps(_mm_sub_ps(initX, v2x), dy20v),
-                            _mm_mul_ps(_mm_sub_ps(initY, v2y), dx20v));
-    }
-
-    uint width = renderTarget.Width();
     for (uint y = iMinY; y <= iMaxY; ++y)
     {
-        uint x;
-        __m128 f01, f12, f20;
+        // Initialise 4 lanes: lane i = f??Row + i * step??X
+        // _mm_set_epi32(e3, e2, e1, e0) — e0 goes to lane 0, e3 to lane 3
+        __m128i f01 = _mm_add_epi32(
+            _mm_set1_epi32(static_cast<int32_t>(f01Row)),
+            _mm_set_epi32(3 * stepX01, 2 * stepX01, stepX01, 0));
+        __m128i f12 = _mm_add_epi32(
+            _mm_set1_epi32(static_cast<int32_t>(f12Row)),
+            _mm_set_epi32(3 * stepX12, 2 * stepX12, stepX12, 0));
+        __m128i f20 = _mm_add_epi32(
+            _mm_set1_epi32(static_cast<int32_t>(f20Row)),
+            _mm_set_epi32(3 * stepX20, 2 * stepX20, stepX20, 0));
 
-        // Increment f in the for expression; continue does not break accumulation
-        for (x = simdStartX, f01 = f01Row, f12 = f12Row, f20 = f20Row;
+        uint x;
+        for (x = (uint)simdStartX;
              x + 3u < width && x <= iMaxX - 3u;
              x += 4,
-             f01 = _mm_add_ps(f01, f01StepX),
-             f12 = _mm_add_ps(f12, f12StepX),
-             f20 = _mm_add_ps(f20, f20StepX))
+             f01 = _mm_add_epi32(f01, s01X4),
+             f12 = _mm_add_epi32(f12, s12X4),
+             f20 = _mm_add_epi32(f20, s20X4))
         {
             if (x > tileMax.x || x + 3u < tileMin.x)
                 continue;
 
-            // f01/f12/f20 already computed incrementally — 3 adds instead of 6 mul + 6 sub
-            __m128 inside;
-            if (area2 > 0)
-                inside = _mm_and_ps(_mm_and_ps(_mm_cmpge_ps(f01, zero),
-                                               _mm_cmpge_ps(f12, zero)),
-                                               _mm_cmpge_ps(f20, zero));
-            else
-                inside = _mm_and_ps(_mm_and_ps(_mm_cmple_ps(f01, zero),
-                                               _mm_cmple_ps(f12, zero)),
-                                               _mm_cmple_ps(f20, zero));
+            // Inside test: all three f >= 0 (CCW-normalised)
+            // _mm_cmpgt_epi32(f, -1) returns 0xFFFFFFFF for lanes where f >= 0
+            __m128i insideI = _mm_and_si128(
+                _mm_and_si128(_mm_cmpgt_epi32(f01, minusOne),
+                              _mm_cmpgt_epi32(f12, minusOne)),
+                _mm_cmpgt_epi32(f20, minusOne));
 
-            __m128 alpha = _mm_mul_ps(f12, invArea);
-            __m128 beta  = _mm_mul_ps(f20, invArea);
-            __m128 gamma = _mm_mul_ps(f01, invArea);
+            // _mm_testz_si128: ZF=1 if (insideI & insideI) == 0 — no lane passed
+            if (_mm_testz_si128(insideI, insideI))
+                continue;
 
-            // Perspective-correct weights
+            // Reinterpret int32 mask as float mask (bits are unchanged)
+            __m128 inside = _mm_castsi128_ps(insideI);
+
+            // Tile boundary mask (guards against data races at tile edges)
+            // _mm_set_ps(e3, e2, e1, e0) — e0 goes to lane 0
+            __m128 pxf      = _mm_set_ps(float(x + 3), float(x + 2), float(x + 1), float(x));
+            __m128 tileMask = _mm_and_ps(_mm_cmpge_ps(pxf, tileMinXv),
+                                          _mm_cmple_ps(pxf, tileMaxXv));
+
+            // Barycentric coordinates: f_int / area2Int == f_float / area2_float
+            // alpha — weight for v0 (opposite edge f12)
+            // beta  — weight for v1 (opposite edge f20)
+            // gamma — weight for v2 (opposite edge f01)
+            __m128 alpha = _mm_mul_ps(_mm_cvtepi32_ps(f12), invAreaV);
+            __m128 beta  = _mm_mul_ps(_mm_cvtepi32_ps(f20), invAreaV);
+            __m128 gamma = _mm_mul_ps(_mm_cvtepi32_ps(f01), invAreaV);
+
+            // Perspective-correct weights (pw = bary * 1/w)
             __m128 pw0 = _mm_mul_ps(alpha, v0w);
             __m128 pw1 = _mm_mul_ps(beta,  v1w);
             __m128 pw2 = _mm_mul_ps(gamma, v2w);
-
             __m128 pwSum    = _mm_add_ps(_mm_add_ps(pw0, pw1), pw2);
             __m128 invPwSum = _mm_div_ps(ones, pwSum);
 
@@ -179,7 +208,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
                                              _mm_mul_ps(beta,  v1z)),
                                              _mm_mul_ps(gamma, v2z));
 
-            // Attributes: perspective-correct
+            // Attributes: perspective-correct interpolation
 #define PLERP128(a0, a1, a2) \
     _mm_mul_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(pw0, a0), \
                                      _mm_mul_ps(pw1, a1)), \
@@ -197,9 +226,8 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
 
 #undef PLERP128
 
-            // Depth read via block API
+            // Depth test
             __m128 depths = depthBuffer.Read4(uint2(x, y));
-
             __m128 depthCmp;
             switch (state.depthFunc)
             {
@@ -214,22 +242,20 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             default:                           depthCmp = _mm_cmplt_ps(z, depths); break;
             }
 
-            // inside is already a SIMD mask
-            __m128 pxf = _mm_set_ps(float(x + 3), float(x + 2), float(x + 1), float(x + 0));
-            __m128 tileMask = _mm_and_ps(_mm_cmpge_ps(pxf, tileMinXv), _mm_cmple_ps(pxf, tileMaxXv));
             __m128 finalMask = _mm_and_ps(_mm_and_ps(depthCmp, inside), tileMask);
-            int depthMask = _mm_movemask_ps(finalMask);
+            int depthMask    = _mm_movemask_ps(finalMask);
             if (depthMask == 0)
                 continue;
+
             depthBuffer.Write4(uint2(x, y), z, finalMask);
 
-            // Scalar loop for shading only
+            // Scalar shading loop
             alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
             alignas(16) float uArr[4], vArr[4], nxArr[4], nyArr[4], nzArr[4];
-            _mm_store_ps(zArr,  z);
-            _mm_store_ps(rArr,  r);  _mm_store_ps(gArr,  g);
-            _mm_store_ps(bArr,  b);  _mm_store_ps(aArr,  a);
-            _mm_store_ps(uArr,  u);  _mm_store_ps(vArr,  v);
+            _mm_store_ps(zArr, z);
+            _mm_store_ps(rArr, r);   _mm_store_ps(gArr,  g);
+            _mm_store_ps(bArr, b);   _mm_store_ps(aArr,  a);
+            _mm_store_ps(uArr, u);   _mm_store_ps(vArr,  v);
             _mm_store_ps(nxArr, nx); _mm_store_ps(nyArr, ny);
             _mm_store_ps(nzArr, nz);
 
@@ -248,31 +274,41 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             }
         }
 
-        // Step to next row
-        f01Row = _mm_add_ps(f01Row, f01StepY);
-        f12Row = _mm_add_ps(f12Row, f12StepY);
-        f20Row = _mm_add_ps(f20Row, f20StepY);
+        // Advance row accumulators (int64 — exact, no drift)
+        f01Row += stepY01;
+        f12Row += stepY12;
+        f20Row += stepY20;
 
-        // Scalar fallback for remaining pixels
+        // Scalar fallback for remaining pixels (< 4 at the right tile edge).
+        // Edge functions are recomputed directly from coordinates — exact, no accumulated error.
+        // normSign applies the same CCW normalisation as the SIMD path.
         for (; x <= iMaxX; ++x)
         {
             if (x < tileMin.x || x > tileMax.x)
                 continue;
 
-            float2 p((float)x + 0.5f, (float)y + 0.5f);
-            float f0 = RasterizerCommon::EdgeFunction(v1.Position, v2.Position, p);
-            float f1 = RasterizerCommon::EdgeFunction(v2.Position, v0.Position, p);
-            float f2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, p);
+            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(
+                x0fp, y0fp, x1fp, y1fp,
+                RasterizerCommon::PixelCentre(x),
+                RasterizerCommon::PixelCentre(y));
+            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(
+                x1fp, y1fp, x2fp, y2fp,
+                RasterizerCommon::PixelCentre(x),
+                RasterizerCommon::PixelCentre(y));
+            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(
+                x2fp, y2fp, x0fp, y0fp,
+                RasterizerCommon::PixelCentre(x),
+                RasterizerCommon::PixelCentre(y));
 
-            if (f0 * area2 < 0 || f1 * area2 < 0 || f2 * area2 < 0)
+            if (sf01 < 0 || sf12 < 0 || sf20 < 0)
                 continue;
 
-            float a = f0 / area2;
-            float b = f1 / area2;
-            float c = f2 / area2;
+            const float fa = float(sf12) / float(area2Int); // weight for v0
+            const float fb = float(sf20) / float(area2Int); // weight for v1
+            const float fc = float(sf01) / float(area2Int); // weight for v2
 
-            VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, a, b, c);
-            uint idx = y * width + x;
+            VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
+            const uint idx    = y * width + x;
 
             bool depthPass = false;
             switch (state.depthFunc)

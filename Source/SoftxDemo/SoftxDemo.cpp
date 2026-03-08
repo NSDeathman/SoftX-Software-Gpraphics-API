@@ -297,7 +297,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 	ctx.SetIndexBuffer(ib);
 	ctx.SetVertexShader(TransformVS);
 	ctx.SetCullMode(CullMode::Back);
-	ctx.SetTileSize(16);
+	ctx.SetTileSize(128);
 
 	// ── Message loop ─────────────────────────────────────────
 	MSG msg = {};

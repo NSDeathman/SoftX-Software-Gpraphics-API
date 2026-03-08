@@ -6,6 +6,41 @@ SOFTX_BEGIN
 
 namespace RasterizerCommon
 {
+    // ─── Fixed-point sub-pixel rasterisation (28.4) ───────────────────────────
+    //
+    // Edge function at pixel P for edge A → B:
+    //   E = (px − ax)·(by − ay) − (py − ay)·(bx − ax)  (all in fixed-point)
+    //
+    // Pixel x±1 step:  ΔE_x = S·(by − ay)   (int32 safe: ≤ 16 × 2·4096·16 ≈ 2²¹)
+    // Row   y±1 step:  ΔE_y = −S·(bx − ax)  (same)
+    // Initial value:   ≤ (2·4096·16)²        = 2³⁴  → int64 required
+    //
+    // int64→int32 cast in SIMD is lossless up to ~1920×1080 (SUBPIXEL_BITS=4).
+    // For 4 K, set SUBPIXEL_BITS = 2.
+
+    static constexpr int SUBPIXEL_BITS = 4;
+    static constexpr int SUBPIXEL_STEP = 1 << SUBPIXEL_BITS; // 16
+
+    // Screen-space float → fixed-point integer
+    inline int ToFixed(float v)
+    {
+        return static_cast<int>(std::lround(v * float(SUBPIXEL_STEP)));
+    }
+
+    // Fixed-point coordinate of pixel-centre for pixel index i
+    //   Pixel i occupies [i·S, (i+1)·S)  →  centre = i·S + S/2
+    inline int PixelCentre(int i)
+    {
+        return i * SUBPIXEL_STEP + (SUBPIXEL_STEP >> 1);
+    }
+
+    // Integer edge function — int64 to avoid overflow during initial setup.
+    // Units: SUBPIXEL_STEP² × float_edge_func (ratio f/area is preserved).
+    inline int64_t EdgeFunctionInt(int ax, int ay, int bx, int by, int px, int py)
+    {
+        return int64_t(px - ax) * (by - ay) - int64_t(py - ay) * (bx - ax);
+    }
+
     inline float EdgeFunction(const float4& a, const float4& b, const float2& c)
     {
         return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
