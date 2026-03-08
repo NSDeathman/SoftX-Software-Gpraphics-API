@@ -241,8 +241,8 @@ struct TextureTable
 };
 
 // Shader function types
-using PixelShader = std::function<float4(const VertexOutput& input, ConstantBuffer constantBuffer, const TextureTable& tex)>;
-using VertexShader = std::function<VertexOutput(const VertexInput& input, ConstantBuffer constantBuffer, const TextureTable& tex)>;
+using PixelShader = std::function<float4(const VertexOutput& input, const ConstantBuffer& constantBuffer, const TextureTable& tex)>;
+using VertexShader = std::function<VertexOutput(const VertexInput& input, const ConstantBuffer& constantBuffer, const TextureTable& tex)>;
 using GeometryShader = std::function<void(const VertexOutput[3], std::vector<VertexOutput>& outVerts, std::vector<int>& outIndices, const TextureTable& tex)>;
 
 // Rasterizer states

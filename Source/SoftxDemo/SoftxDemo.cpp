@@ -88,7 +88,7 @@ TextureRGBA32F CreateUVCheckerTexture()
 // ============================================================
 //  Shaders
 // ============================================================
-VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb, const TextureTable& tex)
+VertexOutput TransformVS(const VertexInput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
     const ConstantBufferData* data =
         reinterpret_cast<const ConstantBufferData*>(cb.Data());
@@ -102,7 +102,7 @@ VertexOutput TransformVS(const VertexInput& input, ConstantBuffer cb, const Text
     return output;
 }
 
-float4 CheckerPS(const VertexOutput& input, ConstantBuffer cb, const TextureTable& tex)
+float4 CheckerPS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
     return tex[0].Sample(input.UV);
 }
