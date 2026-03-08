@@ -17,8 +17,8 @@ class SOFTX_API RasterizerAVX : public IRasterizer
                            const PixelShader& ps,
                            const ConstantBuffer& cb,
                            const TextureTable* tt,
-                           int2 tileMin,
-                           int2 tileMax) override;
+                           uint2 tileMin,
+                           uint2 tileMax) override;
 };
 
 SOFTX_END

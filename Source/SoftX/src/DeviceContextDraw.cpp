@@ -72,8 +72,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
     PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
-    if (!vertexShader || !pixelShader || vertexBuffer.IsEmpty() || indexBuffer.IsEmpty() || !renderTarget ||
-        !depthBuffer)
+    if (!vertexShader || !pixelShader || vertexBuffer.IsEmpty() || indexBuffer.IsEmpty() || !renderTarget || !depthBuffer)
         return;
 
     // Step 1: VS → clip space (without perspective divide)
@@ -96,16 +95,14 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
                                    [&](uint idx)
                                    {
                                        // Only VS — ClipSpaceToScreenSpace not called yet
-                                       clipVerts[idx] =
-                                           vertexShader(vertexBuffer.GetByIndex(idx), constantBuffer, textureTable);
+                                       clipVerts[idx] = vertexShader(vertexBuffer.GetByIndex(idx), constantBuffer, textureTable);
                                    });
 
     // Step 2: Gather source triangles
     std::vector<int3> sourceTriangles;
     for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
     {
-        sourceTriangles.push_back(
-            {(int)indexBuffer.GetByIndex(i), (int)indexBuffer.GetByIndex(i + 1), (int)indexBuffer.GetByIndex(i + 2)});
+        sourceTriangles.push_back({(int)indexBuffer.GetByIndex(i), (int)indexBuffer.GetByIndex(i + 1), (int)indexBuffer.GetByIndex(i + 2)});
     }
 
     // Step 3: Near plane clipping in clip space
@@ -117,8 +114,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     for (const auto& tri : sourceTriangles)
     {
         VertexOutput clipped[2][3];
-        int numTris =
-            RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
+        int numTris = RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
 
         for (int t = 0; t < numTris; ++t)
         {
@@ -167,8 +163,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
         state.fillMode = fillMode;
         state.depthFunc = depthFunc;
 
-        Renderer renderer(*rasterizer, *renderTarget, *depthBuffer, pixelShader, constantBuffer, &textureTable, state,
-                          tileSize);
+        Renderer renderer(*rasterizer, *renderTarget, *depthBuffer, pixelShader, constantBuffer, &textureTable, state, tileSize);
         renderer.Execute(finalVerts, finalTriangles);
 
 #ifdef DEBUG_TILING
@@ -183,12 +178,26 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
             const auto& v0 = finalVerts[tri.x];
             const auto& v1 = finalVerts[tri.y];
             const auto& v2 = finalVerts[tri.z];
-            DrawLine((uint)round(v0.Position.x), (uint)round(v0.Position.y), (uint)round(v1.Position.x),
-                     (uint)round(v1.Position.y), v0.Position.z, v1.Position.z, wireColor);
-            DrawLine((uint)round(v1.Position.x), (uint)round(v1.Position.y), (uint)round(v2.Position.x),
-                     (uint)round(v2.Position.y), v1.Position.z, v2.Position.z, wireColor);
-            DrawLine((uint)round(v2.Position.x), (uint)round(v2.Position.y), (uint)round(v0.Position.x),
-                     (uint)round(v0.Position.y), v2.Position.z, v0.Position.z, wireColor);
+            DrawLine((uint)round(v0.Position.x), 
+                     (uint)round(v0.Position.y), 
+                     (uint)round(v1.Position.x),
+                     (uint)round(v1.Position.y), 
+                     v0.Position.z, 
+                     v1.Position.z, 
+                     wireColor);
+            DrawLine((uint)round(v1.Position.x), 
+                     (uint)round(v1.Position.y), 
+                     (uint)round(v2.Position.x),
+                     (uint)round(v2.Position.y), 
+                     v1.Position.z, v2.Position.z, 
+                     wireColor);
+            DrawLine((uint)round(v2.Position.x), 
+                     (uint)round(v2.Position.y), 
+                     (uint)round(v0.Position.x),
+                     (uint)round(v0.Position.y), 
+                     v2.Position.z, 
+                     v0.Position.z, 
+                     wireColor);
         }
     }
     else if (fillMode == FillMode::Point)
@@ -244,36 +253,36 @@ void DeviceContext::DrawFullScreenQuad()
         return;
 
     IRenderTarget* rt = renderTarget;
-    int w = rt->Width();
-    int h = rt->Height();
-    float invW = 1.0f / (w - 1);
-    float invH = 1.0f / (h - 1);
+    uint w = rt->Width();
+    uint h = rt->Height();
+    float invW = 1.0f / (w - 1u);
+    float invH = 1.0f / (h - 1u);
 
     // Build tiles locally — TiledRenderer not used here,
     // RenderTileQuad does not work with triangles.
     std::vector<Tile> tiles;
     {
-        int ts = tileSize;
-        int tilesX = (w + ts - 1) / ts;
-        int tilesY = (h + ts - 1) / ts;
+        uint ts = tileSize;
+        uint tilesX = (w + ts - 1u) / ts;
+        uint tilesY = (h + ts - 1u) / ts;
         tiles.reserve(tilesX * tilesY);
-        for (int ty = 0; ty < tilesY; ++ty)
-            for (int tx = 0; tx < tilesX; ++tx)
+        for (uint ty = 0; ty < tilesY; ++ty)
+            for (uint tx = 0; tx < tilesX; ++tx)
             {
-                int2 mn(tx * ts, ty * ts);
-                int2 mx(std::min((tx + 1) * ts - 1, w - 1), std::min((ty + 1) * ts - 1, h - 1));
+                uint2 mn(tx * ts, ty * ts);
+                uint2 mx(std::min((tx + 1) * ts - 1u, w - 1u), std::min((ty + 1u) * ts - 1u, h - 1u));
                 tiles.emplace_back(mn, mx);
             }
     }
 
-    int numTiles = (int)tiles.size();
-    std::atomic<int> tileIndex(0);
+    uint numTiles = (int)tiles.size();
+    std::atomic<uint> tileIndex(0);
 
     auto worker = [this, &tiles, invW, invH, &tileIndex, numTiles]()
     {
         while (true)
         {
-            int idx = tileIndex.fetch_add(1);
+            uint idx = tileIndex.fetch_add(1);
             if (idx >= numTiles)
                 break;
             RenderTileQuad(tiles[idx], invW, invH);
@@ -281,7 +290,7 @@ void DeviceContext::DrawFullScreenQuad()
     };
 
     auto& pool = ThreadPoolManager::Get();
-    for (int i = 0; i < (int)pool.threadCount(); ++i)
+    for (uint i = 0; i < (int)pool.threadCount(); ++i)
         pool.enqueue(worker);
     pool.wait();
 

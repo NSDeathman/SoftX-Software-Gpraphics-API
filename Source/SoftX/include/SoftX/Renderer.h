@@ -8,39 +8,39 @@ SOFTX_BEGIN
 class Renderer
 {
 public:
-    Renderer(IRasterizer& rasterizer, 
-             IRenderTarget& renderTarget, 
-             DepthBuffer& depthBuffer, 
-             const PixelShader& ps,
-             const ConstantBuffer& cb, 
-             const TextureTable* tt, 
-             const RasterizerState& state, 
+    Renderer(IRasterizer& rasterizer,
+             IRenderTarget& renderTarget,
+             DepthBuffer& depthBuffer,
+             const PixelShader& pixelShader,
+             const ConstantBuffer& constantBuffer,
+             const TextureTable* textureTable,
+             const RasterizerState& state,
              uint tileSize);
 
     void Execute(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
 
     const std::vector<Tile>& GetTiles() const
     {
-        return m_Tiles;
+        return tiles;
     }
 
 private:
-    void buildTiles(int width, int height);
-    void binTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
-    void renderTiles();
+    void BuildTiles(uint width, uint height);
+    void BinTriangles(const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
+    void RenderTiles();
 
-    IRasterizer& m_Rasterizer;
-    IRenderTarget& m_RenderTarget;
-    DepthBuffer& m_DepthBuffer;
-    const PixelShader& m_PS;
-    const ConstantBuffer& m_CB;
-    const TextureTable* m_TT;
-    RasterizerState m_State;
-    uint m_TileSize;
+    IRasterizer& rasterizer;
+    IRenderTarget& renderTarget;
+    DepthBuffer& depthBuffer;
+    const PixelShader& pixelShader;
+    const ConstantBuffer& constantBuffer;
+    const TextureTable* textureTable;
+    RasterizerState state;
+    uint tileSize;
 
-    std::vector<Tile> m_Tiles;
-    const std::vector<VertexOutput>* m_Verts = nullptr;
-    const std::vector<int3>* m_Triangles = nullptr;
+    std::vector<Tile> tiles;
+    const std::vector<VertexOutput>* verts = nullptr;
+    const std::vector<int3>* triangles = nullptr;
 };
 
 SOFTX_END

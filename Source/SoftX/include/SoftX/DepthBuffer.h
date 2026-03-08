@@ -1,40 +1,42 @@
 ﻿#pragma once
-#include <xmmintrin.h>
-#include <vector>
+
 #include <algorithm>
-#include <limits>
 #include <cassert>
-#include "ThirdPartyIncluding.h"
+#include <limits>
+#include <vector>
+#include <xmmintrin.h>
+
 #include "LibInternal.h"
+#include "ThirdPartyIncluding.h"
 
 SOFTX_BEGIN
 
 class SOFTX_API DepthBuffer
 {
 public:
-    DepthBuffer(uint2 size)
-        : resolution(size)
-        , widthPadded((size.x + 3) & ~3) // округляем до кратного 4
-        , blocks((((size.x + 3) & ~3) * size.y) / 4)
+    explicit DepthBuffer(uint2 size)
+        : resolution(size),
+          widthPadded((size.x + 3) & ~3), // Round up to multiple of 4
+          blocks(widthPadded * size.y / 4)
     {
         Clear(1.0f);
     }
 
-    // ── Очистка ───────────────────────────────────────────────────────────
+    // Clear the entire depth buffer with a single value
     void Clear(float depth)
     {
         __m128 depth4 = _mm_set1_ps(depth);
-        __m128* ptr   = blocks.data();
-        size_t  count = blocks.size();
+        __m128* ptr = blocks.data();
+        size_t count = blocks.size();
 
         size_t i = 0;
-        // Потоковая запись — минует кэш, максимальная скорость
+        // Streaming write – bypass cache, maximum speed
         for (; i < count; ++i)
             _mm_stream_ps(reinterpret_cast<float*>(ptr + i), depth4);
         _mm_sfence();
     }
 
-    // ── Скалярный доступ (обратная совместимость) ─────────────────────────
+    // Scalar access (backward compatibility)
     float Read(int2 coords) const
     {
         return FloatPtr()[coords.y * widthPadded + coords.x];
@@ -49,86 +51,89 @@ public:
     {
         return FloatPtr()[coords.y * widthPadded + coords.x];
     }
+
     const float& At(int2 coords) const
     {
         return FloatPtr()[coords.y * widthPadded + coords.x];
     }
 
-    // At(int index) — линейный индекс по оригинальной ширине (как раньше)
+    // Linear index access (using original width)
     float& At(uint index)
     {
-        int x = index % resolution.x;
-        int y = index / resolution.x;
-        return At(int2(x, y));
-    }
-    const float& At(uint index) const
-    {
-        int x = index % resolution.x;
-        int y = index / resolution.x;
+        uint x = index % resolution.x;
+        uint y = index / resolution.x;
         return At(int2(x, y));
     }
 
-    // ── SIMD блочный доступ ───────────────────────────────────────────────
-    // Читает 4 значения глубины начиная с coords (горизонтально).
-    // coords.x должен быть кратен 4 — используется в SSE растеризаторе.
+    const float& At(uint index) const
+    {
+        uint x = index % resolution.x;
+        uint y = index / resolution.x;
+        return At(int2(x, y));
+    }
+
+    // SIMD block access
+    // Reads 4 depth values starting from coords (horizontally).
+    // coords.x must be a multiple of 4 – used in SSE rasterizer.
     __m128 Read4(uint2 coords) const
     {
         assert(coords.x % 4 == 0);
-        assert(coords.x >= 0 && coords.x + 3u < widthPadded &&
-               coords.y >= 0 && coords.y < resolution.y);
-        int blockIdx = (coords.y * widthPadded + coords.x) / 4u;
+        assert(coords.x + 3u < widthPadded && coords.y < resolution.y);
+        uint blockIdx = (coords.y * widthPadded + coords.x) / 4u;
         return blocks[blockIdx];
     }
 
-    // Записывает 4 значения глубины с учётом маски (1 = перезаписать).
-    // Используется в SSE растеризаторе после depth test.
+    // Writes 4 depth values with mask (1 = overwrite).
+    // Used in SSE rasterizer after depth test.
     void Write4(uint2 coords, __m128 depths, __m128 mask)
     {
         assert(coords.x % 4 == 0);
-        assert(coords.x >= 0 && coords.x + 3 < widthPadded &&
-               coords.y >= 0 && coords.y < resolution.y);
-        int     blockIdx = (coords.y * widthPadded + coords.x) / 4;
-        __m128& block    = blocks[blockIdx];
+        assert(coords.x + 3u < widthPadded && coords.y < resolution.y);
+        uint blockIdx = (coords.y * widthPadded + coords.x) / 4u;
+        __m128& block = blocks[blockIdx];
 
-        // Записываем только те пиксели где маска = 0xFFFFFFFF
+        // Write only pixels where mask = 0xFFFFFFFF
         // block = (depths & mask) | (block & ~mask)
-        block = _mm_or_ps(_mm_and_ps(depths, mask),
-                          _mm_andnot_ps(mask, block));
+        block = _mm_or_ps(_mm_and_ps(depths, mask), _mm_andnot_ps(mask, block));
     }
 
-    // Depth test для 4 пикселей: возвращает маску прошедших (z < buffer).
-    // depth4 — интерполированные z, activeMask — маска покрытия тайла.
+    // Depth test for 4 pixels: returns mask of passing pixels (z < buffer).
+    // depth4 – interpolated z, activeMask – tile coverage mask.
     __m128 Test4(uint2 coords, __m128 depth4, __m128 activeMask) const
     {
         __m128 buffered = Read4(coords);
-        __m128 passed   = _mm_cmplt_ps(depth4, buffered); // z < bufferZ
+        __m128 passed = _mm_cmplt_ps(depth4, buffered); // z < bufferZ
         return _mm_and_ps(passed, activeMask);
     }
 
-    // ── Геттеры ───────────────────────────────────────────────────────────
+    // Getters
     uint Width() const
     {
         return resolution.x;
     }
+
     uint Height() const
     {
         return resolution.y;
     }
+
     uint WidthPadded() const
     {
         return widthPadded;
     }
+
     uint2 Size() const
     {
         return resolution;
     }
 
-    // Сырой доступ к float* — для скалярного растеризатора
+    // Raw float* access – for scalar rasterizer
     float* Data()
     {
         return FloatPtr();
     }
-    const float* data() const
+
+    const float* Data() const
     {
         return FloatPtr();
     }
@@ -138,14 +143,15 @@ private:
     {
         return reinterpret_cast<float*>(blocks.data());
     }
+
     const float* FloatPtr() const
     {
         return reinterpret_cast<const float*>(blocks.data());
     }
 
     uint2 resolution;
-    uint widthPadded;                // кратен 4 — для выравнивания блоков
-    std::vector<__m128> blocks;     // каждый блок = 4 float глубины
+    uint widthPadded;           // multiple of 4 – for block alignment
+    std::vector<__m128> blocks; // each block = 4 float depths
 };
 
 SOFTX_END

@@ -14,10 +14,10 @@ void RasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
                                          const PixelShader& ps, 
                                          const ConstantBuffer& cb,
                                          const TextureTable* tt, 
-                                         int2 tileMin, 
-                                         int2 tileMax)
+                                         uint2 tileMin, 
+                                         uint2 tileMax)
 {
-    PROFILE_SCOPE("RasterizerScalar::RasterizeTriangleTile");
+    PROFILE_SCOPE("RasterizerScalar::RasterizeTriangle");
 
     // Full triangle bounding box
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
@@ -25,14 +25,14 @@ void RasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    // Clamp bounding box to tile and screen
-    int iMinX = std::max(tileMin.x, (int)std::floor(minX));
-    int iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
-    int iMinY = std::max(tileMin.y, (int)std::floor(minY));
-    int iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
+    // Clamp bounding box to tile and screen, staying in unsigned range
+    uint iMinX = uint(std::max(double(tileMin.x), double(floor(minX))));
+    uint iMaxX = uint(std::min(double(tileMax.x), double(std::ceil(maxX))));
+    uint iMinY = uint(std::max(double(tileMin.y), double(std::floor(minY))));
+    uint iMaxY = uint(std::min(double(tileMax.y), double(std::ceil(maxY))));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
-    return;
+        return;
 
     float area2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, v2.Position);
     CullMode cull = state.cullMode;
@@ -40,13 +40,14 @@ void RasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
         return;
     if (cull == CullMode::Front && area2 > 0)
         return;
-    if (std::abs(area2) < 1e-6f) UNLIKELY 
+    if (std::abs(area2) < 1e-6f) UNLIKELY
         return;
 
     uint width = renderTarget.Width();
-    for (int y = iMinY; y <= iMaxY; ++y)
+
+    for (uint y = iMinY; y <= iMaxY; ++y)
     {
-        for (int x = iMinX; x <= iMaxX; ++x)
+        for (uint x = iMinX; x <= iMaxX; ++x)
         {
             float2 p((float)x + 0.5f, (float)y + 0.5f);
 
@@ -62,7 +63,7 @@ void RasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
             float c = f2 / area2;
 
             VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, a, b, c);
-            uint idx = uint(y) * width + uint(x);
+            uint idx = y * width + x;
 
             bool depthPass = false;
             switch (state.depthFunc)
@@ -92,6 +93,7 @@ void RasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
                     depthPass = true;
                     break;
             }
+
             if (depthPass)
             {
                 depthBuffer.At(idx) = frag.Position.z;

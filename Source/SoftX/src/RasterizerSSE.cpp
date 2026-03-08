@@ -15,20 +15,20 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
                                       const PixelShader& ps,
                                       const ConstantBuffer& cb,
                                       const TextureTable* tt,
-                                      int2 tileMin,
-                                      int2 tileMax)
+                                      uint2 tileMin,
+                                      uint2 tileMax)
 {
-    PROFILE_SCOPE("RasterizerSSE::RasterizeTriangleTile");
+    PROFILE_SCOPE("RasterizerSSE::RasterizeTriangle");
 
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    uint iMinX = std::max(tileMin.x, (int)std::floor(minX));
-    uint iMaxX = std::min(tileMax.x, (int)std::ceil(maxX));
-    uint iMinY = std::max(tileMin.y, (int)std::floor(minY));
-    uint iMaxY = std::min(tileMax.y, (int)std::ceil(maxY));
+    uint iMinX = std::max(tileMin.x, (uint)std::floor(minX));
+    uint iMaxX = std::min(tileMax.x, (uint)std::ceil(maxX));
+    uint iMinY = std::max(tileMin.y, (uint)std::floor(minY));
+    uint iMaxY = std::min(tileMax.y, (uint)std::ceil(maxY));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
@@ -144,7 +144,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
              f12 = _mm_add_ps(f12, f12StepX),
              f20 = _mm_add_ps(f20, f20StepX))
         {
-            if (x > (uint)tileMax.x || x + 3u < (uint)tileMin.x)
+            if (x > tileMax.x || x + 3u < tileMin.x)
                 continue;
 
             // f01/f12/f20 already computed incrementally — 3 adds instead of 6 mul + 6 sub
@@ -233,7 +233,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             {
                 if (!(depthMask & (1 << i))) continue;
                 uint px = x + i;
-                if (px < (uint)tileMin.x || px > (uint)tileMax.x) continue;
+                if (px < tileMin.x || px > tileMax.x) continue;
 
                 VertexOutput frag;
                 frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
@@ -252,7 +252,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
         // Scalar fallback for remaining pixels
         for (; x <= iMaxX; ++x)
         {
-            if (x < (uint)tileMin.x || x > (uint)tileMax.x)
+            if (x < tileMin.x || x > tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);

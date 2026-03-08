@@ -26,8 +26,8 @@ public:
                                    const PixelShader& ps,
                                    const ConstantBuffer& cb,
                                    const TextureTable* tt,
-                                   int2 tileMin,
-                                   int2 tileMax) = 0;
+                                   uint2 tileMin,
+                                   uint2 tileMax) = 0;
 };
 
 SOFTX_END

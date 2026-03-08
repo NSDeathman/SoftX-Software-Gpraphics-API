@@ -1,22 +1,24 @@
 ﻿#pragma once
+
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <windows.h>
+#include <xmmintrin.h>
 
 #include "RenderTargetInterface.h"
 #include "ThirdPartyIncluding.h"
 #include "ThreadPoolManager.h"
-#include <xmmintrin.h>
 
 SOFTX_BEGIN
 
 class SOFTX_API Framebuffer : public IRenderTarget
 {
 public:
-    Framebuffer(uint2 size) : resolution(size), pixelsStorage(size.x * size.y)
+    explicit Framebuffer(uint2 size) : resolution(size), pixelsStorage(size.x * size.y)
     {
         Clear(float4(0, 0, 0, 1));
     }
@@ -27,7 +29,8 @@ public:
         __m128* data = pixelsStorage.data();
         size_t count = pixelsStorage.size();
         size_t i = 0;
-        // Заполняем блоками по 4 пикселя (16 байт) потоковой записью
+
+        // Fill with blocks of 4 pixels (16 bytes) using streaming writes
         for (; i + 4 <= count; i += 4)
         {
             _mm_stream_ps(reinterpret_cast<float*>(data + i), col);
@@ -35,7 +38,8 @@ public:
             _mm_stream_ps(reinterpret_cast<float*>(data + i + 2), col);
             _mm_stream_ps(reinterpret_cast<float*>(data + i + 3), col);
         }
-        _mm_sfence(); // гарантировать видимость
+        _mm_sfence(); // Ensure visibility
+
         for (; i < count; ++i)
         {
             data[i] = col;
@@ -45,14 +49,14 @@ public:
     void SetPixel(uint2 coords, const float4& color) override
     {
         __m128* data = pixelsStorage.data();
-        int index = coords.y * resolution.x + coords.x;
+        uint index = coords.y * resolution.x + coords.x;
         _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color.get_simd());
     }
 
     void SetPixel(uint2 coords, __m128 color)
     {
         __m128* data = pixelsStorage.data();
-        int index = coords.y * resolution.x + coords.x;
+        uint index = coords.y * resolution.x + coords.x;
         _mm_stream_ps(reinterpret_cast<float*>(&data[index]), color);
     }
 
@@ -65,10 +69,12 @@ public:
     {
         return resolution.x;
     }
+
     uint Height() const override
     {
         return resolution.y;
     }
+
     uint2 Size() const override
     {
         return resolution;
@@ -81,8 +87,8 @@ public:
         int ty = tileIdx / tilesX;
         int x0 = tx * tileSize;
         int y0 = ty * tileSize;
-        int x1 = std::min(x0 + tileSize, resolution.x);
-        int y1 = std::min(y0 + tileSize, resolution.y);
+        int x1 = std::min(x0 + (int)tileSize, (int)resolution.x);
+        int y1 = std::min(y0 + (int)tileSize, (int)resolution.y);
 
         __m128 scale = _mm_set1_ps(255.0f);
 
@@ -92,12 +98,10 @@ public:
             uint* dstRow = bgraBuffer + y * resolution.x;
             for (int x = x0; x < x1; ++x)
             {
-                // Загружаем один пиксель
+                // Load one pixel
                 __m128 c = srcRow[x];
-                // Преобразуем
-                __m128i i = _mm_cvtps_epi32(_mm_mul_ps(c, scale));
-                // Упаковываем в 8 бит (один пиксель – 4 байта)
-                // Используем SSE для четырёх пикселей, но здесь один, поэтому проще скалярно
+
+                // Convert to BGRA using scalar approach
                 float rgba[4];
                 _mm_storeu_ps(rgba, c);
                 uint8_t r = (uint8_t)(clamp(rgba[0], 0.0f, 1.0f) * 255.0f);
@@ -111,17 +115,17 @@ public:
 
     void Present(HDC hdc, int2 dstPos, int2 dstSize) const
     {
-        PROFILE_SCOPE("Present framebuffer")
+        PROFILE_SCOPE("Present framebuffer");
 
-        int dstW = (dstSize.x == -1) ? resolution.x : dstSize.x;
-        int dstH = (dstSize.y == -1) ? resolution.y : dstSize.y;
+        int dstW = (dstSize.x == -1) ? (int)resolution.x : dstSize.x;
+        int dstH = (dstSize.y == -1) ? (int)resolution.y : dstSize.y;
 
         alignas(16) std::vector<uint> bgraBuffer(resolution.x * resolution.y);
 
         {
-            PROFILE_SCOPE("Converting tiles")
+            PROFILE_SCOPE("Converting tiles");
 
-            const int tileSize = 64;
+            const uint tileSize = 64;
             int tilesX = (resolution.x + tileSize - 1) / tileSize;
             int tilesY = (resolution.y + tileSize - 1) / tileSize;
             int numTiles = tilesX * tilesY;
@@ -153,14 +157,15 @@ public:
 
             BITMAPINFO bmi = {};
             bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bmi.bmiHeader.biWidth = resolution.x;
-            bmi.bmiHeader.biHeight = -(int)resolution.y;
+            bmi.bmiHeader.biWidth = (LONG)resolution.x;
+            bmi.bmiHeader.biHeight = -(LONG)resolution.y;
             bmi.bmiHeader.biPlanes = 1;
             bmi.bmiHeader.biBitCount = 32;
             bmi.bmiHeader.biCompression = BI_RGB;
             bmi.bmiHeader.biSizeImage = 0;
 
-            SetDIBitsToDevice(hdc, dstPos.x, dstPos.y, dstW, dstH, 0, 0, 0, resolution.y, bgraBuffer.data(), &bmi, DIB_RGB_COLORS);
+            SetDIBitsToDevice(hdc, dstPos.x, dstPos.y, dstW, dstH, 0, 0, 0, resolution.y, bgraBuffer.data(), &bmi,
+                              DIB_RGB_COLORS);
         }
     }
 
@@ -171,16 +176,16 @@ public:
             return false;
 
         uint8_t header[18] = {0};
-        header[2] = 2;
-        header[12] = resolution.x & 0xFF;
-        header[13] = (resolution.x >> 8) & 0xFF;
-        header[14] = resolution.y & 0xFF;
-        header[15] = (resolution.y >> 8) & 0xFF;
-        header[16] = 32;
-        header[17] = 8 | (1 << 5);
+        header[2] = 2;                           // Uncompressed true-color
+        header[12] = resolution.x & 0xFF;        // width low byte
+        header[13] = (resolution.x >> 8) & 0xFF; // width high byte
+        header[14] = resolution.y & 0xFF;        // height low byte
+        header[15] = (resolution.y >> 8) & 0xFF; // height high byte
+        header[16] = 32;                         // bits per pixel (RGBA)
+        header[17] = 8 | (1 << 5);               // 8 bits alpha, origin top-left
         file.write(reinterpret_cast<const char*>(header), 18);
 
-        // Converting to BGRA
+        // Convert to BGRA
         std::vector<uint> bgraPixels(resolution.x * resolution.y);
         const __m128* src = pixelsStorage.data();
         uint* dst = bgraPixels.data();
@@ -193,7 +198,7 @@ public:
             uint8_t g = (uint8_t)(clamp(rgba[1], 0.0f, 1.0f) * 255.0f);
             uint8_t b = (uint8_t)(clamp(rgba[2], 0.0f, 1.0f) * 255.0f);
             uint8_t a = (uint8_t)(clamp(rgba[3], 0.0f, 1.0f) * 255.0f);
-            dst[i] = (a << 24) | (b << 16) | (g << 8) | r; // TGA order - BGRA (0xAABBGGRR in little-endian)
+            dst[i] = (a << 24) | (b << 16) | (g << 8) | r; // BGRA in little-endian (0xAABBGGRR)
         }
 
         file.write(reinterpret_cast<const char*>(dst), pixelsStorage.size() * 4);

@@ -88,7 +88,7 @@ void DeviceContext::SetTexture(int slot, const TextureRGBA32F* texture, SamplerS
     assert(slot >= 0 && slot < MAX_TEXTURE_SLOTS);
     auto& b = textureTable[slot];
     b.SetTexture(texture);
-    b.SetSemplerState(sampler);
+    b.SetSamplerState(sampler);
 }
 
 void DeviceContext::SetRenderTarget(IRenderTarget* target)
