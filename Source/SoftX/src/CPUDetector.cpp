@@ -1,4 +1,4 @@
-#include "pch.h"
+п»ї#include "pch.h"
 #include <SoftX/SoftX.h>
 #include <array>
 #include <cstring>
@@ -81,7 +81,7 @@ void CPUDetector::Initialize()
 #warning "CPUDetector not implemented for this compiler/OS. Assuming minimal features."
 	s_caps.sse = true;
 	s_caps.sse2 = true;
-	// остальные false
+	// РѕСЃС‚Р°Р»СЊРЅС‹Рµ false
 #endif
 
 	s_initialized = true;

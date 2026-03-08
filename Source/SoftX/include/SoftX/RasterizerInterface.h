@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "LibInternal.h"
 #include "RenderTargetInterface.h"

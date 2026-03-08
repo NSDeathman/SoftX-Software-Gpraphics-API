@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "RasterizerCommon.h"
 #include <SoftX/SoftX.h>

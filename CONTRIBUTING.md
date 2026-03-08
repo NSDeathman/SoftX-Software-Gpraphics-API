@@ -1,4 +1,4 @@
----
+﻿---
 # SoftX C++ Coding Standard
 ## This document defines the coding style and conventions for the SoftX project.
 ## The primary inspirations are:
