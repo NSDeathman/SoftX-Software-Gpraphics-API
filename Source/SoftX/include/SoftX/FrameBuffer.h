@@ -144,8 +144,8 @@ public:
             };
 
             auto& pool = ThreadPoolManager::Get();
-            int numThreads = (int)pool.threadCount();
-            for (int i = 0; i < numThreads; ++i)
+            uint numThreads = (uint)pool.threadCount();
+            for (uint i = 0; i < numThreads; ++i)
             {
                 pool.enqueue(worker);
             }

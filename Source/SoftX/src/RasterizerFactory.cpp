@@ -10,7 +10,7 @@ std::unique_ptr<IRasterizer> CreateBestRasterizer()
 	if (caps.avx)
 		return std::make_unique<RasterizerAVX>();
 	else if (caps.sse41)
-			return std::make_unique<RasterizerSSE>();
+		return std::make_unique<RasterizerSSE>();
 	else
 		return std::make_unique<RasterizerScalar>();
 }

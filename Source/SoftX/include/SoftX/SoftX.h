@@ -7,7 +7,7 @@
 #include "Types.h"
 
 #include "DepthBuffer.h"
-#include "Framebuffer.h"
+#include "FrameBuffer.h"
 #include "RenderTargetTexture.h"
 
 #include "RasterizerAVX.h"

@@ -290,7 +290,7 @@ void DeviceContext::DrawFullScreenQuad()
     };
 
     auto& pool = ThreadPoolManager::Get();
-    for (uint i = 0; i < (int)pool.threadCount(); ++i)
+    for (uint i = 0; i < (uint)pool.threadCount(); ++i)
         pool.enqueue(worker);
     pool.wait();
 
