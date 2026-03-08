@@ -6,18 +6,17 @@
 
 SOFTX_BEGIN
 
-void RasterizerSSE::RasterizeTriangle(
-    const VertexOutput& v0,
-    const VertexOutput& v1,
-    const VertexOutput& v2,
-    const RasterizerState& state,
-    DepthBuffer& depthBuffer,
-    IRenderTarget& renderTarget,
-    const PixelShader& ps,
-    const ConstantBuffer& cb,
-    const TextureTable* tt,
-    int2 tileMin,
-    int2 tileMax)
+void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
+                                      const VertexOutput& v1,
+                                      const VertexOutput& v2,
+                                      const RasterizerState& state,
+                                      DepthBuffer& depthBuffer,
+                                      IRenderTarget& renderTarget,
+                                      const PixelShader& ps,
+                                      const ConstantBuffer& cb,
+                                      const TextureTable* tt,
+                                      int2 tileMin,
+                                      int2 tileMax)
 {
     PROFILE_SCOPE("RasterizerSSE::RasterizeTriangleTile");
 
@@ -34,18 +33,18 @@ void RasterizerSSE::RasterizeTriangle(
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
 
-    float area2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, v2.Position);
+    float area2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, v2.Position);
     CullMode cull = state.cullMode;
     if (cull == CullMode::Back  && area2 < 0) return;
     if (cull == CullMode::Front && area2 > 0) return;
     if (std::abs(area2) < 1e-6f) UNLIKELY return;
 
-    // ── Рёбра треугольника ────────────────────────────────────────────────
+    // Triangle edges
     float4 dx01 = v1.Position - v0.Position;
     float4 dx12 = v2.Position - v1.Position;
     float4 dx20 = v0.Position - v2.Position;
 
-    // ── Broadcast вершинных позиций для инициализации edge functions ──────
+    // Broadcast vertex positions for edge function initialization
     __m128 v0x = _mm_set1_ps(v0.Position.x);
     __m128 v0y = _mm_set1_ps(v0.Position.y);
     __m128 v1x = _mm_set1_ps(v1.Position.x);
@@ -95,16 +94,16 @@ void RasterizerSSE::RasterizeTriangle(
     __m128 dx20v   = _mm_set1_ps(dx20.x);
     __m128 dy20v   = _mm_set1_ps(dx20.y);
 
-    // ── Константы треугольника, вынесены из обоих циклов ─────────────────
+    // Triangle constants, hoisted out of loops
     __m128 v0w  = _mm_set1_ps(v0.Position.w);
     __m128 v1w  = _mm_set1_ps(v1.Position.w);
     __m128 v2w  = _mm_set1_ps(v2.Position.w);
     __m128 ones = _mm_set1_ps(1.0f);
     __m128 zero = _mm_setzero_ps();
 
-    // ── Инкрементальные edge functions ───────────────────────────────────
-    // При x → x+4:  Δf = +4 * dy   (dy = dx.y = Position.y дельта ребра)
-    // При y → y+1:  Δf = -dx        (dx = dx.x = Position.x дельта ребра)
+    // Incremental edge functions
+    // When x → x+4:  Δf = +4 * dy   (dy = edge delta y)
+    // When y → y+1:  Δf = -dx        (dx = edge delta x)
     __m128 f01StepX = _mm_set1_ps( 4.0f * dx01.y);
     __m128 f12StepX = _mm_set1_ps( 4.0f * dx12.y);
     __m128 f20StepX = _mm_set1_ps( 4.0f * dx20.y);
@@ -112,10 +111,10 @@ void RasterizerSSE::RasterizeTriangle(
     __m128 f12StepY = _mm_set1_ps(-dx12.x);
     __m128 f20StepY = _mm_set1_ps(-dx20.x);
 
-    // ── simdStartX вынесен до y-цикла ────────────────────────────────────
+    // SIMD start X aligned to multiple of 4
     const int simdStartX = (iMinX / 4) * 4;
 
-    // ── Инициализация edge functions для первой строки ────────────────────
+    // Initialize edge functions for the first row
     __m128 f01Row, f12Row, f20Row;
     {
         __m128 initX = _mm_set_ps(
@@ -137,7 +136,7 @@ void RasterizerSSE::RasterizeTriangle(
         uint x;
         __m128 f01, f12, f20;
 
-        // Инкремент f в for-выражении: continue не нарушает накопление
+        // Increment f in the for expression; continue does not break accumulation
         for (x = simdStartX, f01 = f01Row, f12 = f12Row, f20 = f20Row;
              x + 3u < width && x <= iMaxX - 3u;
              x += 4,
@@ -145,10 +144,10 @@ void RasterizerSSE::RasterizeTriangle(
              f12 = _mm_add_ps(f12, f12StepX),
              f20 = _mm_add_ps(f20, f20StepX))
         {
-            if (x > (uint)tileMax.x || x + 3 < (uint)tileMin.x)
+            if (x > (uint)tileMax.x || x + 3u < (uint)tileMin.x)
                 continue;
 
-            // f01/f12/f20 уже вычислены инкрементально — 3 add вместо 6 mul + 6 sub
+            // f01/f12/f20 already computed incrementally — 3 adds instead of 6 mul + 6 sub
             __m128 inside;
             if (area2 > 0)
                 inside = _mm_and_ps(_mm_and_ps(_mm_cmpge_ps(f01, zero),
@@ -163,7 +162,7 @@ void RasterizerSSE::RasterizeTriangle(
             __m128 beta  = _mm_mul_ps(f20, invArea);
             __m128 gamma = _mm_mul_ps(f01, invArea);
 
-            // ── Perspective-correct веса ──────────────────────────────────
+            // Perspective-correct weights
             __m128 pw0 = _mm_mul_ps(alpha, v0w);
             __m128 pw1 = _mm_mul_ps(beta,  v1w);
             __m128 pw2 = _mm_mul_ps(gamma, v2w);
@@ -171,12 +170,12 @@ void RasterizerSSE::RasterizeTriangle(
             __m128 pwSum    = _mm_add_ps(_mm_add_ps(pw0, pw1), pw2);
             __m128 invPwSum = _mm_div_ps(ones, pwSum);
 
-            // ── z: линейная интерполяция (perspective correction не нужна) ─
+            // z: linear interpolation (perspective correction not needed)
             __m128 z = _mm_add_ps(_mm_add_ps(_mm_mul_ps(alpha, v0z),
                                              _mm_mul_ps(beta,  v1z)),
                                              _mm_mul_ps(gamma, v2z));
 
-            // ── Атрибуты: perspective-correct ─────────────────────────────
+            // Attributes: perspective-correct
 #define PLERP128(a0, a1, a2) \
     _mm_mul_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(pw0, a0), \
                                      _mm_mul_ps(pw1, a1)), \
@@ -194,7 +193,7 @@ void RasterizerSSE::RasterizeTriangle(
 
 #undef PLERP128
 
-            // ── Depth read через блочный API ──────────────────────────────
+            // Depth read via block API
             __m128 depths = depthBuffer.Read4(uint2(x, y));
 
             __m128 depthCmp;
@@ -211,16 +210,16 @@ void RasterizerSSE::RasterizeTriangle(
             default:                           depthCmp = _mm_cmplt_ps(z, depths); break;
             }
 
-            // inside — уже готовая SIMD маска, roundtrip через insideMask убран
+            // inside is already a SIMD mask
             __m128 finalMask = _mm_and_ps(depthCmp, inside);
             int depthMask    = _mm_movemask_ps(finalMask);
             if (depthMask == 0)
                 continue;
 
-            // ── Depth write под маской ────────────────────────────────────
+            // Depth write under mask
             depthBuffer.Write4(uint2(x, y), z, finalMask);
 
-            // ── Скалярный цикл только для шейдинга ───────────────────────
+            // Scalar loop for shading only
             alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
             alignas(16) float uArr[4], vArr[4], nxArr[4], nyArr[4], nzArr[4];
             _mm_store_ps(zArr,  z);
@@ -233,8 +232,8 @@ void RasterizerSSE::RasterizeTriangle(
             for (int i = 0; i < 4; ++i)
             {
                 if (!(depthMask & (1 << i))) continue;
-                int px = x + i;
-                if (px < tileMin.x || px > tileMax.x) continue;
+                uint px = x + i;
+                if (px < (uint)tileMin.x || px > (uint)tileMax.x) continue;
 
                 VertexOutput frag;
                 frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
@@ -245,21 +244,21 @@ void RasterizerSSE::RasterizeTriangle(
             }
         }
 
-        // ── Шаг на следующую строку ───────────────────────────────────────
+        // Step to next row
         f01Row = _mm_add_ps(f01Row, f01StepY);
         f12Row = _mm_add_ps(f12Row, f12StepY);
         f20Row = _mm_add_ps(f20Row, f20StepY);
 
-        // ── Скалярный доводчик для оставшихся пикселей ───────────────────
+        // Scalar fallback for remaining pixels
         for (; x <= iMaxX; ++x)
         {
             if (x < (uint)tileMin.x || x > (uint)tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);
-            float f0 = RasterizerCommon::edgeFunction(v1.Position, v2.Position, p);
-            float f1 = RasterizerCommon::edgeFunction(v2.Position, v0.Position, p);
-            float f2 = RasterizerCommon::edgeFunction(v0.Position, v1.Position, p);
+            float f0 = RasterizerCommon::EdgeFunction(v1.Position, v2.Position, p);
+            float f1 = RasterizerCommon::EdgeFunction(v2.Position, v0.Position, p);
+            float f2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, p);
 
             if (f0 * area2 < 0 || f1 * area2 < 0 || f2 * area2 < 0)
                 continue;
@@ -268,11 +267,12 @@ void RasterizerSSE::RasterizeTriangle(
             float b = f1 / area2;
             float c = f2 / area2;
 
-            VertexOutput frag = RasterizerCommon::trilerp(v0, v1, v2, a, b, c);
-            int idx = y * width + x;
+            VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, a, b, c);
+            uint idx = y * width + x;
 
             bool depthPass = false;
-            switch (state.depthFunc) {
+            switch (state.depthFunc)
+            {
             case ComparisonFunc::Never:        depthPass = false; break;
             case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.At(idx); break;
             case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.At(idx); break;
@@ -282,7 +282,8 @@ void RasterizerSSE::RasterizeTriangle(
             case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.At(idx); break;
             case ComparisonFunc::Always:       depthPass = true; break;
             }
-            if (depthPass) {
+            if (depthPass)
+            {
                 depthBuffer.At(idx) = frag.Position.z;
                 renderTarget.SetPixel(uint2(x, y), ps(frag, cb, *tt));
             }
