@@ -6,6 +6,68 @@ SOFTX_BEGIN
 
 namespace RasterizerCommon
 {
+    // ── Morton order (Z-order curve) ─────────────────────────────────────────────
+    //
+    // Interleaves bits of x into even positions: b3b2b1b0 → 0b3 0b2 0b1 0b0
+    // Used to encode 2D pixel coordinates into a 1D Morton code such that
+    // spatially adjacent pixels have nearby codes — improving cache locality.
+    //
+    inline uint32_t Part1By1(uint32_t x)
+    {
+        x &= 0x0000ffff;
+        x = (x ^ (x << 8)) & 0x00ff00ff;
+        x = (x ^ (x << 4)) & 0x0f0f0f0f;
+        x = (x ^ (x << 2)) & 0x33333333;
+        x = (x ^ (x << 1)) & 0x55555555;
+        return x;
+    }
+
+    // Compacts even bit positions back: 0b3 0b2 0b1 0b0 → b3b2b1b0
+    inline uint32_t Compact1By1(uint32_t x)
+    {
+        x &= 0x55555555;
+        x = (x ^ (x >> 1)) & 0x33333333;
+        x = (x ^ (x >> 2)) & 0x0f0f0f0f;
+        x = (x ^ (x >> 4)) & 0x00ff00ff;
+        x = (x ^ (x >> 8)) & 0x0000ffff;
+        return x;
+    }
+
+    // Encodes 2D coordinates into a Morton code (Z-order)
+    inline uint32_t EncodeMorton2(uint32_t x, uint32_t y)
+    {
+        return (Part1By1(y) << 1) | Part1By1(x);
+    }
+
+    inline uint32_t DecodeMorton2X(uint32_t code)
+    {
+        return Compact1By1(code);
+    }
+    inline uint32_t DecodeMorton2Y(uint32_t code)
+    {
+        return Compact1By1(code >> 1);
+    }
+
+    // Smallest power of two >= x
+    inline uint32_t NextPow2(uint32_t x)
+    {
+        if (x <= 1)
+            return 1;
+        --x;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x |= x >> 8;
+        x |= x >> 16;
+        return ++x;
+    }
+
+    // Bounding box side limit for Morton traversal.
+    // Morton is beneficial when the bbox is roughly square and fits in L1 cache:
+    //   side=32 → max 1024 Morton codes → ~4KB of pixel data (fits in L1).
+    // For larger or very non-square bboxes, scanline is more efficient.
+    static constexpr uint MORTON_MAX_SIDE = 32;
+
     // ─── Fixed-point sub-pixel rasterisation (28.4) ───────────────────────────
     //
     // Edge function at pixel P for edge A → B:
