@@ -2,9 +2,9 @@
 
 #include <ppl.h>
 
+#include "RasterizerCommon.h"
 #include <SoftX/SoftX.h>
 #include <SoftX/ThreadPoolManager.h>
-#include "RasterizerCommon.h"
 
 //#define DEBUG_TILING
 
@@ -12,43 +12,48 @@ SOFTX_BEGIN
 
 void DeviceContext::DrawPoint(uint x, uint y, float z, const float4& color)
 {
-    IRenderTarget* rt = m_RenderTarget;
-    if (!rt) return;
-
-    if (!m_DepthBuffer)
-		return;
-
-    if (x < 0 || x >= rt->Width() || y < 0 || y >= rt->Height())
+    IRenderTarget* rt = renderTarget;
+    if (!rt)
         return;
-    int idx = y * rt->Width() + x;
-    if (z < m_DepthBuffer->At(idx))
+
+    if (!depthBuffer)
+        return;
+
+    if (x >= rt->Width() || y >= rt->Height())
+        return;
+
+    uint idx = y * rt->Width() + x;
+    if (z < depthBuffer->At(idx))
     {
-		m_DepthBuffer->At(idx) = z;
+        depthBuffer->At(idx) = z;
         rt->SetPixel(uint2(x, y), color);
     }
 }
 
 void DeviceContext::DrawLine(uint x0, uint y0, uint x1, uint y1, float z0, float z1, const float4& color)
 {
-    IRenderTarget* rt = m_RenderTarget;
-    if (!rt) return;
+    IRenderTarget* rt = renderTarget;
+    if (!rt)
+        return;
 
-    if (!m_DepthBuffer)
-		return;
+    if (!depthBuffer)
+        return;
 
-    uint dx = std::abs((int)x1 - (int)x0);
-    uint dy = -std::abs((int)y1 - (int)y0);
+    int dx = std::abs((int)x1 - (int)x0);
+    int dy = -std::abs((int)y1 - (int)y0);
     int sx = (x0 < x1) ? 1 : -1;
     int sy = (y0 < y1) ? 1 : -1;
-    uint err = dx + dy;
-    int steps = std::max((int)dx, -(int)dy);
+    int err = dx + dy;
+    int steps = std::max(dx, -dy);
     float zStep = (steps > 0) ? (z1 - z0) / steps : 0.0f;
     float z = z0;
     uint x = x0, y = y0;
+
     for (int i = 0; i <= steps; ++i)
     {
         DrawPoint(x, y, z, color);
-        uint e2 = 2u * err;
+
+        int e2 = 2 * err;
         if (e2 >= dy)
         {
             err += dy;
@@ -67,51 +72,53 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
     PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
-    if (!m_VertexShader || !m_PixelShader ||
-        m_VertexBuffer.IsEmpty() || m_IndexBuffer.IsEmpty() ||
-        !m_RenderTarget || !m_DepthBuffer)
+    if (!vertexShader || !pixelShader || vertexBuffer.IsEmpty() || indexBuffer.IsEmpty() || !renderTarget ||
+        !depthBuffer)
         return;
 
-    // ── Step 1: VS → clip space (без perspective divide) ─────────────────
+    // Step 1: VS → clip space (without perspective divide)
     std::vector<uint> uniqueIndices;
     {
-        std::vector<bool> visited(m_VertexBuffer.Size(), false);
+        std::vector<bool> visited(vertexBuffer.Size(), false);
         for (uint i = startIndex; i < startIndex + indexCount; ++i)
         {
-            uint idx = m_IndexBuffer.GetByIndex(i);
-            if (!visited[idx]) { visited[idx] = true; uniqueIndices.push_back(idx); }
+            uint idx = indexBuffer.GetByIndex(i);
+            if (!visited[idx])
+            {
+                visited[idx] = true;
+                uniqueIndices.push_back(idx);
+            }
         }
     }
 
-    std::vector<VertexOutput> clipVerts(m_VertexBuffer.Size());
+    std::vector<VertexOutput> clipVerts(vertexBuffer.Size());
     concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(),
-        [&](uint idx) {
-            // Только VS — ClipSpaceToScreenSpace пока НЕ вызываем
-            clipVerts[idx] = m_VertexShader(m_VertexBuffer.GetByIndex(idx), m_ConstantBuffer, m_TextureTable);
-        });
+                                   [&](uint idx)
+                                   {
+                                       // Only VS — ClipSpaceToScreenSpace not called yet
+                                       clipVerts[idx] =
+                                           vertexShader(vertexBuffer.GetByIndex(idx), constantBuffer, textureTable);
+                                   });
 
-    // ── Step 2: Собрать исходные треугольники ─────────────────────────────
+    // Step 2: Gather source triangles
     std::vector<int3> sourceTriangles;
     for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
     {
-        sourceTriangles.push_back({
-            (int)m_IndexBuffer.GetByIndex(i),
-            (int)m_IndexBuffer.GetByIndex(i + 1),
-            (int)m_IndexBuffer.GetByIndex(i + 2)
-        });
+        sourceTriangles.push_back(
+            {(int)indexBuffer.GetByIndex(i), (int)indexBuffer.GetByIndex(i + 1), (int)indexBuffer.GetByIndex(i + 2)});
     }
 
-    // ── Step 3: Near plane clipping в clip space ──────────────────────────
+    // Step 3: Near plane clipping in clip space
     std::vector<VertexOutput> finalVerts;
-    std::vector<int3>         finalTriangles;
+    std::vector<int3> finalTriangles;
     finalVerts.reserve(sourceTriangles.size() * 3);
     finalTriangles.reserve(sourceTriangles.size() * 2);
 
     for (const auto& tri : sourceTriangles)
     {
         VertexOutput clipped[2][3];
-        int numTris = RasterizerCommon::ClipTriangleNearPlane(
-            clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
+        int numTris =
+            RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
 
         for (int t = 0; t < numTris; ++t)
         {
@@ -119,68 +126,56 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
             finalVerts.push_back(clipped[t][0]);
             finalVerts.push_back(clipped[t][1]);
             finalVerts.push_back(clipped[t][2]);
-            finalTriangles.push_back({ base, base + 1, base + 2 });
+            finalTriangles.push_back({base, base + 1, base + 2});
         }
     }
 
-    if (finalTriangles.empty()) return;
+    if (finalTriangles.empty())
+        return;
 
-    // ── Step 4: Perspective divide на выживших вершинах ───────────────────
+    // Step 4: Perspective divide on surviving vertices
     for (auto& v : finalVerts)
-        RasterizerCommon::ClipSpaceToScreenSpace(v, m_Viewport);
+        RasterizerCommon::ClipSpaceToScreenSpace(v, viewport);
 
-    // ── Step 5: Geometry shader (на screen-space вершинах, как раньше) ────
-    if (m_GeometryShader)
+    // Step 5: Geometry shader (on screen-space vertices)
+    if (geometryShader)
     {
         std::vector<VertexOutput> gsVerts;
-        std::vector<int3>         gsTriangles;
+        std::vector<int3> gsTriangles;
 
         for (const auto& tri : finalTriangles)
         {
-            VertexOutput inVerts[3] = {
-                finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z]
-            };
+            VertexOutput inVerts[3] = {finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z]};
             std::vector<VertexOutput> outVerts;
-            std::vector<int>          outIndices;
-			m_GeometryShader(inVerts, outVerts, outIndices, m_TextureTable);
+            std::vector<int> outIndices;
+            geometryShader(inVerts, outVerts, outIndices, textureTable);
 
             int base = (int)gsVerts.size();
             gsVerts.insert(gsVerts.end(), outVerts.begin(), outVerts.end());
             for (size_t j = 0; j + 2 < outIndices.size(); j += 3)
-                gsTriangles.push_back({
-                    base + outIndices[j],
-                    base + outIndices[j + 1],
-                    base + outIndices[j + 2]
-                });
+                gsTriangles.push_back({base + outIndices[j], base + outIndices[j + 1], base + outIndices[j + 2]});
         }
-        finalVerts      = std::move(gsVerts);
-        finalTriangles  = std::move(gsTriangles);
+        finalVerts = std::move(gsVerts);
+        finalTriangles = std::move(gsTriangles);
     }
 
-    // ── Step 6: Рендер ────────────────────────────────────────────────────
-    if (m_fillMode == FillMode::Solid)
+    // Step 6: Render
+    if (fillMode == FillMode::Solid)
     {
         RasterizerState state;
-        state.cullMode = m_cullMode;
-        state.fillMode = m_fillMode;
-        state.depthFunc = m_depthFunc;
+        state.cullMode = cullMode;
+        state.fillMode = fillMode;
+        state.depthFunc = depthFunc;
 
-        Renderer renderer(
-            *m_Rasterizer, 
-            *m_RenderTarget, 
-            *m_DepthBuffer,
-            m_PixelShader, 
-            m_ConstantBuffer,
-            &m_TextureTable,
-            state, 
-            m_TileSize);
+        Renderer renderer(*rasterizer, *renderTarget, *depthBuffer, pixelShader, constantBuffer, &textureTable, state,
+                          tileSize);
         renderer.Execute(finalVerts, finalTriangles);
 
 #ifdef DEBUG_TILING
         DrawActiveTileBorders(renderer.GetTiles());
 #endif
     }
-    else if (m_fillMode == FillMode::Wireframe)
+    else if (fillMode == FillMode::Wireframe)
     {
         float4 wireColor(1, 1, 1, 1);
         for (const auto& tri : finalTriangles)
@@ -188,113 +183,110 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
             const auto& v0 = finalVerts[tri.x];
             const auto& v1 = finalVerts[tri.y];
             const auto& v2 = finalVerts[tri.z];
-            DrawLine((int)round(v0.Position.x), (int)round(v0.Position.y),
-                     (int)round(v1.Position.x), (int)round(v1.Position.y),
-                     v0.Position.z, v1.Position.z, wireColor);
-            DrawLine((int)round(v1.Position.x), (int)round(v1.Position.y),
-                     (int)round(v2.Position.x), (int)round(v2.Position.y),
-                     v1.Position.z, v2.Position.z, wireColor);
-            DrawLine((int)round(v2.Position.x), (int)round(v2.Position.y),
-                     (int)round(v0.Position.x), (int)round(v0.Position.y),
-                     v2.Position.z, v0.Position.z, wireColor);
+            DrawLine((uint)round(v0.Position.x), (uint)round(v0.Position.y), (uint)round(v1.Position.x),
+                     (uint)round(v1.Position.y), v0.Position.z, v1.Position.z, wireColor);
+            DrawLine((uint)round(v1.Position.x), (uint)round(v1.Position.y), (uint)round(v2.Position.x),
+                     (uint)round(v2.Position.y), v1.Position.z, v2.Position.z, wireColor);
+            DrawLine((uint)round(v2.Position.x), (uint)round(v2.Position.y), (uint)round(v0.Position.x),
+                     (uint)round(v0.Position.y), v2.Position.z, v0.Position.z, wireColor);
         }
     }
-    else if (m_fillMode == FillMode::Point)
+    else if (fillMode == FillMode::Point)
     {
         std::vector<bool> drawn(finalVerts.size(), false);
         for (const auto& tri : finalTriangles)
-            for (int idx : { tri.x, tri.y, tri.z })
+            for (int idx : {tri.x, tri.y, tri.z})
                 if (!drawn[idx])
                 {
                     drawn[idx] = true;
                     const auto& v = finalVerts[idx];
-                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y),
-                              v.Position.z, v.Color);
+                    DrawPoint((uint)round(v.Position.x), (uint)round(v.Position.y), v.Position.z, v.Color);
                 }
     }
 }
 
 void DeviceContext::DrawIndexed()
 {
-    uint count = (uint)m_IndexBuffer.Size();
-	DrawIndexed(count, 0);
+    uint count = (uint)indexBuffer.Size();
+    DrawIndexed(count, 0);
 }
 
-void DeviceContext::renderTileQuad(const Tile& tile, float invW, float invH)
+void DeviceContext::RenderTileQuad(const Tile& tile, float invW, float invH)
 {
-	PROFILE_SCOPE("DeviceContext::renderTileQuad");
-	IRenderTarget* rt = m_RenderTarget;
-	if (!rt)
-		return;
+    PROFILE_SCOPE("DeviceContext::RenderTileQuad");
+    IRenderTarget* rt = renderTarget;
+    if (!rt)
+        return;
 
-	VertexOutput input = {};
-	auto ps = m_PixelShader;
-	auto cb = m_ConstantBuffer;
-	auto tt = m_TextureTable;
+    VertexOutput input = {};
+    auto ps = pixelShader;
+    auto cb = constantBuffer;
+    auto tt = textureTable;
 
-	for (uint y = tile.min.y; y <= (uint)tile.max.y; ++y)
-	{
-		float v = y * invH;
+    for (uint y = tile.min.y; y <= (uint)tile.max.y; ++y)
+    {
+        float v = y * invH;
         for (uint x = tile.min.x; x <= (uint)tile.max.x; ++x)
-		{
-			float u = x * invW;
-			input.UV = float2(u, v);
-			float4 color = ps(input, cb, tt);
-			rt->SetPixel(uint2(x, y), color);
-		}
-	}
+        {
+            float u = x * invW;
+            input.UV = float2(u, v);
+            float4 color = ps(input, cb, tt);
+            rt->SetPixel(uint2(x, y), color);
+        }
+    }
 }
 
 void DeviceContext::DrawFullScreenQuad()
 {
-	PROFILE_SCOPE("DeviceContext::DrawFullScreenQuad");
+    PROFILE_SCOPE("DeviceContext::DrawFullScreenQuad");
 
-	if (!m_PixelShader || !m_RenderTarget)
-		return;
+    if (!pixelShader || !renderTarget)
+        return;
 
-	IRenderTarget* rt = m_RenderTarget;
-	int w = rt->Width();
-	int h = rt->Height();
-	float invW = 1.0f / (w - 1);
-	float invH = 1.0f / (h - 1);
+    IRenderTarget* rt = renderTarget;
+    int w = rt->Width();
+    int h = rt->Height();
+    float invW = 1.0f / (w - 1);
+    float invH = 1.0f / (h - 1);
 
-	// Строим тайлы локально — TiledRenderer здесь не нужен,
-	// renderTileQuad не работает с треугольниками.
-	std::vector<Tile> tiles;
-	{
-		int ts = m_TileSize;
-		int tilesX = (w + ts - 1) / ts;
-		int tilesY = (h + ts - 1) / ts;
+    // Build tiles locally — TiledRenderer not used here,
+    // RenderTileQuad does not work with triangles.
+    std::vector<Tile> tiles;
+    {
+        int ts = tileSize;
+        int tilesX = (w + ts - 1) / ts;
+        int tilesY = (h + ts - 1) / ts;
         tiles.reserve(tilesX * tilesY);
-		for (int ty = 0; ty < tilesY; ++ty)
-			for (int tx = 0; tx < tilesX; ++tx)
-			{
-				int2 mn(tx * ts, ty * ts);
-				int2 mx(std::min((tx + 1) * ts - 1, w - 1), std::min((ty + 1) * ts - 1, h - 1));
-				tiles.emplace_back(mn, mx);
-			}
-	}
+        for (int ty = 0; ty < tilesY; ++ty)
+            for (int tx = 0; tx < tilesX; ++tx)
+            {
+                int2 mn(tx * ts, ty * ts);
+                int2 mx(std::min((tx + 1) * ts - 1, w - 1), std::min((ty + 1) * ts - 1, h - 1));
+                tiles.emplace_back(mn, mx);
+            }
+    }
 
-	int numTiles = (int)tiles.size();
-	std::atomic<int> tileIndex(0);
+    int numTiles = (int)tiles.size();
+    std::atomic<int> tileIndex(0);
 
-	auto worker = [this, &tiles, invW, invH, &tileIndex, numTiles]() {
-		while (true)
-		{
-			int idx = tileIndex.fetch_add(1);
-			if (idx >= numTiles)
-				break;
-			renderTileQuad(tiles[idx], invW, invH);
-		}
-	};
+    auto worker = [this, &tiles, invW, invH, &tileIndex, numTiles]()
+    {
+        while (true)
+        {
+            int idx = tileIndex.fetch_add(1);
+            if (idx >= numTiles)
+                break;
+            RenderTileQuad(tiles[idx], invW, invH);
+        }
+    };
 
-	auto& pool = ThreadPoolManager::Get();
-	for (int i = 0; i < (int)pool.threadCount(); ++i)
-		pool.enqueue(worker);
-	pool.wait();
+    auto& pool = ThreadPoolManager::Get();
+    for (int i = 0; i < (int)pool.threadCount(); ++i)
+        pool.enqueue(worker);
+    pool.wait();
 
 #ifdef DEBUG_TILING
-	DrawActiveTileBorders(tiles);
+    DrawActiveTileBorders(tiles);
 #endif
 }
 

@@ -202,7 +202,7 @@ void DrawFrame()
 	// Передаём aspect явно в perspective чтобы избежать сплющивания.
 	// Если сигнатура твоей функции perspective(fovY, aspect) —
 	// проверь что aspect применяется к X, а не Y.
-	float4x4 projection = perspective(Constants::degrees_to_radians(30.0f), aspect);
+	float4x4 projection = perspective(Constants::degrees_to_radians(60.0f), aspect);
 
 	float3 eye(0.0f, 0.0f, -10.0f);
 	float3 target(0.0f, 0.0f, 1.0f);
@@ -291,13 +291,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
 	VertexBuffer vb;
 	IndexBuffer ib;
-	CreateSphere(vb, ib, 1.0f, 64, 32);
+	CreateSphere(vb, ib, 2.0f, 64, 32);
 
 	ctx.SetVertexBuffer(vb);
 	ctx.SetIndexBuffer(ib);
 	ctx.SetVertexShader(TransformVS);
 	ctx.SetCullMode(CullMode::Back);
-	ctx.SetTileSize(128);
+	ctx.SetTileSize(16);
 
 	// ── Message loop ─────────────────────────────────────────
 	MSG msg = {};
@@ -353,7 +353,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			VertexBuffer vb;
 			IndexBuffer ib;
 			if (isSphere)
-				CreateSphere(vb, ib, 1.0f, 64, 32);
+				CreateSphere(vb, ib, 2.0f, 64, 32);
 			else
 				CreateCube(vb, ib, 2.0f);
 			DeviceContext& ctx = g_device->GetImmediateContext();

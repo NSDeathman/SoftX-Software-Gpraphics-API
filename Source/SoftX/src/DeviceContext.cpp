@@ -4,20 +4,20 @@
 
 SOFTX_BEGIN
 
-DeviceContext::DeviceContext() : 
-	m_VertexShader(nullptr), 
-	m_PixelShader(nullptr), 
-	m_VertexBuffer(), 
-	m_IndexBuffer(), 
-	m_ConstantBuffer(),
-	m_RenderTarget(nullptr), 
-	m_OwnDepthBuffer(nullptr),
-	m_DepthBuffer(nullptr),
-	m_cullMode(CullMode::Back), 
-	m_fillMode(FillMode::Solid), 
-	m_Viewport(),
-	m_TileSize(64),
-	m_Rasterizer(CreateBestRasterizer())
+DeviceContext::DeviceContext()
+    : vertexShader(nullptr),
+      pixelShader(nullptr),
+      vertexBuffer(),
+      indexBuffer(),
+      constantBuffer(),
+      renderTarget(nullptr),
+      ownDepthBuffer(nullptr),
+      depthBuffer(nullptr),
+      cullMode(CullMode::Back),
+      fillMode(FillMode::Solid),
+      viewport(),
+      tileSize(64),
+      rasterizer(CreateBestRasterizer())
 {
 }
 
@@ -25,228 +25,228 @@ DeviceContext::~DeviceContext() = default;
 
 void DeviceContext::SetVertexShader(VertexShader shader)
 {
-	m_VertexShader = std::move(shader);
+    vertexShader = std::move(shader);
 }
 
 VertexShader DeviceContext::GetVertexShader() const
 {
-	return m_VertexShader;
+    return vertexShader;
 }
 
 void DeviceContext::SetGeometryShader(GeometryShader shader)
 {
-	m_GeometryShader = std::move(shader);
+    geometryShader = std::move(shader);
 }
 
 GeometryShader DeviceContext::GetGeometryShader() const
 {
-	return m_GeometryShader;
+    return geometryShader;
 }
 
 void DeviceContext::SetPixelShader(PixelShader shader)
 {
-	m_PixelShader = std::move(shader);
+    pixelShader = std::move(shader);
 }
 
 PixelShader DeviceContext::GetPixelShader() const
 {
-	return m_PixelShader;
+    return pixelShader;
 }
 
 void DeviceContext::SetVertexBuffer(const VertexBuffer& buffer)
 {
-	m_VertexBuffer = buffer;
+    vertexBuffer = buffer;
 }
 
 VertexBuffer DeviceContext::GetVertexBuffer() const
 {
-	return m_VertexBuffer;
+    return vertexBuffer;
 }
 
 void DeviceContext::SetIndexBuffer(const IndexBuffer& buffer)
 {
-	m_IndexBuffer = buffer;
+    indexBuffer = buffer;
 }
 
 IndexBuffer DeviceContext::GetIndexBuffer() const
 {
-	return m_IndexBuffer;
+    return indexBuffer;
 }
 
 void DeviceContext::SetConstantBuffer(const ConstantBuffer& buffer)
 {
-	m_ConstantBuffer = buffer;
+    constantBuffer = buffer;
 }
 
 ConstantBuffer DeviceContext::GetConstantBuffer() const
 {
-	return m_ConstantBuffer;
+    return constantBuffer;
 }
 
 void DeviceContext::SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler)
 {
-	assert(slot >= 0 && slot < MAX_TEXTURE_SLOTS);
-	auto& b = m_TextureTable[slot];
-	b.SetTexture(texture);
-	b.SetSemplerState(sampler);
+    assert(slot >= 0 && slot < MAX_TEXTURE_SLOTS);
+    auto& b = textureTable[slot];
+    b.SetTexture(texture);
+    b.SetSemplerState(sampler);
 }
 
 void DeviceContext::SetRenderTarget(IRenderTarget* target)
 {
-	m_RenderTarget = target;
+    renderTarget = target;
 }
 
 IRenderTarget* DeviceContext::GetRenderTarget() const
 {
-	return m_RenderTarget;
+    return renderTarget;
 }
 
-void DeviceContext::SetDepthBuffer(DepthBuffer* depthBuffer)
+void DeviceContext::SetDepthBuffer(DepthBuffer* dpthBuffer)
 {
-	m_DepthBuffer = depthBuffer;
+    this->depthBuffer = dpthBuffer;
 }
 
 DepthBuffer* DeviceContext::GetDepthBuffer() const
 {
-	return m_DepthBuffer;
+    return depthBuffer;
 }
 
 void DeviceContext::SetRenderTarget(IRenderTarget* rt, bool createDepthBuffer)
 {
-	m_RenderTarget = rt;
-	if (createDepthBuffer && rt)
-	{
-		uint2 newSize = rt->Size();
-		if (!m_OwnDepthBuffer || m_OwnDepthBuffer->Size() != newSize)
-		{
-			m_OwnDepthBuffer = std::make_unique<DepthBuffer>(newSize);
-		}
-		m_DepthBuffer = m_OwnDepthBuffer.get();
-	}
-	else
-	{
-		m_DepthBuffer = nullptr;
-	}
+    renderTarget = rt;
+    if (createDepthBuffer && rt)
+    {
+        uint2 newSize = rt->Size();
+        if (!ownDepthBuffer || ownDepthBuffer->Size() != newSize)
+        {
+            ownDepthBuffer = std::make_unique<DepthBuffer>(newSize);
+        }
+        depthBuffer = ownDepthBuffer.get();
+    }
+    else
+    {
+        depthBuffer = nullptr;
+    }
 }
 
 void DeviceContext::Clear(const float4& color)
 {
-	PROFILE_SCOPE("DeviceContext::Clear");
+    PROFILE_SCOPE("DeviceContext::Clear");
 
-	if (m_RenderTarget)
-	{
-		m_RenderTarget->Clear(color);
-	}
+    if (renderTarget)
+    {
+        renderTarget->Clear(color);
+    }
 }
 
 void DeviceContext::ClearDepth(float depth)
 {
-	PROFILE_SCOPE("DeviceContext::ClearDepth");
+    PROFILE_SCOPE("DeviceContext::ClearDepth");
 
-	if (m_DepthBuffer)
-	{
-		m_DepthBuffer->Clear(depth);
-	}
+    if (depthBuffer)
+    {
+        depthBuffer->Clear(depth);
+    }
 }
 
 void DeviceContext::SetCullMode(CullMode mode)
 {
-	m_cullMode = mode;
+    cullMode = mode;
 }
 
 CullMode DeviceContext::GetCullMode() const
 {
-	return m_cullMode;
+    return cullMode;
 }
 
 void DeviceContext::SetFillMode(FillMode mode)
 {
-	m_fillMode = mode;
+    fillMode = mode;
 }
 
 FillMode DeviceContext::GetFillMode() const
 {
-	return m_fillMode;
+    return fillMode;
 }
 
 void DeviceContext::SetDepthFunc(ComparisonFunc func)
 {
-	m_depthFunc = func;
+    depthFunc = func;
 }
 
 ComparisonFunc DeviceContext::GetDepthFunc() const
 {
-	return m_depthFunc;
+    return depthFunc;
 }
 
 void DeviceContext::SetViewport(const Viewport& vp)
 {
-	m_Viewport = vp;
+    viewport = vp;
 }
 
 Viewport DeviceContext::GetViewport() const
 {
-	return m_Viewport;
+    return viewport;
 }
 
 void DeviceContext::SetTileSize(uint size)
 {
-	m_TileSize = size;
+    tileSize = size;
 }
 
 uint DeviceContext::GetTileSize() const
 {
-	return m_TileSize;
+    return tileSize;
 }
 
 bool DeviceContext::Validate(std::string* errorMsg) const
 {
-	bool bCheckResult = true;
+    bool result = true;
 
-	if (!m_VertexShader)
-	{
-		if (errorMsg)
-			*errorMsg = "Vertex shader not set ";
-		bCheckResult = false;
-	}
-	if (!m_PixelShader)
-	{
-		if (errorMsg)
-			*errorMsg += "Pixel shader not set ";
-		bCheckResult = false;
-	}
-	if (m_VertexBuffer.IsEmpty())
-	{
-		if (errorMsg)
-			*errorMsg += "Vertex buffer is empty ";
-		bCheckResult = false;
-	}
-	if (m_IndexBuffer.IsEmpty())
-	{
-		if (errorMsg)
-			*errorMsg += "Index buffer is empty ";
-		bCheckResult = false;
-	}
-	if (m_RenderTarget == nullptr)
-	{
-		if (errorMsg)
-			*errorMsg += "Render target not set ";
-		bCheckResult = false;
-	}
-	if (m_Viewport.size.x <= 0.0f || m_Viewport.size.y <= 0.0f)
-	{
-		if (errorMsg)
-			*errorMsg += "Viewport has non-positive size ";
-		bCheckResult = false;
-	}
-	if (m_TileSize == 0)
-	{
-		if (errorMsg)
-			*errorMsg += "Tile size is zero ";
-		bCheckResult = false;
-	}
+    if (!vertexShader)
+    {
+        if (errorMsg)
+            *errorMsg = "Vertex shader not set ";
+        result = false;
+    }
+    if (!pixelShader)
+    {
+        if (errorMsg)
+            *errorMsg += "Pixel shader not set ";
+        result = false;
+    }
+    if (vertexBuffer.IsEmpty())
+    {
+        if (errorMsg)
+            *errorMsg += "Vertex buffer is empty ";
+        result = false;
+    }
+    if (indexBuffer.IsEmpty())
+    {
+        if (errorMsg)
+            *errorMsg += "Index buffer is empty ";
+        result = false;
+    }
+    if (renderTarget == nullptr)
+    {
+        if (errorMsg)
+            *errorMsg += "Render target not set ";
+        result = false;
+    }
+    if (viewport.size.x <= 0.0f || viewport.size.y <= 0.0f)
+    {
+        if (errorMsg)
+            *errorMsg += "Viewport has non-positive size ";
+        result = false;
+    }
+    if (tileSize == 0)
+    {
+        if (errorMsg)
+            *errorMsg += "Tile size is zero ";
+        result = false;
+    }
 
-	return bCheckResult;
+    return result;
 }
 
 SOFTX_END

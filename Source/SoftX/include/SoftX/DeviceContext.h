@@ -1,107 +1,107 @@
 ﻿#pragma once
 
-#include "ThirdPartyIncluding.h"
 #include "LibInternal.h"
-#include "Types.h"
-#include "RenderTargetInterface.h"
 #include "RasterizerInterface.h"
+#include "RenderTargetInterface.h"
+#include "ThirdPartyIncluding.h"
+#include "Types.h"
 
 SOFTX_BEGIN
 
 class SOFTX_API DeviceContext
 {
-  public:
-	DeviceContext();
-	~DeviceContext();
+public:
+    DeviceContext();
+    ~DeviceContext();
 
-	DeviceContext(DeviceContext&&) = default;
-	DeviceContext& operator=(DeviceContext&&) = default;
+    DeviceContext(DeviceContext&&) = default;
+    DeviceContext& operator=(DeviceContext&&) = default;
 
-	void SetVertexShader(VertexShader shader);
-	VertexShader GetVertexShader() const;
+    void SetVertexShader(VertexShader shader);
+    VertexShader GetVertexShader() const;
 
-	void SetGeometryShader(GeometryShader shader);
-	GeometryShader GetGeometryShader() const;
+    void SetGeometryShader(GeometryShader shader);
+    GeometryShader GetGeometryShader() const;
 
-	void SetPixelShader(PixelShader shader);
-	PixelShader GetPixelShader() const;
+    void SetPixelShader(PixelShader shader);
+    PixelShader GetPixelShader() const;
 
-	void SetVertexBuffer(const VertexBuffer& buffer);
-	VertexBuffer GetVertexBuffer() const;
+    void SetVertexBuffer(const VertexBuffer& buffer);
+    VertexBuffer GetVertexBuffer() const;
 
-	void SetIndexBuffer(const IndexBuffer& buffer);
-	IndexBuffer GetIndexBuffer() const;
+    void SetIndexBuffer(const IndexBuffer& buffer);
+    IndexBuffer GetIndexBuffer() const;
 
-	void SetConstantBuffer(const ConstantBuffer& buffer);
-	ConstantBuffer GetConstantBuffer() const;
+    void SetConstantBuffer(const ConstantBuffer& buffer);
+    ConstantBuffer GetConstantBuffer() const;
 
-	void SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{});
+    void SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{});
 
-	void SetRenderTarget(IRenderTarget* target);
-	void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);
-	IRenderTarget* GetRenderTarget() const;
+    void SetRenderTarget(IRenderTarget* target);
+    void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);
+    IRenderTarget* GetRenderTarget() const;
 
-	// Методы для управления depth buffer
-	void SetDepthBuffer(DepthBuffer* depthBuffer);
-	DepthBuffer* GetDepthBuffer() const;
+    // Depth buffer management methods
+    void SetDepthBuffer(DepthBuffer* depthBuffer);
+    DepthBuffer* GetDepthBuffer() const;
 
-	void Clear(const float4& color);
-	void ClearDepth(float depth = 1.0f);
+    void Clear(const float4& color);
+    void ClearDepth(float depth = 1.0f);
 
-	void SetCullMode(CullMode mode);
-	CullMode GetCullMode() const;
+    void SetCullMode(CullMode mode);
+    CullMode GetCullMode() const;
 
-	void SetFillMode(FillMode mode);
-	FillMode GetFillMode() const;
+    void SetFillMode(FillMode mode);
+    FillMode GetFillMode() const;
 
-	void SetDepthFunc(ComparisonFunc func);
-	ComparisonFunc GetDepthFunc() const;
+    void SetDepthFunc(ComparisonFunc func);
+    ComparisonFunc GetDepthFunc() const;
 
-	void SetViewport(const Viewport& vp);
-	Viewport GetViewport() const;
+    void SetViewport(const Viewport& vp);
+    Viewport GetViewport() const;
 
-	void SetTileSize(uint size);
+    void SetTileSize(uint size);
     uint GetTileSize() const;
 
-	bool Validate(std::string* errorMsg = nullptr) const;
+    bool Validate(std::string* errorMsg = nullptr) const;
 
-	void DrawIndexed(uint indexCount, uint startIndex);
-	void DrawIndexed();
+    void DrawIndexed(uint indexCount, uint startIndex);
+    void DrawIndexed();
 
-	void DrawFullScreenQuad();
+    void DrawFullScreenQuad();
 
-  private:
-	VertexShader m_VertexShader;
-	GeometryShader m_GeometryShader;
-	PixelShader m_PixelShader;
-
-	VertexBuffer m_VertexBuffer;
-	IndexBuffer m_IndexBuffer;
-	ConstantBuffer m_ConstantBuffer;
-	TextureTable m_TextureTable;
-
-	std::unique_ptr<DepthBuffer> m_OwnDepthBuffer;
-	DepthBuffer* m_DepthBuffer;
-	IRenderTarget* m_RenderTarget;
-
-	std::unique_ptr<IRasterizer> m_Rasterizer;
-
-	CullMode m_cullMode = CullMode::Back;
-	FillMode m_fillMode = FillMode::Solid;
-	ComparisonFunc m_depthFunc = ComparisonFunc::Less;
-
-	Viewport m_Viewport;
-
-	uint32_t m_TileSize;
-
-	void renderTileQuad(const Tile& tile, float invW, float invH);
-
-	void DrawPoint(uint x, uint y, float z, const float4& color);
+private:
+    // Private methods (all PascalCase)
+    void RenderTileQuad(const Tile& tile, float invW, float invH);
+    void DrawPoint(uint x, uint y, float z, const float4& color);
     void DrawLine(uint x0, uint y0, uint x1, uint y1, float z0, float z1, const float4& color);
+    void DrawDebugLine(uint x0, uint y0, uint x1, uint y1, const float4& color);
+    void DrawTileBorders();
+    void DrawActiveTileBorders(const std::vector<Tile>& tiles);
 
-	void DrawDebugLine(uint x0, uint y0, uint x1, uint y1, const float4& color);
-	void DrawTileBorders();
-	void DrawActiveTileBorders(const std::vector<Tile>& tiles);
+    // Fields (camelCase, no m_ prefix)
+    VertexShader vertexShader;
+    GeometryShader geometryShader;
+    PixelShader pixelShader;
+
+    VertexBuffer vertexBuffer;
+    IndexBuffer indexBuffer;
+    ConstantBuffer constantBuffer;
+    TextureTable textureTable;
+
+    std::unique_ptr<DepthBuffer> ownDepthBuffer;
+    DepthBuffer* depthBuffer;
+    IRenderTarget* renderTarget;
+
+    std::unique_ptr<IRasterizer> rasterizer;
+
+    CullMode cullMode = CullMode::Back;
+    FillMode fillMode = FillMode::Solid;
+    ComparisonFunc depthFunc = ComparisonFunc::Less;
+
+    Viewport viewport;
+
+    uint tileSize;
 };
 
 SOFTX_END
