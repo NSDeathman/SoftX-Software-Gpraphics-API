@@ -304,7 +304,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetPixelShader(CheckerPS);
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
-    ctx.SetTileSize(128);
+    ctx.SetTileSize(64);
 
     // Message loop
     MSG msg = {};
