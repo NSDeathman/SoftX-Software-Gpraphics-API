@@ -69,3 +69,12 @@ Supported platforms: x86 and x64.
 SoftX is open‑source software released under the MIT License. See LICENSE for details.
 
 For more information, please refer to the CONTRIBUTING guide and the example projects.
+
+<img width="1280" height="644" alt="image" src="https://github.com/user-attachments/assets/c89fe404-5621-4429-8524-4c398c8fead1" />
+<img width="1277" height="767" alt="image" src="https://github.com/user-attachments/assets/2ce43b0a-4633-46e0-a9db-697548149b29" />
+<img width="1280" height="575" alt="image" src="https://github.com/user-attachments/assets/7c6418e6-8805-4ca0-bb69-bd5d71b9f05a" />
+<img width="1280" height="692" alt="image" src="https://github.com/user-attachments/assets/fe3d189a-ed8f-4472-b351-448199613bda" />
+<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/3a78586a-91f4-450b-bd63-0112bc924b61" />
+
+
+
