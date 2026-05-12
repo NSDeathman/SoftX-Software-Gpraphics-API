@@ -17,8 +17,8 @@ using namespace AfterMath;
 static constexpr int WINDOW_WIDTH  = 1280;
 static constexpr int WINDOW_HEIGHT = 720;
 
-static constexpr int CHECKER_SIZE  = 512;
-static constexpr int CHECKER_CELLS = 8;
+static constexpr int CHECKER_SIZE  = 1024;
+static constexpr int CHECKER_CELLS = 16;
 
 // ============================================================
 //  Globals
@@ -296,7 +296,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     // Build sphere geometry
     VertexBuffer vb;
     IndexBuffer  ib;
-    CreateSphere(vb, ib, 2.0f, 64, 32);
+    CreateSphere(vb, ib, 3.0f, 64, 32);
 
     ctx.SetVertexBuffer(vb);
     ctx.SetIndexBuffer(ib);
@@ -305,6 +305,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
     ctx.SetTileSize(64);
+    ctx.SetFillMode(FillMode::Solid);
 
     // Message loop
     MSG msg = {};

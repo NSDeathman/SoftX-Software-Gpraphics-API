@@ -64,10 +64,10 @@ void RasterizerScalar::RasterizeTriangle(
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    uint iMinX = uint(std::max(double(tileMin.x), double(std::floor(minX))));
-    uint iMaxX = uint(std::min(double(tileMax.x), double(std::ceil(maxX))));
-    uint iMinY = uint(std::max(double(tileMin.y), double(std::floor(minY))));
-    uint iMaxY = uint(std::min(double(tileMax.y), double(std::ceil(maxY))));
+    int iMinX = std::max((int)tileMin.x, (int)std::floor(minX));
+    int iMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));
+    int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
+    int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
@@ -202,14 +202,14 @@ void RasterizerScalar::RasterizeTriangle(
         const float invArea2 = 1.0f / float(area2Int);
         (void)invArea2; // used inside ShadeSinglePixel via area2Int
 
-        for (uint y = iMinY; y <= iMaxY;
+        for (int y = iMinY; y <= iMaxY;
              ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
         {
             int64_t f01 = f01Row;
             int64_t f12 = f12Row;
             int64_t f20 = f20Row;
 
-            for (uint x = iMinX; x <= iMaxX;
+            for (int x = iMinX; x <= iMaxX;
                  ++x, f01 += stepX01, f12 += stepX12, f20 += stepX20)
             {
                 // Single branch: OR of sign bits — negative if any f < 0

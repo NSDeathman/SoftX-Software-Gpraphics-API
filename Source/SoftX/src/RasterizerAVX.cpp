@@ -24,10 +24,10 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    uint iMinX = std::max(tileMin.x, (uint)std::floor(minX));
-    uint iMaxX = std::min(tileMax.x, (uint)std::ceil(maxX));
-    uint iMinY = std::max(tileMin.y, (uint)std::floor(minY));
-    uint iMaxY = std::min(tileMax.y, (uint)std::ceil(maxY));
+    int iMinX = std::max((int)tileMin.x, (int)std::floor(minX));
+    int iMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));
+    int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
+    int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
@@ -135,20 +135,20 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
     }
 
     uint width = renderTarget.Width();
-    for (uint y = iMinY; y <= iMaxY; ++y)
+    for (int y = iMinY; y <= iMaxY; ++y)
     {
-        uint x;
+        int x;
         __m256 f01, f12, f20;
 
         // Increment f in the for expression; continue does not break accumulation
         for (x = simdStartX, f01 = f01Row, f12 = f12Row, f20 = f20Row;
-             x + 7u < width && x <= iMaxX - 7u;
+             x + 7 < (int)width && x <= iMaxX - 7;
              x += 8,
              f01 = _mm256_add_ps(f01, f01StepX),
              f12 = _mm256_add_ps(f12, f12StepX),
              f20 = _mm256_add_ps(f20, f20StepX))
         {
-            if (x > tileMax.x || x + 7u < tileMin.x)
+            if (x > (int)tileMax.x || x + 7 < (int)tileMin.x)
                 continue;
 
             // f01/f12/f20 already computed incrementally — 3 adds instead of 6 mul + 6 sub
@@ -240,10 +240,14 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
             alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
             alignas(32) float uArr[8], vArr[8], nxArr[8], nyArr[8], nzArr[8];
             _mm256_store_ps(zArr,  z);
-            _mm256_store_ps(rArr,  r);  _mm256_store_ps(gArr,  g);
-            _mm256_store_ps(bArr,  b);  _mm256_store_ps(aArr,  a);
-            _mm256_store_ps(uArr,  u);  _mm256_store_ps(vArr,  v);
-            _mm256_store_ps(nxArr, nx); _mm256_store_ps(nyArr, ny);
+            _mm256_store_ps(rArr,  r);  
+            _mm256_store_ps(gArr,  g);
+            _mm256_store_ps(bArr,  b);  
+            _mm256_store_ps(aArr,  a);
+            _mm256_store_ps(uArr,  u);  
+            _mm256_store_ps(vArr,  v);
+            _mm256_store_ps(nxArr, nx); 
+            _mm256_store_ps(nyArr, ny);
             _mm256_store_ps(nzArr, nz);
 
             for (int i = 0; i < 8; ++i)
@@ -269,7 +273,7 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
         // Scalar fallback for remaining pixels
         for (; x <= iMaxX; ++x)
         {
-            if (x < tileMin.x || x > tileMax.x)
+            if (x < (int)tileMin.x || x > (int)tileMax.x)
                 continue;
 
             float2 p((float)x + 0.5f, (float)y + 0.5f);

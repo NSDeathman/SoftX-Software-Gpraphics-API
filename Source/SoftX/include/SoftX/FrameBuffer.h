@@ -78,8 +78,11 @@ public:
         bmi.bmiHeader.biCompression = BI_RGB;
 
         SetDIBitsToDevice(hdc,
-                          dstPos.x, dstPos.y, dstW, dstH,
-                          0, 0, 0, resolution.y,
+                          dstPos.x, dstPos.y, 
+                          dstW, dstH,
+                          0, 0, 
+                          0, 
+                          resolution.y,
                           pixelsStorage.data(),
                           &bmi,
                           DIB_RGB_COLORS);
@@ -121,12 +124,12 @@ private:
         return (a << 24) | (b << 16) | (g << 8) | r; // BGRA
     }
 
-    static __m128 UnpackColor(uint32_t bg)
+    static __m128 UnpackColor(uint32_t bgra)
     {
-        uint8_t b = (bg >> 16) & 0xFF;
-        uint8_t g = (bg >> 8)  & 0xFF;
-        uint8_t r = (bg >> 0)  & 0xFF;
-        uint8_t a = (bg >> 24) & 0xFF;
+        uint8_t b = (bgra >> 16) & 0xFF;
+        uint8_t g = (bgra >> 8)  & 0xFF;
+        uint8_t r = (bgra >> 0)  & 0xFF;
+        uint8_t a = (bgra >> 24) & 0xFF;
         const float inv255 = 1.0f / 255.0f;
         return _mm_set_ps(a * inv255, b * inv255, g * inv255, r * inv255);
     }

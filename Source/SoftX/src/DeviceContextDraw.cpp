@@ -10,7 +10,7 @@
 
 SOFTX_BEGIN
 
-void DeviceContext::DrawPoint(uint x, uint y, float z, const float4& color)
+void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 {
     IRenderTarget* rt = renderTarget;
     if (!rt)
@@ -19,7 +19,7 @@ void DeviceContext::DrawPoint(uint x, uint y, float z, const float4& color)
     if (!depthBuffer)
         return;
 
-    if (x >= rt->Width() || y >= rt->Height())
+    if (x >= (int)rt->Width() || y >= (int)rt->Height())
         return;
 
     uint idx = y * rt->Width() + x;
@@ -30,7 +30,7 @@ void DeviceContext::DrawPoint(uint x, uint y, float z, const float4& color)
     }
 }
 
-void DeviceContext::DrawLine(uint x0, uint y0, uint x1, uint y1, float z0, float z1, const float4& color)
+void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
     IRenderTarget* rt = renderTarget;
     if (!rt)
@@ -178,23 +178,23 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
             const auto& v0 = finalVerts[tri.x];
             const auto& v1 = finalVerts[tri.y];
             const auto& v2 = finalVerts[tri.z];
-            DrawLine((uint)round(v0.Position.x), 
-                     (uint)round(v0.Position.y), 
-                     (uint)round(v1.Position.x),
-                     (uint)round(v1.Position.y), 
+            DrawLine((int)round(v0.Position.x), 
+                     (int)round(v0.Position.y), 
+                     (int)round(v1.Position.x),
+                     (int)round(v1.Position.y), 
                      v0.Position.z, 
                      v1.Position.z, 
                      wireColor);
-            DrawLine((uint)round(v1.Position.x), 
-                     (uint)round(v1.Position.y), 
-                     (uint)round(v2.Position.x),
-                     (uint)round(v2.Position.y), 
+            DrawLine((int)round(v1.Position.x), 
+                     (int)round(v1.Position.y), 
+                     (int)round(v2.Position.x),
+                     (int)round(v2.Position.y), 
                      v1.Position.z, v2.Position.z, 
                      wireColor);
-            DrawLine((uint)round(v2.Position.x), 
-                     (uint)round(v2.Position.y), 
-                     (uint)round(v0.Position.x),
-                     (uint)round(v0.Position.y), 
+            DrawLine((int)round(v2.Position.x), 
+                     (int)round(v2.Position.y), 
+                     (int)round(v0.Position.x),
+                     (int)round(v0.Position.y), 
                      v2.Position.z, 
                      v0.Position.z, 
                      wireColor);
@@ -209,7 +209,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
                 {
                     drawn[idx] = true;
                     const auto& v = finalVerts[idx];
-                    DrawPoint((uint)round(v.Position.x), (uint)round(v.Position.y), v.Position.z, v.Color);
+                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
                 }
     }
 }

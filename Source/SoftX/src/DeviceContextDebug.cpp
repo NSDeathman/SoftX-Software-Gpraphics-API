@@ -8,7 +8,7 @@
 
 SOFTX_BEGIN
 
-void DeviceContext::DrawDebugLine(uint x0, uint y0, uint x1, uint y1, const float4& color)
+void DeviceContext::DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color)
 {
     IRenderTarget* rt = renderTarget;
     if (!rt)
@@ -19,11 +19,11 @@ void DeviceContext::DrawDebugLine(uint x0, uint y0, uint x1, uint y1, const floa
     int sx = (x0 < x1) ? 1 : -1;
     int sy = (y0 < y1) ? 1 : -1;
     int err = dx + dy;
-    uint x = x0, y = y0;
+    int x = x0, y = y0;
 
     while (true)
     {
-        if (x < rt->Width() && y < rt->Height())
+        if (x < (int)rt->Width() && y < (int)rt->Height())
         {
             rt->SetPixel(uint2(x, y), color);
         }

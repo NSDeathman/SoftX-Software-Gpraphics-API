@@ -26,10 +26,10 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
     float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
 
-    uint iMinX = std::max(tileMin.x, (uint)std::floor(minX));
-    uint iMaxX = std::min(tileMax.x, (uint)std::ceil(maxX));
-    uint iMinY = std::max(tileMin.y, (uint)std::floor(minY));
-    uint iMaxY = std::min(tileMax.y, (uint)std::ceil(maxY));
+    int iMinX = std::max((int)tileMin.x, (int)std::floor(minX));
+    int iMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));
+    int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
+    int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
     if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
         return;
@@ -143,7 +143,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
 
     const uint width = renderTarget.Width();
 
-    for (uint y = iMinY; y <= iMaxY; ++y)
+    for (int y = iMinY; y <= iMaxY; ++y)
     {
         // Initialise 4 lanes: lane i = f??Row + i * step??X
         // _mm_set_epi32(e3, e2, e1, e0) — e0 goes to lane 0, e3 to lane 3
@@ -157,15 +157,15 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             _mm_set1_epi32(static_cast<int32_t>(f20Row)),
             _mm_set_epi32(3 * stepX20, 2 * stepX20, stepX20, 0));
 
-        uint x;
-        for (x = (uint)simdStartX;
-             x + 3u < width && x <= iMaxX - 3u;
+        int x;
+        for (x = simdStartX;
+             x + 3 < (int)width && x <= iMaxX - 3;
              x += 4,
              f01 = _mm_add_epi32(f01, s01X4),
              f12 = _mm_add_epi32(f12, s12X4),
              f20 = _mm_add_epi32(f20, s20X4))
         {
-            if (x > tileMax.x || x + 3u < tileMin.x)
+            if (x > (int)tileMax.x || x + 3 < (int)tileMin.x)
                 continue;
 
             // Inside test: all three f >= 0 (CCW-normalised)
@@ -253,10 +253,14 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
             alignas(16) float uArr[4], vArr[4], nxArr[4], nyArr[4], nzArr[4];
             _mm_store_ps(zArr, z);
-            _mm_store_ps(rArr, r);   _mm_store_ps(gArr,  g);
-            _mm_store_ps(bArr, b);   _mm_store_ps(aArr,  a);
-            _mm_store_ps(uArr, u);   _mm_store_ps(vArr,  v);
-            _mm_store_ps(nxArr, nx); _mm_store_ps(nyArr, ny);
+            _mm_store_ps(rArr, r);   
+            _mm_store_ps(gArr,  g);
+            _mm_store_ps(bArr, b);   
+            _mm_store_ps(aArr,  a);
+            _mm_store_ps(uArr, u);   
+            _mm_store_ps(vArr,  v);
+            _mm_store_ps(nxArr, nx); 
+            _mm_store_ps(nyArr, ny);
             _mm_store_ps(nzArr, nz);
 
             for (int i = 0; i < 4; ++i)
@@ -284,7 +288,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
         // normSign applies the same CCW normalisation as the SIMD path.
         for (; x <= iMaxX; ++x)
         {
-            if (x < tileMin.x || x > tileMax.x)
+            if (x < (int)tileMin.x || x > (int)tileMax.x)
                 continue;
 
             const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(
