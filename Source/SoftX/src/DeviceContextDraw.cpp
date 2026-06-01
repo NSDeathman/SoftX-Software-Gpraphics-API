@@ -22,6 +22,9 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
     if (x >= (int)rt->Width() || y >= (int)rt->Height())
         return;
 
+    if (x < 0 || y < 0)
+        return;
+
     uint idx = y * rt->Width() + x;
     if (z < depthBuffer->At(idx))
     {
@@ -76,33 +79,39 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
         return;
 
     // Step 1: VS → clip space (without perspective divide)
-    std::vector<uint> uniqueIndices;
+    std::vector<VertexOutput> clipVerts(vertexBuffer.Size());
     {
-        std::vector<bool> visited(vertexBuffer.Size(), false);
-        for (uint i = startIndex; i < startIndex + indexCount; ++i)
+        PROFILE_SCOPE("Vertex Shader (VS -> clip space)");
+        std::vector<uint> uniqueIndices;
         {
-            uint idx = indexBuffer.GetByIndex(i);
-            if (!visited[idx])
+            std::vector<bool> visited(vertexBuffer.Size(), false);
+            for (uint i = startIndex; i < startIndex + indexCount; ++i)
             {
-                visited[idx] = true;
-                uniqueIndices.push_back(idx);
+                uint idx = indexBuffer.GetByIndex(i);
+                if (!visited[idx])
+                {
+                    visited[idx] = true;
+                    uniqueIndices.push_back(idx);
+                }
             }
         }
-    }
 
-    std::vector<VertexOutput> clipVerts(vertexBuffer.Size());
-    concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(),
-                                   [&](uint idx)
-                                   {
-                                       // Only VS — ClipSpaceToScreenSpace not called yet
-                                       clipVerts[idx] = vertexShader(vertexBuffer.GetByIndex(idx), constantBuffer, textureTable);
-                                   });
+        concurrency::parallel_for_each(uniqueIndices.begin(), uniqueIndices.end(),
+            [&](uint idx)
+            {
+                // Only VS — ClipSpaceToScreenSpace not called yet
+                clipVerts[idx] = vertexShader(vertexBuffer.GetByIndex(idx), constantBuffer, textureTable);
+            });
+    }
 
     // Step 2: Gather source triangles
     std::vector<int3> sourceTriangles;
-    for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
     {
-        sourceTriangles.push_back({(int)indexBuffer.GetByIndex(i), (int)indexBuffer.GetByIndex(i + 1), (int)indexBuffer.GetByIndex(i + 2)});
+        PROFILE_SCOPE("Gather source triangles");
+        for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
+        {
+            sourceTriangles.push_back({ (int)indexBuffer.GetByIndex(i), (int)indexBuffer.GetByIndex(i + 1), (int)indexBuffer.GetByIndex(i + 2) });
+        }
     }
 
     // Step 3: Near plane clipping in clip space
@@ -111,18 +120,21 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     finalVerts.reserve(sourceTriangles.size() * 3);
     finalTriangles.reserve(sourceTriangles.size() * 2);
 
-    for (const auto& tri : sourceTriangles)
     {
-        VertexOutput clipped[2][3];
-        int numTris = RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
-
-        for (int t = 0; t < numTris; ++t)
+        PROFILE_SCOPE("Near plane clipping in clip space");
+        for (const auto& tri : sourceTriangles)
         {
-            int base = (int)finalVerts.size();
-            finalVerts.push_back(clipped[t][0]);
-            finalVerts.push_back(clipped[t][1]);
-            finalVerts.push_back(clipped[t][2]);
-            finalTriangles.push_back({base, base + 1, base + 2});
+            VertexOutput clipped[2][3];
+            int numTris = RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
+
+            for (int t = 0; t < numTris; ++t)
+            {
+                int base = (int)finalVerts.size();
+                finalVerts.push_back(clipped[t][0]);
+                finalVerts.push_back(clipped[t][1]);
+                finalVerts.push_back(clipped[t][2]);
+                finalTriangles.push_back({ base, base + 1, base + 2 });
+            }
         }
     }
 
@@ -130,12 +142,16 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
         return;
 
     // Step 4: Perspective divide on surviving vertices
-    for (auto& v : finalVerts)
-        RasterizerCommon::ClipSpaceToScreenSpace(v, viewport);
+    {
+        PROFILE_SCOPE("Perspective divide on surviving vertices");
+        for (auto& v : finalVerts)
+            RasterizerCommon::ClipSpaceToScreenSpace(v, viewport);
+    }
 
     // Step 5: Geometry shader (on screen-space vertices)
     if (geometryShader)
     {
+        PROFILE_SCOPE("Geometry shader");
         std::vector<VertexOutput> gsVerts;
         std::vector<int3> gsTriangles;
 
@@ -158,6 +174,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     // Step 6: Render
     if (fillMode == FillMode::Solid)
     {
+        PROFILE_SCOPE("Render Solid");
         RasterizerState state;
         state.cullMode = cullMode;
         state.fillMode = fillMode;
@@ -172,6 +189,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     }
     else if (fillMode == FillMode::Wireframe)
     {
+        PROFILE_SCOPE("Render Wireframe");
         float4 wireColor(1, 1, 1, 1);
         for (const auto& tri : finalTriangles)
         {
@@ -202,6 +220,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     }
     else if (fillMode == FillMode::Point)
     {
+        PROFILE_SCOPE("Render Point");
         std::vector<bool> drawn(finalVerts.size(), false);
         for (const auto& tri : finalTriangles)
             for (int idx : {tri.x, tri.y, tri.z})
@@ -253,46 +272,143 @@ void DeviceContext::DrawFullScreenQuad()
         return;
 
     IRenderTarget* rt = renderTarget;
-    uint w = rt->Width();
-    uint h = rt->Height();
-    float invW = 1.0f / (w - 1u);
-    float invH = 1.0f / (h - 1u);
+    const uint w = rt->Width();
+    const uint h = rt->Height();
+    const float invW = 1.0f / (w - 1u);
+    const float invH = 1.0f / (h - 1u);
 
-    // Build tiles locally — TiledRenderer not used here,
-    // RenderTileQuad does not work with triangles.
+    Framebuffer* fb = dynamic_cast<Framebuffer*>(rt);
+    RenderTargetTexture* rtt = dynamic_cast<RenderTargetTexture*>(rt);
+    uint32_t* fbPixels = fb ? fb->GetRawPixels() : nullptr;
+    __m128* texPixels = rtt ? rtt->Texture().GetRawPixels() : nullptr;
+
+    auto ps = pixelShader;
+    auto cb = constantBuffer;
+    auto tt = textureTable;
+
+    const uint ts = tileSize;
+    const uint tilesX = (w + ts - 1u) / ts;
+    const uint tilesY = (h + ts - 1u) / ts;
     std::vector<Tile> tiles;
-    {
-        uint ts = tileSize;
-        uint tilesX = (w + ts - 1u) / ts;
-        uint tilesY = (h + ts - 1u) / ts;
-        tiles.reserve(tilesX * tilesY);
-        for (uint ty = 0; ty < tilesY; ++ty)
-            for (uint tx = 0; tx < tilesX; ++tx)
-            {
-                uint2 mn(tx * ts, ty * ts);
-                uint2 mx(std::min((tx + 1) * ts - 1u, w - 1u), std::min((ty + 1u) * ts - 1u, h - 1u));
-                tiles.emplace_back(mn, mx);
-            }
-    }
+    tiles.reserve(tilesX * tilesY);
+    for (uint ty = 0; ty < tilesY; ++ty)
+        for (uint tx = 0; tx < tilesX; ++tx) {
+            uint2 mn(tx * ts, ty * ts);
+            uint2 mx(std::min((tx + 1) * ts - 1u, w - 1u),
+                std::min((ty + 1u) * ts - 1u, h - 1u));
+            tiles.emplace_back(mn, mx);
+        }
 
-    uint numTiles = (int)tiles.size();
+    const uint numTiles = (uint)tiles.size();
     std::atomic<uint> tileIndex(0);
 
-    auto worker = [this, &tiles, invW, invH, &tileIndex, numTiles]()
-    {
-        while (true)
-        {
-            uint idx = tileIndex.fetch_add(1);
-            if (idx >= numTiles)
-                break;
-            RenderTileQuad(tiles[idx], invW, invH);
-        }
-    };
+    if (fbPixels) {
+        auto workerFB = [&, ps, cb, tt, fbPixels, w, invW, invH]() {
+            PROFILE_SCOPE("FullScreenQuad FB Worker");
+            while (true) {
+                uint idx = tileIndex.fetch_add(1);
+                if (idx >= numTiles) break;
+                const Tile& tile = tiles[idx];
+                const uint startX = tile.min.x, endX = tile.max.x;
+                const uint startY = tile.min.y, endY = tile.max.y;
 
-    auto& pool = ThreadPoolManager::Get();
-    for (uint i = 0; i < (uint)pool.threadCount(); ++i)
-        pool.enqueue(worker);
-    pool.wait();
+                float v = startY * invH;
+                for (uint y = startY; y <= endY; ++y, v += invH) {
+                    float u = startX * invW;
+                    uint x = startX;
+                    uint32_t* row = fbPixels + y * w;
+
+                    for (; x + 3 <= endX; x += 4, u += 4.0f * invW) {
+                        uint32_t packed[4];
+                        for (int i = 0; i < 4; ++i) {
+                            VertexOutput input;
+                            input.UV = float2(u + i * invW, v);
+                            packed[i] = Framebuffer::PackColor(ps(input, cb, tt));
+                        }
+                        _mm_store_si128((__m128i*)(row + x),
+                            _mm_loadu_si128((__m128i*)packed));
+                    }
+
+                    for (; x <= endX; ++x, u += invW) {
+                        VertexOutput input;
+                        input.UV = float2(u, v);
+                        row[x] = Framebuffer::PackColor(ps(input, cb, tt));
+                    }
+                }
+            }
+        };
+        auto& pool = ThreadPoolManager::Get();
+        for (uint i = 0; i < pool.threadCount(); ++i)
+            pool.enqueue(workerFB);
+        pool.wait();
+    }
+    else if (texPixels) {
+        auto workerTex = [&, ps, cb, tt, texPixels, w, invW, invH]() {
+            PROFILE_SCOPE("FullScreenQuad Tex Worker");
+            while (true) {
+                uint idx = tileIndex.fetch_add(1);
+                if (idx >= numTiles) break;
+                const Tile& tile = tiles[idx];
+                const uint startX = tile.min.x, endX = tile.max.x;
+                const uint startY = tile.min.y, endY = tile.max.y;
+
+                float v = startY * invH;
+                for (uint y = startY; y <= endY; ++y, v += invH) {
+                    float u = startX * invW;
+                    uint x = startX;
+                    __m128* row = texPixels + y * w;
+
+                    for (; x + 3 <= endX; x += 4, u += 4.0f * invW) {
+                        for (int i = 0; i < 4; ++i) {
+                            VertexOutput input;
+                            input.UV = float2(u + i * invW, v);
+                            float4 c = ps(input, cb, tt);
+                            _mm_store_ps((float*)(row + x + i),
+                                _mm_set_ps(c.w, c.z, c.y, c.x));
+                        }
+                    }
+
+                    for (; x <= endX; ++x, u += invW) {
+                        VertexOutput input;
+                        input.UV = float2(u, v);
+                        float4 c = ps(input, cb, tt);
+                        _mm_store_ps((float*)(row + x),
+                            _mm_set_ps(c.w, c.z, c.y, c.x));
+                    }
+                }
+            }
+        };
+        auto& pool = ThreadPoolManager::Get();
+        for (uint i = 0; i < pool.threadCount(); ++i)
+            pool.enqueue(workerTex);
+        pool.wait();
+    }
+    else {
+        auto workerFallback = [&, ps, cb, tt, rt, w, invW, invH]() {
+            PROFILE_SCOPE("FullScreenQuad Fallback Worker");
+            while (true) {
+                uint idx = tileIndex.fetch_add(1);
+                if (idx >= numTiles) break;
+                const Tile& tile = tiles[idx];
+                const uint startX = tile.min.x, endX = tile.max.x;
+                const uint startY = tile.min.y, endY = tile.max.y;
+
+                float v = startY * invH;
+                for (uint y = startY; y <= endY; ++y, v += invH) {
+                    float u = startX * invW;
+                    for (uint x = startX; x <= endX; ++x, u += invW) {
+                        VertexOutput input;
+                        input.UV = float2(u, v);
+                        rt->SetPixel(uint2(x, y), ps(input, cb, tt));
+                    }
+                }
+            }
+        };
+        auto& pool = ThreadPoolManager::Get();
+        for (uint i = 0; i < pool.threadCount(); ++i)
+            pool.enqueue(workerFallback);
+        pool.wait();
+    }
 
 #ifdef DEBUG_TILING
     DrawActiveTileBorders(tiles);

@@ -19,8 +19,6 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
                                       uint2 tileMin,
                                       uint2 tileMax)
 {
-    PROFILE_SCOPE("RasterizerSSE::RasterizeTriangle");
-
     float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
     float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
     float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});

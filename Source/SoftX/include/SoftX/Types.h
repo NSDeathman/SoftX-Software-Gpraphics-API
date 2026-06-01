@@ -195,6 +195,12 @@ private:
     SamplerState sampler;
 
 public:
+    TextureBinding() = default;
+
+    TextureBinding(const TextureRGBA32F* tex, SamplerState samp = SamplerState{}) : texture(tex), sampler(samp)
+    {
+    }
+
     bool IsValid() const { return texture != nullptr; }
     bool IsEmpty() const { return !IsValid(); }
 
@@ -214,30 +220,38 @@ public:
             return texture->Sample(wrapped);
     }
 
-    int2 GetDimensions() const
+    uint2 GetDimensions() const
     {
-        return int2(texture->Width(), texture->Height());
+        return uint2(texture->Width(), texture->Height());
     }
 };
 
-// Texture table (fixed max slots)
-static constexpr int MAX_TEXTURE_SLOTS = 16;
-
-struct TextureTable
+class TextureTable
 {
-    TextureBinding bindings[MAX_TEXTURE_SLOTS];
-
-    TextureBinding& operator[](int i)
+public:
+    void Set(const std::string& name, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{})
     {
-        assert(i >= 0 && i < MAX_TEXTURE_SLOTS);
-        return bindings[i];
+        bindings[name] = { texture, sampler };
     }
 
-    const TextureBinding& operator[](int i) const
+    const TextureBinding& Get(const std::string& name) const
     {
-        assert(i >= 0 && i < MAX_TEXTURE_SLOTS);
-        return bindings[i];
+        auto it = bindings.find(name);
+        if (it != bindings.end())
+            return it->second;
+
+        static const TextureBinding emptyBinding;
+        return emptyBinding;
     }
+
+    const TextureBinding& operator[](const std::string& name) const { return Get(name); }
+
+    void Remove(const std::string& name) { bindings.erase(name); }
+    void Clear() { bindings.clear(); }
+    bool Contains(const std::string& name) const { return bindings.find(name) != bindings.end(); }
+
+private:
+    std::unordered_map<std::string, TextureBinding> bindings;
 };
 
 // Shader function types

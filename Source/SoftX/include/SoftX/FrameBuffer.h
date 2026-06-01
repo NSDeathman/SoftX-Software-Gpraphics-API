@@ -23,6 +23,32 @@ public:
     {
     }
 
+    uint32_t* GetRawPixels() { return pixelsStorage.data(); }
+    const uint32_t* GetRawPixels() const { return pixelsStorage.data(); }
+
+    static uint32_t PackColor(const float4& c)
+    {
+        auto toByte = [](float f) -> uint8_t {
+            int v = int(f * 255.0f + 0.5f);
+            return uint8_t(std::clamp(v, 0, 255));
+        };
+        uint8_t r = toByte(c.x);
+        uint8_t g = toByte(c.y);
+        uint8_t b = toByte(c.z);
+        uint8_t a = toByte(c.w);
+        return (a << 24) | (b << 16) | (g << 8) | r; // BGRA
+    }
+
+    static __m128 UnpackColor(uint32_t bgra)
+    {
+        uint8_t b = (bgra >> 16) & 0xFF;
+        uint8_t g = (bgra >> 8) & 0xFF;
+        uint8_t r = (bgra >> 0) & 0xFF;
+        uint8_t a = (bgra >> 24) & 0xFF;
+        const float inv255 = 1.0f / 255.0f;
+        return _mm_set_ps(a * inv255, b * inv255, g * inv255, r * inv255);
+    }
+
     void Clear(const float4& color) override
     {
         uint32_t bg = PackColor(color);
@@ -111,29 +137,6 @@ public:
     }
 
 private:
-    static uint32_t PackColor(const float4& c)
-    {
-        auto toByte = [](float f) -> uint8_t {
-            int v = int(f * 255.0f + 0.5f);
-            return uint8_t(std::clamp(v, 0, 255));
-        };
-        uint8_t r = toByte(c.x);
-        uint8_t g = toByte(c.y);
-        uint8_t b = toByte(c.z);
-        uint8_t a = toByte(c.w);
-        return (a << 24) | (b << 16) | (g << 8) | r; // BGRA
-    }
-
-    static __m128 UnpackColor(uint32_t bgra)
-    {
-        uint8_t b = (bgra >> 16) & 0xFF;
-        uint8_t g = (bgra >> 8)  & 0xFF;
-        uint8_t r = (bgra >> 0)  & 0xFF;
-        uint8_t a = (bgra >> 24) & 0xFF;
-        const float inv255 = 1.0f / 255.0f;
-        return _mm_set_ps(a * inv255, b * inv255, g * inv255, r * inv255);
-    }
-
     uint2 resolution;
     std::vector<uint32_t> pixelsStorage;   // BGRA
 };

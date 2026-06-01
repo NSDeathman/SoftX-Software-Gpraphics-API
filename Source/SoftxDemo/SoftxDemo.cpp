@@ -15,7 +15,7 @@ using namespace AfterMath;
 //  Constants
 // ============================================================
 static constexpr int WINDOW_WIDTH  = 1280;
-static constexpr int WINDOW_HEIGHT = 720;
+static constexpr int WINDOW_HEIGHT = 768;
 
 static constexpr int CHECKER_SIZE  = 1024;
 static constexpr int CHECKER_CELLS = 16;
@@ -104,7 +104,8 @@ VertexOutput TransformVS(const VertexInput& input, const ConstantBuffer& cb, con
 
 float4 CheckerPS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
-    return tex[0].Sample(input.UV);
+    const auto& Albedo = tex.Get("t_albedo");
+    return Albedo.Sample(input.UV);
 }
 
 // ============================================================
@@ -172,27 +173,6 @@ void DrawFrame()
 {
     PROFILE_SCOPE("DrawFrame");
 
-    // ── FPS counter ──────────────────────────────────────────
-    static UINT64 frameCount = 0;
-    static UINT64 lastUpdateTime = GetTickCount64();
-    ++frameCount;
-
-    UINT64 now = GetTickCount64();
-    UINT64 elapsed = now - lastUpdateTime;
-
-    if (elapsed >= 1000)
-    {
-        // Frames rendered in the last elapsed milliseconds
-        double fps = double(frameCount) * 1000.0 / double(elapsed);
-
-        char title[128];
-        sprintf_s(title, "SoftX — UV Checker Sphere | FPS: %.1f", fps);
-        SetWindowTextA(g_hWnd, title);
-
-        frameCount = 0;
-        lastUpdateTime = now;
-    }
-
     // ── Build MVP matrix ─────────────────────────────────────
     const float aspect = float(WINDOW_WIDTH) / float(WINDOW_HEIGHT);
     float4x4 projection = perspective(Constants::degrees_to_radians(60.0f), aspect);
@@ -222,6 +202,30 @@ void DrawFrame()
     ctx.DrawIndexed();
 
     g_device->Present();
+}
+
+void UpdateFPSCounter()
+{
+    // ── FPS counter ──────────────────────────────────────────
+    static UINT64 frameCount = 0;
+    static UINT64 lastUpdateTime = GetTickCount64();
+    ++frameCount;
+
+    UINT64 now = GetTickCount64();
+    UINT64 elapsed = now - lastUpdateTime;
+
+    if (elapsed >= 1000)
+    {
+        // Frames rendered in the last elapsed milliseconds
+        double fps = double(frameCount) * 1000.0 / double(elapsed);
+
+        char title[128];
+        sprintf_s(title, "SoftX — UV Checker Sphere | FPS: %.1f", fps);
+        SetWindowTextA(g_hWnd, title);
+
+        frameCount = 0;
+        lastUpdateTime = now;
+    }
 }
 
 // ============================================================
@@ -290,8 +294,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     DeviceContext& ctx = g_device->GetImmediateContext();
     ctx.SetRenderTarget(&device.GetBackBuffer(), true);
     ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
-    ctx.SetTexture(0, &checkerTexture,
-                   SamplerState{Filter::Bilinear, Wrap::Repeat, Wrap::Repeat});
+    ctx.SetTexture("t_albedo", &checkerTexture, SamplerState{Filter::Bilinear, Wrap::Repeat, Wrap::Repeat});
 
     // Build sphere geometry
     VertexBuffer vb;
@@ -304,7 +307,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetPixelShader(CheckerPS);
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
-    ctx.SetTileSize(64);
+    ctx.SetTileSize(128);
     ctx.SetFillMode(FillMode::Solid);
 
     // Message loop
@@ -319,6 +322,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         else
         {
             PROFILE_FRAME("SoftX");
+            UpdateFPSCounter();
             DrawFrame();
         }
     }

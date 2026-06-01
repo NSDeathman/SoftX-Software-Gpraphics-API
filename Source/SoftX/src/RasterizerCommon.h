@@ -193,70 +193,52 @@ namespace RasterizerCommon
     // Clips triangle against near plane (w = nearW) in clip space.
     // Returns 0, 1 or 2 triangles in outTris[2][3].
     // Sutherland-Hodgman algorithm for a single plane.
-    inline int ClipTriangleNearPlane(const VertexOutput& v0, 
-                                     const VertexOutput& v1, 
-                                     const VertexOutput& v2,
-                                     VertexOutput outTris[2][3], 
-                                     float nearW = 0.1f)
+    inline int ClipTriangleNearPlane(
+        const VertexOutput& v0,
+        const VertexOutput& v1,
+        const VertexOutput& v2,
+        VertexOutput outTris[2][3])
     {
-        const VertexOutput* verts[3] = {&v0, &v1, &v2};
-
+        const VertexOutput* verts[3] = { &v0, &v1, &v2 };
         bool inside[3];
         int insideCount = 0;
-        for (int i = 0; i < 3; ++i)
-        {
-            inside[i] = verts[i]->Position.w >= nearW;
-            if (inside[i])
-                ++insideCount;
+
+        for (int i = 0; i < 3; ++i) {
+            inside[i] = (verts[i]->Position.z >= 0.0f) && (verts[i]->Position.w > 0.0f);
+            if (inside[i]) ++insideCount;
         }
 
-        // All vertices behind camera — discard
-        if (insideCount == 0) UNLIKELY
-            return 0;
-
-        // All vertices in front of camera — pass through unchanged
-        if (insideCount == 3) LIKELY
-        {
-            outTris[0][0] = v0;
-            outTris[0][1] = v1;
-            outTris[0][2] = v2;
+        if (insideCount == 0) return 0;
+        if (insideCount == 3) {
+            outTris[0][0] = v0; outTris[0][1] = v1; outTris[0][2] = v2;
             return 1;
         }
 
-        // Sutherland-Hodgman: traverse edges, build output polygon
         VertexOutput poly[4];
         int polySize = 0;
 
-        for (int i = 0; i < 3; ++i)
-        {
+        for (int i = 0; i < 3; ++i) {
             int j = (i + 1) % 3;
             const VertexOutput& A = *verts[i];
             const VertexOutput& B = *verts[j];
             bool aIn = inside[i];
             bool bIn = inside[j];
 
-            if (aIn)
-                poly[polySize++] = A;
+            if (aIn) poly[polySize++] = A;
 
-            // Edge intersects plane — add intersection point
-            if (aIn != bIn)
-            {
-                float wA = A.Position.w;
-                float wB = B.Position.w;
-                float t = (nearW - wA) / (wB - wA);
+            if (aIn != bIn) {
+                float t = (0.0f - A.Position.z) / (B.Position.z - A.Position.z);
+                t = std::clamp(t, 0.0f, 1.0f);
                 poly[polySize++] = LerpVertexClipSpace(A, B, t);
             }
         }
 
-        if (polySize < 3) UNLIKELY
-            return 0;
+        if (polySize < 3) return 0;
 
-        // Fan triangulation: 3 vertices → 1 triangle, 4 vertices → 2 triangles
         outTris[0][0] = poly[0];
         outTris[0][1] = poly[1];
         outTris[0][2] = poly[2];
-        if (polySize == 4)
-        {
+        if (polySize == 4) {
             outTris[1][0] = poly[0];
             outTris[1][1] = poly[2];
             outTris[1][2] = poly[3];

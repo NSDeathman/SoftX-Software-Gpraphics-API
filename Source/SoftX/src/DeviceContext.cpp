@@ -83,12 +83,9 @@ ConstantBuffer DeviceContext::GetConstantBuffer() const
     return constantBuffer;
 }
 
-void DeviceContext::SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler)
+void DeviceContext::SetTexture(const std::string& name, const TextureRGBA32F* texture, SamplerState sampler)
 {
-    assert(slot >= 0 && slot < MAX_TEXTURE_SLOTS);
-    auto& b = textureTable[slot];
-    b.SetTexture(texture);
-    b.SetSamplerState(sampler);
+    textureTable.Set(name, texture, sampler);
 }
 
 void DeviceContext::SetRenderTarget(IRenderTarget* target)
@@ -103,7 +100,7 @@ IRenderTarget* DeviceContext::GetRenderTarget() const
 
 void DeviceContext::SetDepthBuffer(DepthBuffer* dpthBuffer)
 {
-    this->depthBuffer = dpthBuffer;
+    depthBuffer = dpthBuffer;
 }
 
 DepthBuffer* DeviceContext::GetDepthBuffer() const
@@ -146,6 +143,24 @@ void DeviceContext::ClearDepth(float depth)
     if (depthBuffer)
     {
         depthBuffer->Clear(depth);
+    }
+}
+
+void DeviceContext::ClearColorAndDepth(const float4& color, float depth)
+{
+    PROFILE_SCOPE("DeviceContext::ClearColorAndDepth");
+
+    auto& pool = ThreadPoolManager::Get();
+    if (renderTarget && depthBuffer && (pool.threadCount() > 0))
+    {
+        pool.enqueue([this, color] { Clear(color); });
+        pool.enqueue([this, depth] { ClearDepth(depth); });
+        pool.wait();
+    }
+    else
+    {
+        Clear(color);
+        ClearDepth(depth);
     }
 }
 

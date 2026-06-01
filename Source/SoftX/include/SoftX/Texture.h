@@ -24,6 +24,9 @@ public:
         }
     }
 
+    __m128* GetRawPixels() { return pixels.data(); }
+    const __m128* GetRawPixels() const { return pixels.data(); }
+
     __m128 Read(uint2 coords) const
     {
         assert(coords.x < resolution.x && coords.y < resolution.y);

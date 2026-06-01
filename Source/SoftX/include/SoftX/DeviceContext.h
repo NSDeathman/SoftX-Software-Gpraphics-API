@@ -35,7 +35,7 @@ public:
     void SetConstantBuffer(const ConstantBuffer& buffer);
     ConstantBuffer GetConstantBuffer() const;
 
-    void SetTexture(int slot, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{});
+    void SetTexture(const std::string& name, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{});
 
     void SetRenderTarget(IRenderTarget* target);
     void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);
@@ -47,6 +47,7 @@ public:
 
     void Clear(const float4& color);
     void ClearDepth(float depth = 1.0f);
+    void ClearColorAndDepth(const float4& color, float depth = 1.0f);
 
     void SetCullMode(CullMode mode);
     CullMode GetCullMode() const;

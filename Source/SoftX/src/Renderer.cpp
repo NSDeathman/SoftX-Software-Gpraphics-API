@@ -25,6 +25,7 @@ Renderer::Renderer(IRasterizer& rasterizer,
 
 void Renderer::Execute(const std::vector<VertexOutput>& inputVerts, const std::vector<int3>& inputTriangles)
 {
+    PROFILE_SCOPE("Renderer::Execute");
     this->verts = &inputVerts;
     this->triangles = &inputTriangles;
     BuildTiles(renderTarget.Width(), renderTarget.Height());
@@ -36,6 +37,7 @@ void Renderer::Execute(const std::vector<VertexOutput>& inputVerts, const std::v
 
 void Renderer::BuildTiles(uint width, uint height)
 {
+    PROFILE_SCOPE("Renderer::BuildTiles");
     tiles.clear();
     uint ts = tileSize;
     uint tilesX = (width + ts - 1) / ts;
@@ -54,12 +56,15 @@ void Renderer::BuildTiles(uint width, uint height)
 
 void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts, const std::vector<int3>& inputTriangles)
 {
+    PROFILE_SCOPE("Renderer::BinTriangles");
     for (auto& t : tiles)
         t.triangleIndices.clear();
 
     uint ts = tileSize;
     uint tilesX = (renderTarget.Width() + ts - 1) / ts;
     uint tilesY = (renderTarget.Height() + ts - 1) / ts;
+    float rtWidthF = (float)renderTarget.Width() - 1.0f;
+    float rtHeightF = (float)renderTarget.Height() - 1.0f;
 
     for (int triIdx = 0; triIdx < static_cast<int>(inputTriangles.size()); ++triIdx)
     {
@@ -68,19 +73,29 @@ void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts, const s
         const auto& v1 = inputVerts[tri.y];
         const auto& v2 = inputVerts[tri.z];
 
-        float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
-        float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
-        float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
-        float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
+        float x0 = std::clamp(v0.Position.x, 0.0f, rtWidthF);
+        float y0 = std::clamp(v0.Position.y, 0.0f, rtHeightF);
+        float x1 = std::clamp(v1.Position.x, 0.0f, rtWidthF);
+        float y1 = std::clamp(v1.Position.y, 0.0f, rtHeightF);
+        float x2 = std::clamp(v2.Position.x, 0.0f, rtWidthF);
+        float y2 = std::clamp(v2.Position.y, 0.0f, rtHeightF);
 
-        uint tileX0 = uint(std::max(0.0f, std::floor(minX))) / ts;
-        uint tileY0 = uint(std::max(0.0f, std::floor(minY))) / ts;
-        uint tileX1 = std::min(tilesX - 1, uint(std::ceil(maxX)) / ts);
-        uint tileY1 = std::min(tilesY - 1, uint(std::ceil(maxY)) / ts);
+        float minX = std::min({ x0, x1, x2 });
+        float maxX = std::max({ x0, x1, x2 });
+        float minY = std::min({ y0, y1, y2 });
+        float maxY = std::max({ y0, y1, y2 });
 
-        for (uint ty = tileY0; ty <= tileY1; ++ty)
+        if (minX >= rtWidthF || maxX <= 0.0f || minY >= rtHeightF || maxY <= 0.0f)
+            continue;
+
+        int tileX0 = std::clamp(static_cast<int>(std::floor(minX)) / static_cast<int>(ts), 0, static_cast<int>(tilesX) - 1);
+        int tileY0 = std::clamp(static_cast<int>(std::floor(minY)) / static_cast<int>(ts), 0, static_cast<int>(tilesY) - 1);
+        int tileX1 = std::clamp(static_cast<int>(std::ceil(maxX)) / static_cast<int>(ts), 0, static_cast<int>(tilesX) - 1);
+        int tileY1 = std::clamp(static_cast<int>(std::ceil(maxY)) / static_cast<int>(ts), 0, static_cast<int>(tilesY) - 1);
+
+        for (int ty = tileY0; ty <= tileY1; ++ty)
         {
-            for (uint tx = tileX0; tx <= tileX1; ++tx)
+            for (int tx = tileX0; tx <= tileX1; ++tx)
             {
                 tiles[ty * tilesX + tx].triangleIndices.push_back(triIdx);
             }
@@ -90,11 +105,13 @@ void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts, const s
 
 void Renderer::RenderTiles()
 {
+    PROFILE_SCOPE("Renderer::RenderTiles");
     uint numTiles = static_cast<uint>(tiles.size());
     std::atomic<int> tileIndex(0);
 
     auto worker = [this, &tileIndex, numTiles]()
     {
+        PROFILE_SCOPE("RenderTiles::tile worker");
         while (true)
         {
             uint idx = static_cast<uint>(tileIndex.fetch_add(1));

@@ -17,7 +17,8 @@ class SOFTX_API ThreadPool
 	{
 		for (size_t i = 0; i < numThreads; ++i)
 		{
-			workers.emplace_back([this] {
+			workers.emplace_back([this, i] {
+				PROFILE_THREAD(("SoftX Worker " + std::to_string(i)).c_str());
 				while (true)
 				{
 					std::function<void()> task;
@@ -70,6 +71,8 @@ class SOFTX_API ThreadPool
 
 	void wait()
 	{
+		PROFILE_SCOPE("Waiting for workers");
+		PROFILE_TAG("Blocked", "true");
 		std::unique_lock<std::mutex> lock(queueMutex);
 		condition.wait(lock, [this] { return tasks.empty() && activeTasks == 0; });
 	}
