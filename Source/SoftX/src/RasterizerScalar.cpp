@@ -39,7 +39,8 @@ static inline void ShadeSinglePixel(
 
     if (depthPass)
     {
-        depthBuffer.At(idx) = frag.Position.z;
+        if (state.depthWriteEnable)
+            depthBuffer.At(idx) = frag.Position.z;
         if(renderTarget != nullptr)
             renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
     }

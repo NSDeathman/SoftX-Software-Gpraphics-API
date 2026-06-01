@@ -249,7 +249,8 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             if (depthMask == 0)
                 continue;
 
-            depthBuffer.Write4(uint2(x, y), z, finalMask);
+            if (state.depthWriteEnable)
+                depthBuffer.Write4(uint2(x, y), z, finalMask);
 
             // Scalar shading loop
             alignas(16) float zArr[4], rArr[4], gArr[4], bArr[4], aArr[4];
@@ -331,7 +332,8 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             }
             if (depthPass)
             {
-                depthBuffer.At(idx) = frag.Position.z;
+                if (state.depthWriteEnable)
+                    depthBuffer.At(idx) = frag.Position.z;
                 if(renderTarget != nullptr)
                     renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
             }

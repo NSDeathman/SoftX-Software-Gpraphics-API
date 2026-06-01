@@ -13,6 +13,7 @@ DeviceContext::DeviceContext()
       renderTarget(nullptr),
       ownDepthBuffer(nullptr),
       depthBuffer(nullptr),
+      depthWriteEnable(true),
       cullMode(CullMode::Back),
       fillMode(FillMode::Solid),
       viewport(),
@@ -106,6 +107,16 @@ void DeviceContext::SetDepthBuffer(DepthBuffer* dpthBuffer)
 DepthBuffer* DeviceContext::GetDepthBuffer() const
 {
     return depthBuffer;
+}
+
+void DeviceContext::SetDepthWriteEnable(bool enable)
+{
+    depthWriteEnable = enable;
+}
+
+bool DeviceContext::GetDepthWriteEnable() const
+{
+    return depthWriteEnable;
 }
 
 void DeviceContext::SetRenderTarget(IRenderTarget* rt, bool createDepthBuffer)

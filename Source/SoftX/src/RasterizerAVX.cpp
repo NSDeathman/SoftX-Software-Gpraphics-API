@@ -234,10 +234,14 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
             int depthMask    = _mm256_movemask_ps(finalMask);
             if (depthMask == 0)
                 continue;
-            __m128 mask_lo = _mm256_castps256_ps128(finalMask);
-            __m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
-            depthBuffer.Write4(uint2(x,     y), _mm256_castps256_ps128(z), mask_lo);
-            depthBuffer.Write4(uint2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
+
+            if (state.depthWriteEnable)
+            {
+                __m128 mask_lo = _mm256_castps256_ps128(finalMask);
+                __m128 mask_hi = _mm256_extractf128_ps(finalMask, 1);
+                depthBuffer.Write4(uint2(x, y), _mm256_castps256_ps128(z), mask_lo);
+                depthBuffer.Write4(uint2(x + 4, y), _mm256_extractf128_ps(z, 1), mask_hi);
+            }
 
             // Scalar loop for shading only
             alignas(32) float zArr[8], rArr[8], gArr[8], bArr[8], aArr[8];
@@ -310,7 +314,8 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
             }
             if (depthPass)
             {
-                depthBuffer.At(idx) = frag.Position.z;
+                if (state.depthWriteEnable)
+                    depthBuffer.At(idx) = frag.Position.z;
                 if(renderTarget != nullptr)
                     renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
             }

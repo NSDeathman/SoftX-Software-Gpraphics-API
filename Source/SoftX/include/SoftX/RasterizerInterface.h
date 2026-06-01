@@ -11,6 +11,7 @@ struct RasterizerState {
     CullMode cullMode = CullMode::Back;
     FillMode fillMode = FillMode::Solid;
 	ComparisonFunc depthFunc = ComparisonFunc::Less;
+    bool depthWriteEnable = true;
 };
 
 class IRasterizer {

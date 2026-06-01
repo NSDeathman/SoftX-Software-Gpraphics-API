@@ -45,6 +45,9 @@ public:
     void SetDepthBuffer(DepthBuffer* depthBuffer);
     DepthBuffer* GetDepthBuffer() const;
 
+    void SetDepthWriteEnable(bool enable);
+    bool GetDepthWriteEnable() const;
+
     void Clear(const float4& color);
     void ClearDepth(float depth = 1.0f);
     void ClearColorAndDepth(const float4& color, float depth = 1.0f);
@@ -99,6 +102,7 @@ private:
     CullMode cullMode = CullMode::Back;
     FillMode fillMode = FillMode::Solid;
     ComparisonFunc depthFunc = ComparisonFunc::Less;
+    bool depthWriteEnable;
 
     Viewport viewport;
 

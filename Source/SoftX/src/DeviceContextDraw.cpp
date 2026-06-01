@@ -28,7 +28,7 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
     uint idx = y * rt->Width() + x;
     if (z < depthBuffer->At(idx))
     {
-        depthBuffer->At(idx) = z;
+        if(depthWriteEnable) depthBuffer->At(idx) = z;
         if (renderTarget) rt->SetPixel(uint2(x, y), color);
     }
 }
@@ -179,6 +179,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
         state.cullMode = cullMode;
         state.fillMode = fillMode;
         state.depthFunc = depthFunc;
+        state.depthWriteEnable = depthWriteEnable;
 
         Renderer renderer(*rasterizer, renderTarget, *depthBuffer, pixelShader, constantBuffer, &textureTable, state, tileSize);
         renderer.Execute(finalVerts, finalTriangles);

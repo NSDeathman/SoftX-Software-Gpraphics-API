@@ -171,6 +171,7 @@ void DrawFrame()
         // Привязываем только буфер глубины, рендер-таргет отключаем
         ctx.SetRenderTarget(nullptr, false);
         ctx.SetDepthBuffer(g_depthOnly.get());
+        ctx.SetDepthWriteEnable(true);
 
         // Пиксельный шейдер не обязателен, но можно и nullptr
         ctx.SetPixelShader(nullptr);
