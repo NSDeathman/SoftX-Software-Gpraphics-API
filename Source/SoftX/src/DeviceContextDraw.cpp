@@ -6,7 +6,7 @@
 #include <SoftX/SoftX.h>
 #include <SoftX/ThreadPoolManager.h>
 
-//#define DEBUG_TILING
+#define DEBUG_TILING
 
 SOFTX_BEGIN
 
@@ -29,7 +29,7 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
     if (z < depthBuffer->At(idx))
     {
         depthBuffer->At(idx) = z;
-        rt->SetPixel(uint2(x, y), color);
+        if (renderTarget) rt->SetPixel(uint2(x, y), color);
     }
 }
 
@@ -75,7 +75,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
     PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
-    if (!vertexShader || !pixelShader || vertexBuffer.IsEmpty() || indexBuffer.IsEmpty() || !renderTarget || !depthBuffer)
+    if (!vertexShader || vertexBuffer.IsEmpty() || indexBuffer.IsEmpty() || !depthBuffer)
         return;
 
     // Step 1: VS → clip space (without perspective divide)
@@ -180,7 +180,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
         state.fillMode = fillMode;
         state.depthFunc = depthFunc;
 
-        Renderer renderer(*rasterizer, *renderTarget, *depthBuffer, pixelShader, constantBuffer, &textureTable, state, tileSize);
+        Renderer renderer(*rasterizer, renderTarget, *depthBuffer, pixelShader, constantBuffer, &textureTable, state, tileSize);
         renderer.Execute(finalVerts, finalTriangles);
 
 #ifdef DEBUG_TILING
@@ -190,6 +190,10 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     else if (fillMode == FillMode::Wireframe)
     {
         PROFILE_SCOPE("Render Wireframe");
+
+        if (renderTarget == nullptr)
+            return;
+
         float4 wireColor(1, 1, 1, 1);
         for (const auto& tri : finalTriangles)
         {
@@ -221,6 +225,10 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     else if (fillMode == FillMode::Point)
     {
         PROFILE_SCOPE("Render Point");
+
+        if (renderTarget == nullptr)
+            return;
+
         std::vector<bool> drawn(finalVerts.size(), false);
         for (const auto& tri : finalTriangles)
             for (int idx : {tri.x, tri.y, tri.z})
@@ -259,7 +267,7 @@ void DeviceContext::RenderTileQuad(const Tile& tile, float invW, float invH)
             float u = x * invW;
             input.UV = float2(u, v);
             float4 color = ps(input, cb, tt);
-            rt->SetPixel(uint2(x, y), color);
+            if (renderTarget) rt->SetPixel(uint2(x, y), color);
         }
     }
 }
@@ -399,7 +407,7 @@ void DeviceContext::DrawFullScreenQuad()
                     for (uint x = startX; x <= endX; ++x, u += invW) {
                         VertexOutput input;
                         input.UV = float2(u, v);
-                        rt->SetPixel(uint2(x, y), ps(input, cb, tt));
+                        if (renderTarget) rt->SetPixel(uint2(x, y), ps(input, cb, tt));
                     }
                 }
             }

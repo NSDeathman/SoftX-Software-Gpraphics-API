@@ -224,7 +224,7 @@ bool DeviceContext::Validate(std::string* errorMsg) const
             *errorMsg = "Vertex shader not set ";
         result = false;
     }
-    if (!pixelShader)
+    if (renderTarget != nullptr && !pixelShader)
     {
         if (errorMsg)
             *errorMsg += "Pixel shader not set ";
@@ -242,7 +242,7 @@ bool DeviceContext::Validate(std::string* errorMsg) const
             *errorMsg += "Index buffer is empty ";
         result = false;
     }
-    if (renderTarget == nullptr)
+    if (renderTarget == nullptr && depthBuffer == nullptr)
     {
         if (errorMsg)
             *errorMsg += "Render target not set ";

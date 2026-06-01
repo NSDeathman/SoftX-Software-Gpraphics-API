@@ -14,17 +14,18 @@ using namespace AfterMath;
 // ============================================================
 //  Constants
 // ============================================================
-static constexpr int WINDOW_WIDTH  = 1280;
+static constexpr int WINDOW_WIDTH = 1280;
 static constexpr int WINDOW_HEIGHT = 768;
-
-static constexpr int CHECKER_SIZE  = 1024;
-static constexpr int CHECKER_CELLS = 16;
 
 // ============================================================
 //  Globals
 // ============================================================
-static HWND    g_hWnd   = nullptr;
+static HWND    g_hWnd = nullptr;
 static Device* g_device = nullptr;
+
+// Глобальные ресурсы для depth-only прохода
+static std::unique_ptr<DepthBuffer>        g_depthOnly;      // отдельный буфер глубины
+static std::unique_ptr<RenderTargetTexture> g_depthAsTexture; // текстура, в которую скопируем глубину
 
 // ============================================================
 //  Constant buffer
@@ -35,111 +36,59 @@ struct ConstantBufferData
 };
 
 // ============================================================
-//  UV checker texture
-// ============================================================
-static const float4 CHECKER_PALETTE[4] =
-{
-    float4(0.90f, 0.20f, 0.20f, 1.0f),
-    float4(0.20f, 0.60f, 0.90f, 1.0f),
-    float4(0.20f, 0.80f, 0.30f, 1.0f),
-    float4(0.95f, 0.80f, 0.10f, 1.0f),
-};
-
-TextureRGBA32F CreateUVCheckerTexture()
-{
-    TextureRGBA32F tex(uint2(CHECKER_SIZE, CHECKER_SIZE));
-    const int cellSize = CHECKER_SIZE / CHECKER_CELLS;
-
-    for (int y = 0; y < CHECKER_SIZE; ++y)
-    {
-        for (int x = 0; x < CHECKER_SIZE; ++x)
-        {
-            int   cellX = x / cellSize;
-            int   cellY = y / cellSize;
-            float fx    = float(x % cellSize) / float(cellSize);
-            float fy    = float(y % cellSize) / float(cellSize);
-
-            const float gridWidth = 0.08f;
-            bool isGrid = (fx < gridWidth || fx > 1.0f - gridWidth ||
-                           fy < gridWidth || fy > 1.0f - gridWidth);
-
-            float4 color;
-            if (isGrid)
-            {
-                color = float4(1.0f, 1.0f, 1.0f, 1.0f);
-            }
-            else
-            {
-                int   paletteIdx = (cellX + cellY) % 4;
-                float shade      = 0.75f + 0.25f * (fx * 0.5f + fy * 0.5f);
-                color   = CHECKER_PALETTE[paletteIdx];
-                color.x *= shade;
-                color.y *= shade;
-                color.z *= shade;
-            }
-
-            __m128 c = _mm_set_ps(color.w, color.z, color.y, color.x);
-            tex.StreamWrite(uint2(x, y), c);
-        }
-    }
-    return tex;
-}
-
-// ============================================================
 //  Shaders
 // ============================================================
 VertexOutput TransformVS(const VertexInput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
-    const ConstantBufferData* data =
-        reinterpret_cast<const ConstantBufferData*>(cb.Data());
-
+    const ConstantBufferData* data = reinterpret_cast<const ConstantBufferData*>(cb.Data());
     VertexOutput output;
     output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f)
-                      * data->modelViewProjection;
-    output.Color  = input.Color;
+        * data->modelViewProjection;
+    output.Color = input.Color;
     output.Normal = input.Normal;
-    output.UV     = input.UV;
+    output.UV = input.UV;
     return output;
 }
 
-float4 CheckerPS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
+// Пиксельный шейдер для визуализации глубины: просто сэмплирует текстуру
+float4 DepthVisualizePS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
-    const auto& Albedo = tex.Get("t_albedo");
-    return Albedo.Sample(input.UV);
+    const auto& depthTex = tex.Get("t_depth");
+    return depthTex.Sample(input.UV);
 }
 
 // ============================================================
 //  Sphere geometry
 // ============================================================
 void CreateSphere(VertexBuffer& vb, IndexBuffer& ib,
-                  float radius, int slices, int stacks)
+    float radius, int slices, int stacks)
 {
     std::vector<VertexInput> vertices;
     std::vector<uint>        indices;
 
     for (int stack = 0; stack <= stacks; ++stack)
     {
-        float phi    = PI * float(stack) / float(stacks);
+        float phi = PI * float(stack) / float(stacks);
         float sinPhi = sinf(phi);
         float cosPhi = cosf(phi);
 
         for (int slice = 0; slice <= slices; ++slice)
         {
-            float theta    = 2.0f * PI * float(slice) / float(slices);
+            float theta = 2.0f * PI * float(slice) / float(slices);
             float sinTheta = sinf(theta);
             float cosTheta = cosf(theta);
 
             float3 pos(radius * sinPhi * cosTheta,
-                       radius * cosPhi,
-                       radius * sinPhi * sinTheta);
+                radius * cosPhi,
+                radius * sinPhi * sinTheta);
             float3 norm = normalize(pos);
             float4 color((norm.x + 1.0f) * 0.5f,
-                         (norm.y + 1.0f) * 0.5f,
-                         (norm.z + 1.0f) * 0.5f, 1.0f);
+                (norm.y + 1.0f) * 0.5f,
+                (norm.z + 1.0f) * 0.5f, 1.0f);
             float2 uv(float(slice) / float(slices),
-                      float(stack) / float(stacks));
+                float(stack) / float(stacks));
 
-            vertices.push_back({pos, norm, color, uv});
+            vertices.push_back({ pos, norm, color, uv });
         }
     }
 
@@ -147,9 +96,9 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib,
     {
         for (int slice = 0; slice < slices; ++slice)
         {
-            int first  = stack * (slices + 1) + slice;
+            int first = stack * (slices + 1) + slice;
             int second = first + 1;
-            int third  = first + (slices + 1);
+            int third = first + (slices + 1);
             int fourth = third + 1;
 
             indices.push_back(first);
@@ -167,13 +116,37 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib,
 }
 
 // ============================================================
+//  Копирование глубины в текстуру (CPU)
+//  В реальном коде это делалось бы через рендер в R32F текстуру,
+//  но для демонстрации копируем вручную.
+// ============================================================
+void CopyDepthToTexture(const DepthBuffer& src, TextureRGBA32F& dst)
+{
+    uint w = src.Width();
+    uint h = src.Height();
+    for (uint y = 0; y < h; ++y)
+    {
+        for (uint x = 0; x < w; ++x)
+        {
+            float depth = src.At(int2(x, y));
+            // Визуализация: инвертируем глубину, чтобы ближние объекты были ярче
+            float grey = (1.0f - depth) * 100.0f;
+            __m128 col = _mm_set_ps(1.0f, grey, grey, grey); // A=1, BGR=grey
+            dst.StreamWrite(uint2(x, y), col);
+        }
+    }
+}
+
+// ============================================================
 //  Per-frame rendering
 // ============================================================
 void DrawFrame()
 {
     PROFILE_SCOPE("DrawFrame");
 
-    // ── Build MVP matrix ─────────────────────────────────────
+    DeviceContext& ctx = g_device->GetImmediateContext();
+
+    // ── Подготовка матрицы MVP ─────────────────────────────
     const float aspect = float(WINDOW_WIDTH) / float(WINDOW_HEIGHT);
     float4x4 projection = perspective(Constants::degrees_to_radians(60.0f), aspect);
 
@@ -191,22 +164,50 @@ void DrawFrame()
     cbData.modelViewProjection = mvp;
     ConstantBuffer mvpCB(&cbData, sizeof(cbData));
 
-    DeviceContext& ctx = g_device->GetImmediateContext();
+    // ── 1. Depth-only pass ─────────────────────────────────
+    {
+        PROFILE_SCOPE("Depth-Only Pass");
 
-    // ── Clear ────────────────────────────────────────────────
-    ctx.Clear(float4(0.05f, 0.10f, 0.18f, 1.0f));
-    ctx.ClearDepth(1.0f);
+        // Привязываем только буфер глубины, рендер-таргет отключаем
+        ctx.SetRenderTarget(nullptr, false);
+        ctx.SetDepthBuffer(g_depthOnly.get());
 
-    // ── Draw sphere ──────────────────────────────────────────
-    ctx.SetConstantBuffer(mvpCB);
-    ctx.DrawIndexed();
+        // Пиксельный шейдер не обязателен, но можно и nullptr
+        ctx.SetPixelShader(nullptr);
+
+        ctx.ClearDepth(1.0f);                // очистка глубины
+        ctx.SetConstantBuffer(mvpCB);
+        ctx.DrawIndexed();                   // рисуем сферу (только глубина!)
+    }
+
+    // ── 2. Копирование глубины в текстуру ──────────────────
+    {
+        PROFILE_SCOPE("Copy Depth to Texture");
+        CopyDepthToTexture(*g_depthOnly, g_depthAsTexture->Texture());
+    }
+
+    // ── 3. Визуализация глубины на весь экран ──────────────
+    {
+        PROFILE_SCOPE("Visualize Depth");
+
+        // Рендерим в бэкбуфер, depth-буфер не нужен
+        ctx.SetRenderTarget(&g_device->GetBackBuffer(), false);
+        ctx.SetDepthBuffer(nullptr);         // можно оставить старый, но не используется
+
+        // Привязываем текстуру глубины для шейдера
+        SamplerState sampler;
+        sampler.filter = Filter::Bilinear;
+        ctx.SetTexture("t_depth", &g_depthAsTexture->Texture(), sampler);
+
+        ctx.SetPixelShader(DepthVisualizePS);
+        ctx.DrawFullScreenQuad();            // полноэкранный квад
+    }
 
     g_device->Present();
 }
 
 void UpdateFPSCounter()
 {
-    // ── FPS counter ──────────────────────────────────────────
     static UINT64 frameCount = 0;
     static UINT64 lastUpdateTime = GetTickCount64();
     ++frameCount;
@@ -216,11 +217,10 @@ void UpdateFPSCounter()
 
     if (elapsed >= 1000)
     {
-        // Frames rendered in the last elapsed milliseconds
         double fps = double(frameCount) * 1000.0 / double(elapsed);
 
         char title[128];
-        sprintf_s(title, "SoftX — UV Checker Sphere | FPS: %.1f", fps);
+        sprintf_s(title, "SoftX — Depth-Only Pass + Visualization | FPS: %.1f", fps);
         SetWindowTextA(g_hWnd, title);
 
         frameCount = 0;
@@ -253,21 +253,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
     // Register window class
-    WNDCLASSEX wc    = {};
-    wc.cbSize        = sizeof(WNDCLASSEX);
-    wc.style         = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc   = WndProc;
-    wc.hInstance     = hInstance;
-    wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
-    wc.lpszClassName = L"SoftXDemoWindow";
+    wc.lpszClassName = L"SoftXDepthDemo";
     RegisterClassEx(&wc);
 
     // Create window
-    RECT rc = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+    RECT rc = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
     g_hWnd = CreateWindowEx(
-        0, L"SoftXDemoWindow", L"SoftX — UV Checker Sphere",
+        0, L"SoftXDepthDemo", L"SoftX — Depth-Only Pass + Visualization",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
         rc.right - rc.left, rc.bottom - rc.top,
         nullptr, nullptr, hInstance, nullptr);
@@ -278,23 +278,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
 
-    // Create checker texture (lives for the entire program lifetime)
-    TextureRGBA32F checkerTexture = CreateUVCheckerTexture();
-
     // Create device
     PresentParameters params;
     params.BackBufferSize = uint2(WINDOW_WIDTH, WINDOW_HEIGHT);
-    params.hDeviceWindow  = g_hWnd;
-    params.Windowed       = true;
+    params.hDeviceWindow = g_hWnd;
+    params.Windowed = true;
 
     Device device(params);
     g_device = &device;
 
+    // ── Создание ресурсов для depth-only ────────────────────
+    uint2 depthSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+    g_depthOnly = std::make_unique<DepthBuffer>(depthSize);
+    g_depthAsTexture = std::make_unique<RenderTargetTexture>(depthSize);
+
     // Configure context
     DeviceContext& ctx = g_device->GetImmediateContext();
-    ctx.SetRenderTarget(&device.GetBackBuffer(), true);
     ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
-    ctx.SetTexture("t_albedo", &checkerTexture, SamplerState{Filter::Bilinear, Wrap::Repeat, Wrap::Repeat});
 
     // Build sphere geometry
     VertexBuffer vb;
@@ -304,11 +304,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetVertexBuffer(vb);
     ctx.SetIndexBuffer(ib);
     ctx.SetVertexShader(TransformVS);
-    ctx.SetPixelShader(CheckerPS);
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
-    ctx.SetTileSize(128);
+    ctx.SetTileSize(64);
     ctx.SetFillMode(FillMode::Solid);
+
+    // Начальная привязка (не обязательна, но для порядка)
+    ctx.SetRenderTarget(&device.GetBackBuffer(), false);
 
     // Message loop
     MSG msg = {};

@@ -36,14 +36,14 @@ public:
         uint8_t g = toByte(c.y);
         uint8_t b = toByte(c.z);
         uint8_t a = toByte(c.w);
-        return (a << 24) | (b << 16) | (g << 8) | r; // BGRA
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     static __m128 UnpackColor(uint32_t bgra)
     {
-        uint8_t b = (bgra >> 16) & 0xFF;
+        uint8_t r = (bgra >> 16) & 0xFF;
         uint8_t g = (bgra >> 8) & 0xFF;
-        uint8_t r = (bgra >> 0) & 0xFF;
+        uint8_t b = (bgra >> 0) & 0xFF;
         uint8_t a = (bgra >> 24) & 0xFF;
         const float inv255 = 1.0f / 255.0f;
         return _mm_set_ps(a * inv255, b * inv255, g * inv255, r * inv255);
@@ -55,7 +55,6 @@ public:
         size_t count = pixelsStorage.size();
         size_t i = 0;
 
-        // Заполняем блоками по 4 пикселя с помощью streaming stores
         __m128i bg4 = _mm_set1_epi32(bg);
         for (; i + 4 <= count; i += 4)
         {
@@ -63,7 +62,6 @@ public:
         }
         _mm_sfence();
 
-        // Обрабатываем оставшиеся пиксели
         for (; i < count; ++i)
         {
             pixelsStorage[i] = bg;
@@ -76,7 +74,6 @@ public:
         pixelsStorage[index] = PackColor(color);
     }
 
-    // Чтение пикселя в формате float4 (удобно для растеризаторов)
     __m128 Read(uint2 coords) const
     {
         uint32_t bg = pixelsStorage[coords.y * resolution.x + coords.x];
@@ -87,7 +84,6 @@ public:
     uint Height() const override { return resolution.y; }
     uint2 Size() const override { return resolution; }
 
-    // Вывод на экран через GDI
     void Present(HDC hdc, int2 dstPos, int2 dstSize) const
     {
         PROFILE_SCOPE("Present framebuffer");

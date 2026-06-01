@@ -12,7 +12,7 @@ static inline void ShadeSinglePixel(
     int64_t sf12, int64_t sf20, int64_t sf01,
     int64_t area2Int,
     const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2,
-    DepthBuffer& depthBuffer, IRenderTarget& renderTarget,
+    DepthBuffer& depthBuffer, IRenderTarget* renderTarget,
     const PixelShader& ps, const ConstantBuffer& cb, const TextureTable* tt,
     const RasterizerState& state,
     uint width)
@@ -40,7 +40,8 @@ static inline void ShadeSinglePixel(
     if (depthPass)
     {
         depthBuffer.At(idx) = frag.Position.z;
-        renderTarget.SetPixel(uint2(x, y), ps(frag, cb, *tt));
+        if(renderTarget != nullptr)
+            renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
     }
 }
 
@@ -50,7 +51,7 @@ void RasterizerScalar::RasterizeTriangle(
     const VertexOutput& v2,
     const RasterizerState& state,
     DepthBuffer& depthBuffer,
-    IRenderTarget& renderTarget,
+    IRenderTarget* renderTarget,
     const PixelShader& ps,
     const ConstantBuffer& cb,
     const TextureTable* tt,
@@ -90,7 +91,11 @@ void RasterizerScalar::RasterizeTriangle(
     if (area2Int < 0)
         area2Int = -area2Int;
 
-    const uint width = renderTarget.Width();
+    uint width = 0;
+    if (renderTarget)
+        width = renderTarget->Width();
+    else
+        width = depthBuffer.Width();
 
     // ── Traversal path selection ─────────────────────────────────────────────
     //

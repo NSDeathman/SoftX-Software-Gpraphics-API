@@ -12,7 +12,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
                                       const VertexOutput& v2,
                                       const RasterizerState& state,
                                       DepthBuffer& depthBuffer,
-                                      IRenderTarget& renderTarget,
+                                      IRenderTarget* renderTarget,
                                       const PixelShader& ps,
                                       const ConstantBuffer& cb,
                                       const TextureTable* tt,
@@ -139,7 +139,11 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     // Inside test: f >= 0  ↔  f > -1 (one cmpgt instead of two cmpge/cmple)
     const __m128i minusOne = _mm_set1_epi32(-1);
 
-    const uint width = renderTarget.Width();
+    uint width = 0;
+    if (renderTarget)
+        width = renderTarget->Width();
+    else
+        width = depthBuffer.Width();
 
     for (int y = iMinY; y <= iMaxY; ++y)
     {
@@ -266,13 +270,14 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
                 if (!(depthMask & (1 << i))) continue;
                 uint px = x + i;
                 if (px < tileMin.x || px > tileMax.x) continue;
+                if (renderTarget == nullptr) continue;
 
                 VertexOutput frag;
                 frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
                 frag.UV       = float2(uArr[i], vArr[i]);
-                renderTarget.SetPixel(uint2(px, y), ps(frag, cb, *tt));
+                renderTarget->SetPixel(uint2(px, y), ps(frag, cb, *tt));
             }
         }
 
@@ -327,7 +332,8 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             if (depthPass)
             {
                 depthBuffer.At(idx) = frag.Position.z;
-                renderTarget.SetPixel(uint2(x, y), ps(frag, cb, *tt));
+                if(renderTarget != nullptr)
+                    renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
             }
         }
     }

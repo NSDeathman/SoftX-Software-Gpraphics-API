@@ -25,7 +25,7 @@ void DeviceContext::DrawDebugLine(int x0, int y0, int x1, int y1, const float4& 
     {
         if (x < (int)rt->Width() && y < (int)rt->Height())
         {
-            rt->SetPixel(uint2(x, y), color);
+            if (renderTarget) rt->SetPixel(uint2(x, y), color);
         }
         if (x == x1 && y == y1)
             break;

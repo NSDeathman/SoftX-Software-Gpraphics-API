@@ -13,7 +13,7 @@ class SOFTX_API RasterizerScalar : public IRasterizer
                            const VertexOutput& v2,
                            const RasterizerState& state,
                            DepthBuffer& depthBuffer,
-                           IRenderTarget& renderTarget,
+                           IRenderTarget* renderTarget,
                            const PixelShader& ps,
                            const ConstantBuffer& cb,
                            const TextureTable* tt,

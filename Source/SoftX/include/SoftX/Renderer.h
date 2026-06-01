@@ -9,7 +9,7 @@ class Renderer
 {
 public:
     Renderer(IRasterizer& rasterizer,
-             IRenderTarget& renderTarget,
+             IRenderTarget* renderTarget,
              DepthBuffer& depthBuffer,
              const PixelShader& pixelShader,
              const ConstantBuffer& constantBuffer,
@@ -30,14 +30,15 @@ private:
     void RenderTiles();
 
     IRasterizer& rasterizer;
-    IRenderTarget& renderTarget;
+    IRenderTarget* renderTarget;
     DepthBuffer& depthBuffer;
     const PixelShader& pixelShader;
     const ConstantBuffer& constantBuffer;
     const TextureTable* textureTable;
     RasterizerState state;
     uint tileSize;
-
+    uint width;
+    uint height;
     std::vector<Tile> tiles;
     const std::vector<VertexOutput>* verts = nullptr;
     const std::vector<int3>* triangles = nullptr;

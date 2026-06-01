@@ -5,7 +5,7 @@
 SOFTX_BEGIN
 
 Renderer::Renderer(IRasterizer& rasterizer,
-                   IRenderTarget& rt,
+                   IRenderTarget* rt,
                    DepthBuffer& db,
                    const PixelShader& ps,
                    const ConstantBuffer& cb,
@@ -21,6 +21,16 @@ Renderer::Renderer(IRasterizer& rasterizer,
                    state(state),
                    tileSize(tileSize)
 {
+    if (renderTarget != nullptr)
+    {
+        width = renderTarget->Width();
+        height = renderTarget->Height();
+    }
+    else
+    {
+        width = depthBuffer.Width();
+        height = depthBuffer.Height();
+    }
 }
 
 void Renderer::Execute(const std::vector<VertexOutput>& inputVerts, const std::vector<int3>& inputTriangles)
@@ -28,27 +38,27 @@ void Renderer::Execute(const std::vector<VertexOutput>& inputVerts, const std::v
     PROFILE_SCOPE("Renderer::Execute");
     this->verts = &inputVerts;
     this->triangles = &inputTriangles;
-    BuildTiles(renderTarget.Width(), renderTarget.Height());
+    BuildTiles(width, height);
     BinTriangles(inputVerts, inputTriangles);
     RenderTiles();
     this->verts = nullptr;
     this->triangles = nullptr;
 }
 
-void Renderer::BuildTiles(uint width, uint height)
+void Renderer::BuildTiles(uint global_width, uint global_height)
 {
     PROFILE_SCOPE("Renderer::BuildTiles");
     tiles.clear();
     uint ts = tileSize;
-    uint tilesX = (width + ts - 1) / ts;
-    uint tilesY = (height + ts - 1) / ts;
+    uint tilesX = (global_width + ts - 1) / ts;
+    uint tilesY = (global_height + ts - 1) / ts;
     for (uint ty = 0; ty < tilesY; ++ty)
     {
         for (uint tx = 0; tx < tilesX; ++tx)
         {
             uint2 mn(tx * ts, ty * ts);
-            uint2 mx(std::min((tx + 1) * ts - 1, width - 1),
-                     std::min((ty + 1) * ts - 1, height - 1));
+            uint2 mx(std::min((tx + 1) * ts - 1, global_width - 1),
+                     std::min((ty + 1) * ts - 1, global_height - 1));
             tiles.emplace_back(mn, mx);
         }
     }
@@ -61,10 +71,10 @@ void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts, const s
         t.triangleIndices.clear();
 
     uint ts = tileSize;
-    uint tilesX = (renderTarget.Width() + ts - 1) / ts;
-    uint tilesY = (renderTarget.Height() + ts - 1) / ts;
-    float rtWidthF = (float)renderTarget.Width() - 1.0f;
-    float rtHeightF = (float)renderTarget.Height() - 1.0f;
+    uint tilesX = (width + ts - 1) / ts;
+    uint tilesY = (height + ts - 1) / ts;
+    float rtWidthF = (float)width - 1.0f;
+    float rtHeightF = (float)height - 1.0f;
 
     for (int triIdx = 0; triIdx < static_cast<int>(inputTriangles.size()); ++triIdx)
     {
