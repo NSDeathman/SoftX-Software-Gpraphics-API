@@ -2,7 +2,7 @@
 
 #include "LibInternal.h"
 #include "RenderTargetInterface.h"
-#include "Texture.h"
+#include "TextureRGBA32F.h"
 #include "ThirdPartyIncluding.h"
 
 SOFTX_BEGIN

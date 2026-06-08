@@ -203,6 +203,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\SoftX\CPUDetector.h" />
     <ClInclude Include="..\include\SoftX\DepthBuffer.h" />
+    <ClInclude Include="..\include\SoftX\DepthTextureView.h" />
     <ClInclude Include="..\include\SoftX\Device.h" />
     <ClInclude Include="..\include\SoftX\DeviceContext.h" />
     <ClInclude Include="..\include\SoftX\FrameBuffer.h" />
@@ -216,7 +217,8 @@
     <ClInclude Include="..\include\SoftX\RenderTargetInterface.h" />
     <ClInclude Include="..\include\SoftX\RenderTargetTexture.h" />
     <ClInclude Include="..\include\SoftX\SoftX.h" />
-    <ClInclude Include="..\include\SoftX\Texture.h" />
+    <ClInclude Include="..\include\SoftX\TextureRGBA32F.h" />
+    <ClInclude Include="..\include\SoftX\TextureInterface.h" />
     <ClInclude Include="..\include\SoftX\ThirdPartyIncluding.h" />
     <ClInclude Include="..\include\SoftX\ThreadPool.h" />
     <ClInclude Include="..\include\SoftX\ThreadPoolManager.h" />

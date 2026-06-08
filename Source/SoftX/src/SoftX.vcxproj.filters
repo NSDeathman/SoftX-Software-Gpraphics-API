@@ -40,16 +40,7 @@
     <ClInclude Include="..\include\SoftX\ThirdPartyIncluding.h">
       <Filter>Include\Library kernel</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\SoftX\DepthBuffer.h">
-      <Filter>Include\Resources</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\FrameBuffer.h">
-      <Filter>Include\Resources</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\SoftX\Types.h">
-      <Filter>Include\Resources</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\Texture.h">
       <Filter>Include\Resources</Filter>
     </ClInclude>
     <ClInclude Include="..\include\SoftX\RenderTargetInterface.h">
@@ -66,6 +57,21 @@
     </ClInclude>
     <ClInclude Include="..\include\SoftX\Renderer.h">
       <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\TextureRGBA32F.h">
+      <Filter>Include\Resources\Textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\TextureInterface.h">
+      <Filter>Include\Resources\Textures</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\DepthBuffer.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\FrameBuffer.h">
+      <Filter>Include\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\DepthTextureView.h">
+      <Filter>Include\Resources\Textures</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -136,6 +142,9 @@
     </Filter>
     <Filter Include="Include\Resources">
       <UniqueIdentifier>{35b70c0c-d052-47ae-a192-33e9dd03fce5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Resources\Textures">
+      <UniqueIdentifier>{81064715-bdee-4e43-8282-2ce06654c3e1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -6,7 +6,6 @@
 #include <cmath>
 
 #include <SoftX/SoftX.h>
-#pragma comment(lib, "SoftX.lib")
 
 using namespace SoftX;
 using namespace AfterMath;
@@ -15,7 +14,7 @@ using namespace AfterMath;
 //  Constants
 // ============================================================
 static constexpr int WINDOW_WIDTH = 1280;
-static constexpr int WINDOW_HEIGHT = 768;
+static constexpr int WINDOW_HEIGHT = 720;
 
 // ============================================================
 //  Globals
@@ -23,9 +22,9 @@ static constexpr int WINDOW_HEIGHT = 768;
 static HWND    g_hWnd = nullptr;
 static Device* g_device = nullptr;
 
-// Глобальные ресурсы для depth-only прохода
-static std::unique_ptr<DepthBuffer>        g_depthOnly;      // отдельный буфер глубины
-static std::unique_ptr<RenderTargetTexture> g_depthAsTexture; // текстура, в которую скопируем глубину
+// Ресурсы для depth‑only прохода
+static std::unique_ptr<DepthBuffer>      g_depthOnly; // буфер глубины
+static std::unique_ptr<DepthTextureView> g_depthView; // представление буфера как текстуры
 
 // ============================================================
 //  Constant buffer
@@ -50,11 +49,15 @@ VertexOutput TransformVS(const VertexInput& input, const ConstantBuffer& cb, con
     return output;
 }
 
-// Пиксельный шейдер для визуализации глубины: просто сэмплирует текстуру
+// Пиксельный шейдер визуализации глубины:
+// сэмплирует текстуру глубины (через ITexture) и показывает инвертированную глубину
 float4 DepthVisualizePS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
     const auto& depthTex = tex.Get("t_depth");
-    return depthTex.Sample(input.UV);
+    float depth = depthTex.Sample(input.UV).x; // берём красный канал (r = depth)
+    // Инвертируем для наглядности: ближние пиксели ярче
+    float brightness = (1.0f - depth) * 200.0f;
+    return float4(brightness, brightness, brightness, 1.0f);
 }
 
 // ============================================================
@@ -116,28 +119,6 @@ void CreateSphere(VertexBuffer& vb, IndexBuffer& ib,
 }
 
 // ============================================================
-//  Копирование глубины в текстуру (CPU)
-//  В реальном коде это делалось бы через рендер в R32F текстуру,
-//  но для демонстрации копируем вручную.
-// ============================================================
-void CopyDepthToTexture(const DepthBuffer& src, TextureRGBA32F& dst)
-{
-    uint w = src.Width();
-    uint h = src.Height();
-    for (uint y = 0; y < h; ++y)
-    {
-        for (uint x = 0; x < w; ++x)
-        {
-            float depth = src.At(int2(x, y));
-            // Визуализация: инвертируем глубину, чтобы ближние объекты были ярче
-            float grey = (1.0f - depth) * 100.0f;
-            __m128 col = _mm_set_ps(1.0f, grey, grey, grey); // A=1, BGR=grey
-            dst.StreamWrite(uint2(x, y), col);
-        }
-    }
-}
-
-// ============================================================
 //  Per-frame rendering
 // ============================================================
 void DrawFrame()
@@ -173,7 +154,7 @@ void DrawFrame()
         ctx.SetDepthBuffer(g_depthOnly.get());
         ctx.SetDepthWriteEnable(true);
 
-        // Пиксельный шейдер не обязателен, но можно и nullptr
+        // Пиксельный шейдер не нужен (игнорируется растеризатором)
         ctx.SetPixelShader(nullptr);
 
         ctx.ClearDepth(1.0f);                // очистка глубины
@@ -181,27 +162,21 @@ void DrawFrame()
         ctx.DrawIndexed();                   // рисуем сферу (только глубина!)
     }
 
-    // ── 2. Копирование глубины в текстуру ──────────────────
-    {
-        PROFILE_SCOPE("Copy Depth to Texture");
-        CopyDepthToTexture(*g_depthOnly, g_depthAsTexture->Texture());
-    }
-
-    // ── 3. Визуализация глубины на весь экран ──────────────
+    // ── 2. Визуализация глубины на весь экран ──────────────
     {
         PROFILE_SCOPE("Visualize Depth");
 
-        // Рендерим в бэкбуфер, depth-буфер не нужен
+        // Рендерим в бэкбуфер, глубина не нужна
         ctx.SetRenderTarget(&g_device->GetBackBuffer(), false);
-        ctx.SetDepthBuffer(nullptr);         // можно оставить старый, но не используется
+        ctx.SetDepthBuffer(nullptr);
 
-        // Привязываем текстуру глубины для шейдера
+        // Привязываем DepthTextureView как текстуру напрямую
         SamplerState sampler;
-        sampler.filter = Filter::Bilinear;
-        ctx.SetTexture("t_depth", &g_depthAsTexture->Texture(), sampler);
+        sampler.filter = Filter::Bilinear;   // билинейная фильтрация глубины
+        ctx.SetTexture("t_depth", g_depthView.get(), sampler);
 
         ctx.SetPixelShader(DepthVisualizePS);
-        ctx.DrawFullScreenQuad();            // полноэкранный квад
+        ctx.DrawFullScreenQuad();
     }
 
     g_device->Present();
@@ -221,7 +196,7 @@ void UpdateFPSCounter()
         double fps = double(frameCount) * 1000.0 / double(elapsed);
 
         char title[128];
-        sprintf_s(title, "SoftX — Depth-Only Pass + Visualization | FPS: %.1f", fps);
+        sprintf_s(title, "SoftX — Depth-Only Pass (direct view) | FPS: %.1f", fps);
         SetWindowTextA(g_hWnd, title);
 
         frameCount = 0;
@@ -268,7 +243,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     RECT rc = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
     g_hWnd = CreateWindowEx(
-        0, L"SoftXDepthDemo", L"SoftX — Depth-Only Pass + Visualization",
+        0, L"SoftXDepthDemo", L"SoftX — Depth-Only Pass (direct view)",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
         rc.right - rc.left, rc.bottom - rc.top,
         nullptr, nullptr, hInstance, nullptr);
@@ -288,10 +263,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     Device device(params);
     g_device = &device;
 
-    // ── Создание ресурсов для depth-only ────────────────────
-    uint2 depthSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-    g_depthOnly = std::make_unique<DepthBuffer>(depthSize);
-    g_depthAsTexture = std::make_unique<RenderTargetTexture>(depthSize);
+    // ── Ресурсы для depth‑only ────────────────────────────
+    g_depthOnly = std::make_unique<DepthBuffer>(uint2(WINDOW_WIDTH, WINDOW_HEIGHT));
+    g_depthView = std::make_unique<DepthTextureView>(g_depthOnly.get());
 
     // Configure context
     DeviceContext& ctx = g_device->GetImmediateContext();
@@ -310,7 +284,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetTileSize(64);
     ctx.SetFillMode(FillMode::Solid);
 
-    // Начальная привязка (не обязательна, но для порядка)
+    // Начальная привязка (backbuffer)
     ctx.SetRenderTarget(&device.GetBackBuffer(), false);
 
     // Message loop

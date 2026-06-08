@@ -7,8 +7,10 @@
 #include <cassert>
 
 #include "LibInternal.h"
-#include "Texture.h"
 #include "ThirdPartyIncluding.h"
+
+#include "TextureRGBA32F.h"
+#include "DepthTextureView.h"
 
 SOFTX_BEGIN
 
@@ -191,20 +193,20 @@ struct SamplerState
 struct TextureBinding
 {
 private:
-    const TextureRGBA32F* texture = nullptr;
+    const ITexture* texture = nullptr;
     SamplerState sampler;
 
 public:
     TextureBinding() = default;
 
-    TextureBinding(const TextureRGBA32F* tex, SamplerState samp = SamplerState{}) : texture(tex), sampler(samp)
+    TextureBinding(const ITexture* tex, SamplerState samp = SamplerState{}) : texture(tex), sampler(samp)
     {
     }
 
     bool IsValid() const { return texture != nullptr; }
     bool IsEmpty() const { return !IsValid(); }
 
-    void SetTexture(const TextureRGBA32F* tex) { texture = tex; }
+    void SetTexture(const ITexture* tex) { texture = tex; }
     void SetSamplerState(SamplerState samp) { sampler = samp; }
 
     float4 Sample(float2 uv) const
@@ -229,7 +231,7 @@ public:
 class TextureTable
 {
 public:
-    void Set(const std::string& name, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{})
+    void Set(const std::string& name, const ITexture* texture, SamplerState sampler = SamplerState{})
     {
         bindings[name] = { texture, sampler };
     }

@@ -9,10 +9,11 @@
 
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
+#include "TextureInterface.h"
 
 SOFTX_BEGIN
 
-class SOFTX_API TextureRGBA32F
+class SOFTX_API TextureRGBA32F : public ITexture
 {
 public:
     explicit TextureRGBA32F(uint2 size) : resolution(size), pixels(size.x * size.y)
@@ -50,13 +51,13 @@ public:
         return pixels[y * resolution.x + x];
     }
 
-    float4 Sample(float2 uv) const
+    float4 Sample(float2 uv) const override
     {
         __m128 color = SampleRaw(uv);
         return float4(color);
     }
 
-    __m128 FetchRaw(int x, int y) const
+    __m128 FetchRaw(int x, int y) const override
     {
         x = std::clamp(x, 0, (int)resolution.x - 1);
         y = std::clamp(y, 0, (int)resolution.y - 1);
@@ -100,7 +101,7 @@ public:
     }
 
     // Public float4 version – delegates to raw version
-    float4 SampleBilinear(float2 uv) const
+    float4 SampleBilinear(float2 uv) const override
     {
         return float4(SampleBilinearRaw(uv));
     }
@@ -119,12 +120,12 @@ public:
         _mm_stream_ps(reinterpret_cast<float*>(&pixels[index]), color);
     }
 
-    uint Width() const
+    uint Width() const override
     {
         return resolution.x;
     }
 
-    uint Height() const
+    uint Height() const override
     {
         return resolution.y;
     }

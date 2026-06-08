@@ -35,7 +35,7 @@ public:
     void SetConstantBuffer(const ConstantBuffer& buffer);
     ConstantBuffer GetConstantBuffer() const;
 
-    void SetTexture(const std::string& name, const TextureRGBA32F* texture, SamplerState sampler = SamplerState{});
+    void SetTexture(const std::string& name, const ITexture* texture, SamplerState sampler = SamplerState{});
 
     void SetRenderTarget(IRenderTarget* target);
     void SetRenderTarget(IRenderTarget* target, bool createDepthBuffer = true);

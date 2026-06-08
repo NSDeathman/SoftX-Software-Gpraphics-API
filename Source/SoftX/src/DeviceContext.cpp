@@ -84,7 +84,7 @@ ConstantBuffer DeviceContext::GetConstantBuffer() const
     return constantBuffer;
 }
 
-void DeviceContext::SetTexture(const std::string& name, const TextureRGBA32F* texture, SamplerState sampler)
+void DeviceContext::SetTexture(const std::string& name, const ITexture* texture, SamplerState sampler)
 {
     textureTable.Set(name, texture, sampler);
 }
