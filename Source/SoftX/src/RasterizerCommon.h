@@ -228,7 +228,7 @@ namespace RasterizerCommon
 
             if (aIn != bIn) {
                 float t = (0.0f - A.Position.z) / (B.Position.z - A.Position.z);
-                t = std::clamp(t, 0.0f, 1.0f);
+                t = clamp(t, 0.0f, 1.0f);
                 poly[polySize++] = LerpVertexClipSpace(A, B, t);
             }
         }

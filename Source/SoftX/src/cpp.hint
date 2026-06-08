@@ -6,3 +6,6 @@
 #define PROFILE_SCOPE(x)
 #define PROFILE_SCOPE(x) OPTICK_EVENT(x)
 #define PROFILE_SCOPE(x)
+#define UNLIKELY [[unlikely]]
+#define UNLIKELY
+#define SOFTX_END }

@@ -11,6 +11,7 @@
 
 #include "TextureRGBA32F.h"
 #include "DepthTextureView.h"
+#include <unordered_map>
 
 SOFTX_BEGIN
 
@@ -172,7 +173,7 @@ struct SamplerState
         switch (mode)
         {
         case Wrap::Clamp:
-            return std::clamp(uv, 0.0f, 1.0f);
+            return clamp(uv, 0.0f, 1.0f);
         case Wrap::Mirror:
             {
                 float t = std::fmod(std::abs(uv), 2.0f);

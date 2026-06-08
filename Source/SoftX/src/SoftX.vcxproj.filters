@@ -13,24 +13,6 @@
     <ClInclude Include="pch.h">
       <Filter>Src\Library kernel</Filter>
     </ClInclude>
-    <ClInclude Include="RasterizerCommon.h">
-      <Filter>Src\Rasterizer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerAVX.h">
-      <Filter>Include\Rasterizer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerInterface.h">
-      <Filter>Include\Rasterizer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerFactory.h">
-      <Filter>Include\Rasterizer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerScalar.h">
-      <Filter>Include\Rasterizer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SoftX\RasterizerSSE.h">
-      <Filter>Include\Rasterizer</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\SoftX\CPUDetector.h">
       <Filter>Include\Tools</Filter>
     </ClInclude>
@@ -73,6 +55,33 @@
     <ClInclude Include="..\include\SoftX\DepthTextureView.h">
       <Filter>Include\Resources\Textures</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerAVX.h">
+      <Filter>Include\Rasterizer\Standard</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerFactory.h">
+      <Filter>Include\Rasterizer\Standard</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerInterface.h">
+      <Filter>Include\Rasterizer\Standard</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerScalar.h">
+      <Filter>Include\Rasterizer\Standard</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\RasterizerSSE.h">
+      <Filter>Include\Rasterizer\Standard</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\QueryRasterizerFactory.h">
+      <Filter>Include\Rasterizer\Query</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\QueryRasterizerInterface.h">
+      <Filter>Include\Rasterizer\Query</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\QueryRasterizerScalar.h">
+      <Filter>Include\Rasterizer\Query</Filter>
+    </ClInclude>
+    <ClInclude Include="RasterizerCommon.h">
+      <Filter>Src\Rasterizer\Standard</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Device.cpp">
@@ -90,29 +99,35 @@
     <ClCompile Include="pch.cpp">
       <Filter>Src\Library kernel</Filter>
     </ClCompile>
-    <ClCompile Include="RasterizerFactory.cpp">
-      <Filter>Src\Rasterizer</Filter>
-    </ClCompile>
-    <ClCompile Include="RasterizerScalar.cpp">
-      <Filter>Src\Rasterizer</Filter>
-    </ClCompile>
     <ClCompile Include="CPUDetector.cpp">
       <Filter>Src\Tools</Filter>
     </ClCompile>
     <ClCompile Include="ThreadPoolManager.cpp">
       <Filter>Src\Tools</Filter>
     </ClCompile>
-    <ClCompile Include="RasterizerSSE.cpp">
-      <Filter>Src\Rasterizer</Filter>
-    </ClCompile>
-    <ClCompile Include="RasterizerAVX.cpp">
-      <Filter>Src\Rasterizer</Filter>
-    </ClCompile>
     <ClCompile Include="DeviceContextDebug.cpp">
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="Renderer.cpp">
       <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="RasterizerAVX.cpp">
+      <Filter>Src\Rasterizer\Standard</Filter>
+    </ClCompile>
+    <ClCompile Include="RasterizerFactory.cpp">
+      <Filter>Src\Rasterizer\Standard</Filter>
+    </ClCompile>
+    <ClCompile Include="RasterizerScalar.cpp">
+      <Filter>Src\Rasterizer\Standard</Filter>
+    </ClCompile>
+    <ClCompile Include="RasterizerSSE.cpp">
+      <Filter>Src\Rasterizer\Standard</Filter>
+    </ClCompile>
+    <ClCompile Include="QueryRasterizerFactory.cpp">
+      <Filter>Src\Rasterizer\Query</Filter>
+    </ClCompile>
+    <ClCompile Include="QueryRasterizerScalar.cpp">
+      <Filter>Src\Rasterizer\Query</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -145,6 +160,18 @@
     </Filter>
     <Filter Include="Include\Resources\Textures">
       <UniqueIdentifier>{81064715-bdee-4e43-8282-2ce06654c3e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Rasterizer\Standard">
+      <UniqueIdentifier>{94eeadfc-8a4e-4473-a187-c020c79a6884}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Rasterizer\Query">
+      <UniqueIdentifier>{d1fb7987-a3d2-45ee-ba1c-71004db70a30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Rasterizer\Standard">
+      <UniqueIdentifier>{06a3abe7-21ef-4788-bb77-8e13e036da5d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Rasterizer\Query">
+      <UniqueIdentifier>{e327d422-6520-4a2a-874e-43b37ef65abd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

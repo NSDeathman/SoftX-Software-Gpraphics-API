@@ -54,8 +54,7 @@ VertexOutput TransformVS(const VertexInput& input, const ConstantBuffer& cb, con
 float4 DepthVisualizePS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
     const auto& depthTex = tex.Get("t_depth");
-    float depth = depthTex.Sample(input.UV).x; // берём красный канал (r = depth)
-    // Инвертируем для наглядности: ближние пиксели ярче
+    float depth = depthTex.Sample(input.UV).x;
     float brightness = (1.0f - depth) * 200.0f;
     return float4(brightness, brightness, brightness, 1.0f);
 }
