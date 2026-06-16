@@ -1,10 +1,15 @@
+/////////////////////////////////////////////////////////////////
+// SoftX – Software Graphics API
+// Copyright (c) 2026 NSDeathman
+// Licensed under the MIT License.
+/////////////////////////////////////////////////////////////////
 #pragma once
-
+/////////////////////////////////////////////////////////////////
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
 #include "TextureInterface.h"
 #include "DepthBuffer.h"
-
+/////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 class SOFTX_API DepthTextureView : public ITexture
@@ -33,10 +38,10 @@ public:
         float fy = uv.y * h - 0.5f;
         int x0 = (int)std::floor(fx);
         int y0 = (int)std::floor(fy);
-        x0 = clamp(x0, 0, w - 1);
-        y0 = clamp(y0, 0, h - 1);
-        int x1 = clamp(x0 + 1, 0, w - 1);
-        int y1 = clamp(y0 + 1, 0, h - 1);
+        x0 = AfterMath::clamp(x0, 0, w - 1);
+        y0 = AfterMath::clamp(y0, 0, h - 1);
+        int x1 = AfterMath::clamp(x0 + 1, 0, w - 1);
+        int y1 = AfterMath::clamp(y0 + 1, 0, h - 1);
 
         float tx = fx - x0;
         float ty = fy - y0;
@@ -62,3 +67,4 @@ private:
 };
 
 SOFTX_END
+/////////////////////////////////////////////////////////////////

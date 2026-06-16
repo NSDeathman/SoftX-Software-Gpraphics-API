@@ -7,7 +7,7 @@
 #include <cmath>
 #include <ctime>
 
-#include <SoftX/SoftX.h>
+#include <SoftX.h>
 #pragma comment(lib, "SoftX.lib")
 
 using namespace SoftX;
