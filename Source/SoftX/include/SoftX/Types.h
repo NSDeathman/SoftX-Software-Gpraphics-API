@@ -18,9 +18,10 @@ SOFTX_BEGIN
 // Presentation parameters
 struct PresentParameters
 {
-    uint2 BackBufferSize;
-    HWND hDeviceWindow;
-    bool Windowed;
+    uint2 BackBufferSize = uint2(1, 1);
+    HWND hDeviceWindow = nullptr;
+    bool Windowed = true;
+    bool Headless = false;
 };
 
 // Input vertex structure (model space)

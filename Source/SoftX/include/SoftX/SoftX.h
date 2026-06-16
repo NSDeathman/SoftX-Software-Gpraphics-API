@@ -18,5 +18,13 @@
 
 #include "Renderer.h"
 
+#include "QueryRasterizerInterface.h"
+#include "QueryRasterizerFactory.h"
+#include "QueryRasterizerScalar.h"
+#include "QueryRasterizerSSE.h"
+#include "QueryRasterizerAVX.h"
+
+#include "OcclusionQuery.h"
+
 #include "Device.h"
 #include "DeviceContext.h"

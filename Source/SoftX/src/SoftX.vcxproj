@@ -106,7 +106,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <FloatingPointModel>Fast</FloatingPointModel>
       <ExpandAttributedSource>false</ExpandAttributedSource>
@@ -129,7 +129,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <Optimization>MaxSpeed</Optimization>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -157,7 +157,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <FloatingPointModel>Fast</FloatingPointModel>
       <ExpandAttributedSource>false</ExpandAttributedSource>
@@ -180,7 +180,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <Optimization>MaxSpeed</Optimization>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -208,9 +208,12 @@
     <ClInclude Include="..\include\SoftX\DeviceContext.h" />
     <ClInclude Include="..\include\SoftX\FrameBuffer.h" />
     <ClInclude Include="..\include\SoftX\LibInternal.h" />
+    <ClInclude Include="..\include\SoftX\OcclusionQuery.h" />
+    <ClInclude Include="..\include\SoftX\QueryRasterizerAVX.h" />
     <ClInclude Include="..\include\SoftX\QueryRasterizerFactory.h" />
     <ClInclude Include="..\include\SoftX\QueryRasterizerInterface.h" />
     <ClInclude Include="..\include\SoftX\QueryRasterizerScalar.h" />
+    <ClInclude Include="..\include\SoftX\QueryRasterizerSSE.h" />
     <ClInclude Include="..\include\SoftX\RasterizerAVX.h" />
     <ClInclude Include="..\include\SoftX\RasterizerInterface.h" />
     <ClInclude Include="..\include\SoftX\RasterizerFactory.h" />
@@ -235,14 +238,17 @@
     <ClCompile Include="DeviceContext.cpp" />
     <ClCompile Include="DeviceContextDebug.cpp" />
     <ClCompile Include="DeviceContextDraw.cpp" />
+    <ClCompile Include="OcclusionQuery.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="QueryRasterizerAVX.cpp" />
     <ClCompile Include="QueryRasterizerFactory.cpp" />
     <ClCompile Include="QueryRasterizerScalar.cpp" />
+    <ClCompile Include="QueryRasterizerSSE.cpp" />
     <ClCompile Include="RasterizerAVX.cpp" />
     <ClCompile Include="RasterizerFactory.cpp" />
     <ClCompile Include="RasterizerScalar.cpp" />
@@ -255,6 +261,9 @@
     <ProjectReference Include="..\..\Optick\Include\OptickCore.vcxproj">
       <Project>{830934d9-6f6c-c37d-18f2-fb3304348f00}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

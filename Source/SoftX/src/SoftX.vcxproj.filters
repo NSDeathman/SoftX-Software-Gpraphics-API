@@ -82,6 +82,15 @@
     <ClInclude Include="RasterizerCommon.h">
       <Filter>Src\Rasterizer\Standard</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\SoftX\OcclusionQuery.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\QueryRasterizerSSE.h">
+      <Filter>Include\Rasterizer\Query</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SoftX\QueryRasterizerAVX.h">
+      <Filter>Include\Rasterizer\Query</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Device.cpp">
@@ -129,6 +138,15 @@
     <ClCompile Include="QueryRasterizerScalar.cpp">
       <Filter>Src\Rasterizer\Query</Filter>
     </ClCompile>
+    <ClCompile Include="OcclusionQuery.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="QueryRasterizerSSE.cpp">
+      <Filter>Src\Rasterizer\Query</Filter>
+    </ClCompile>
+    <ClCompile Include="QueryRasterizerAVX.cpp">
+      <Filter>Src\Rasterizer\Query</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Include">
@@ -173,5 +191,8 @@
     <Filter Include="Src\Rasterizer\Query">
       <UniqueIdentifier>{e327d422-6520-4a2a-874e-43b37ef65abd}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
 </Project>
