@@ -168,9 +168,22 @@ enum class Wrap
     Mirror
 };
 
+enum class MipFilter
+{
+    Nearest,
+    Linear
+};
+
 struct SamplerState
 {
+    Filter minFilter = Filter::Bilinear;
+    Filter magFilter = Filter::Bilinear;
     Filter filter = Filter::Bilinear;
+    MipFilter mipFilter = MipFilter::Nearest;
+    float minLOD = 0.0f;
+    float maxLOD = 16.0f;
+    float lodBias = 0.0f;
+
     Wrap wrapU = Wrap::Repeat;
     Wrap wrapV = Wrap::Repeat;
 
@@ -205,10 +218,7 @@ private:
 
 public:
     TextureBinding() = default;
-
-    TextureBinding(const ITexture* tex, SamplerState samp = SamplerState{}) : texture(tex), sampler(samp)
-    {
-    }
+    TextureBinding(const ITexture* tex, SamplerState samp = SamplerState{}) : texture(tex), sampler(samp) {}
 
     bool IsValid() const { return texture != nullptr; }
     bool IsEmpty() const { return !IsValid(); }
@@ -223,10 +233,26 @@ public:
 
         float2 wrapped = sampler.ApplyWrap(uv);
 
-        if (sampler.filter == Filter::Bilinear)
+        if (sampler.minFilter == Filter::Bilinear)
             return texture->SampleBilinear(wrapped);
         else
             return texture->Sample(wrapped);
+    }
+
+    float4 SampleLevel(float2 uv, float lod) const
+    {
+        if (!texture)
+            return float4(1.0f, 0.0f, 1.0f, 1.0f);
+
+        float2 wrapped = sampler.ApplyWrap(uv);
+
+        lod = lod + sampler.lodBias;
+        lod = AfterMath::clamp(lod, sampler.minLOD, sampler.maxLOD);
+
+        if (sampler.mipFilter == MipFilter::Nearest)
+            lod = std::floor(lod + 0.5f);
+
+        return texture->SampleLevel(wrapped, lod);
     }
 
     uint2 GetDimensions() const
@@ -251,6 +277,16 @@ public:
 
         static const TextureBinding emptyBinding;
         return emptyBinding;
+    }
+
+    const float4 Sample(const std::string& name, float2 uv) const
+    {
+        return Get(name).Sample(uv);
+    }
+
+    const float4 SampleLevel(const std::string& name, float2 uv, float lod) const
+    {
+        return Get(name).SampleLevel(uv, lod);
     }
 
     const TextureBinding& operator[](const std::string& name) const { return Get(name); }

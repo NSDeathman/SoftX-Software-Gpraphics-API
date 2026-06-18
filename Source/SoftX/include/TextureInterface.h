@@ -17,12 +17,15 @@ public:
 
     virtual uint Width() const = 0;
     virtual uint Height() const = 0;
+    virtual uint MipCount() const { return 1; }
     uint2 Size() const { return uint2(Width(), Height()); }
 
     virtual float4 Sample(float2 uv) const = 0;
     virtual float4 SampleBilinear(float2 uv) const = 0;
+    virtual float4 SampleLevel(float2 uv, float lod) const { return Sample(uv); }
 
     virtual __m128 FetchRaw(int x, int y) const = 0;
+    virtual __m128 FetchRaw(int x, int y, uint level) const { return FetchRaw(x, y); }
 };
 
 SOFTX_END
