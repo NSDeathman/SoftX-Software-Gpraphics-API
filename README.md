@@ -54,7 +54,7 @@ ctx.SetVertexShader(vs);
 ctx.SetPixelShader(ps);
 ctx.SetVertexBuffer(myVertexBuffer);
 ctx.SetIndexBuffer(myIndexBuffer);
-ctx.SetRenderTarget(&device.GetBackBuffer());
+ctx.SetRenderTarget(device.GetBackBuffer());
 
 // Draw
 ctx.Clear(float4(0,0,0,1));
@@ -72,7 +72,7 @@ params.Headless = true;
 
 Device device(params);
 auto& ctx = device.GetImmediateContext();
-ctx.SetRenderTarget(&device.GetBackBuffer(), true);
+ctx.SetRenderTarget(device.GetBackBuffer(), true);
 ctx.SetViewport(Viewport(0, 0, 800, 600, 0.0f, 1.0f));
 
 // ... set shaders, vertex/index buffers, draw ...
@@ -89,7 +89,7 @@ params.ConsoleSize    = uint2(80, 40);    // character grid
 
 Device device(params);
 auto& ctx = device.GetImmediateContext();
-ctx.SetRenderTarget(&device.GetBackBuffer(), true);
+ctx.SetRenderTarget(device.GetBackBuffer(), true);
 ctx.SetViewport(Viewport(0, 0, 160, 80, 0.0f, 1.0f));
 
 while (running) {
