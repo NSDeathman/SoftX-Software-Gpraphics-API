@@ -10,7 +10,12 @@ It provides a DirectX‑style programming model with full support for **vertex**
 - **Multithreading** – create multiple deferred contexts to record command lists concurrently, then execute them in parallel.
 - **SIMD optimised rasterisers** – scalar, SSE, and AVX backends selected at runtime based on CPU capabilities.
 - **Shader support** – C++ callable objects (std::function) for vertex, geometry and pixel shaders; easy to integrate custom shading logic.
-- **Math library included** – **Presence AfterMath**, a HLSL‑friendly mathematics library with row‑major matrices and left‑handed coordinate space (identical to DirectX conventions). Low learning curve for HLSL developers.
+- **Occlusion query** – hardware‑style asynchronous occlusion queries with per‑draw call visibility results. Backed by a separate SIMD‑optimised query rasteriser that counts visible samples.
+- **MIP‑mapped textures** – textures support a full mip chain with automatic generation (`GenerateMips`), bilinear sampling at arbitrary LOD levels, and configurable sampler state (LOD bias, mip filter, clamp/repeat/mirror wrapping).
+- **Hi‑Z depth buffer** – hierarchical depth (Hi‑Z) buffer generation (min/max reduction) for efficient coarse‑grained depth testing and occlusion culling.
+- **Console rendering mode** – present the framebuffer as ASCII art directly to the Windows console. Use a configurable character gradient, automatic downsampling, and proper aspect‑ratio correction for crisp text‑mode output.
+- **Headless rendering** – render scenes without any visible window, ideal for off‑screen rendering, testing, or server‑side generation. Output can be saved to TGA or used programmatically.
+- **Math library included** – **AfterMath**, a HLSL‑friendly mathematics library with row‑major matrices and left‑handed coordinate space (identical to DirectX conventions). Low learning curve for HLSL developers.
 - **Dynamic link library** – compiled as a `.lib` import library with a DLL runtime (CRT linked dynamically).
 - **Wide compiler support** – compatible with C++14, C++17, and C++20 standards.
 
@@ -18,16 +23,19 @@ It provides a DirectX‑style programming model with full support for **vertex**
 
 SoftX is designed from the ground up for performance and flexibility:
 
-- **Device** – creates resources, owns the backbuffer and depth buffer.
+- **Device** – creates resources, owns the backbuffer and depth buffer, manages console output when in ASCII mode.
 - **Immediate Context** – the main rendering channel; submits commands directly to the driver (i.e., the software rasteriser).
 - **Deferred Contexts** – record rendering commands into command lists that can be executed later on the immediate context; perfect for multithreaded scene generation.
 - **Rasteriser** – pluggable backend (scalar, SSE, AVX) automatically chosen by `CPUDetector`.
 - **Tile‑based renderer** – splits the screen into tiles, bins triangles, and processes tiles in parallel using a thread pool.
+- **Occlusion Query** – dedicated query rasteriser runs geometry in a low‑overhead async pass, recording visible sample counts without pixel shading.
+- **Depth Buffer** – supports multiple MIP levels (Hi‑Z) for fast hierarchical depth tests, generated on demand.
+- **Textures** – `TextureRGBA32F` provides a full mip‑map chain, bilinear filtering, and LOD‑aware sampling through the sampler interface.
 - **Shader stages** – user‑supplied functors that follow a simple signature; no separate shader compilation required.
 
-## Example
+## Examples
 
-A minimal example of setting up a device, clearing the screen, and drawing a triangle can be found in the `examples/` folder.
+### A minimal example of setting up a device and clearing the screen
 
 ```cpp
 #include <SoftX/SoftX.h>
@@ -53,6 +61,81 @@ ctx.Clear(float4(0,0,0,1));
 ctx.DrawIndexed();
 device.Present();
 ```
+
+### Headless rendering
+Create a device without a window and save the result to a TGA file.
+
+```cpp
+PresentParameters params;
+params.BackBufferSize = uint2(800, 600);
+params.Headless = true;
+
+Device device(params);
+auto& ctx = device.GetImmediateContext();
+ctx.SetRenderTarget(&device.GetBackBuffer(), true);
+ctx.SetViewport(Viewport(0, 0, 800, 600, 0.0f, 1.0f));
+
+// ... set shaders, vertex/index buffers, draw ...
+```
+
+### Console (ASCII) rendering
+Render into a text console with a character gradient.
+
+```cpp
+PresentParameters params;
+params.BackBufferSize = uint2(160, 80);   // internal resolution
+params.Output         = PresentationMode::Console;
+params.ConsoleSize    = uint2(80, 40);    // character grid
+
+Device device(params);
+auto& ctx = device.GetImmediateContext();
+ctx.SetRenderTarget(&device.GetBackBuffer(), true);
+ctx.SetViewport(Viewport(0, 0, 160, 80, 0.0f, 1.0f));
+
+while (running) {
+    ctx.ClearColorAndDepth(float4(0,0,0,1), 1.0f);
+    // ... draw ...
+    device.Present();   // outputs ASCII art to the console
+}
+```
+<img width="1433" height="862" alt="image" src="https://github.com/user-attachments/assets/f82af2f0-0a73-4206-af65-5539bc0c8261" />
+
+### Occlusion query
+Determine which objects are visible without expensive pixel shading.
+```cpp
+// Create and begin a query
+OcclusionQuery query;
+query.SetDepthBuffer(*ctx.GetDepthBuffer());
+query.SetViewport(ctx.GetViewport());
+query.SetCullMode(CullMode::Back);
+query.SetDepthFunc(ComparisonFunc::Less);
+query.Begin();
+
+// Issue draw calls for occludees
+query.SetVertexBuffer(cubeVB);
+query.SetIndexBuffer(cubeIB);
+query.SetVertexShader(OcclusionVS);
+query.SetConstantBuffer(cubeCB);
+auto id0 = query.DrawIndexed();   // returns query ID for this draw
+
+query.SetVertexBuffer(sphereVB);
+query.SetIndexBuffer(sphereIB);
+query.SetConstantBuffer(sphereCB);
+auto id1 = query.DrawIndexed();
+
+query.End();
+
+// Wait for results (or check periodically with IsReady())
+query.Flush();
+
+uint samples0 = 0, samples1 = 0;
+bool visible0 = query.GetResult(id0, &samples0);
+bool visible1 = query.GetResult(id1, &samples1);
+
+if (visible0) { /* draw cube */ }
+if (visible1) { /* draw sphere */ }
+```
+<img width="1282" height="800" alt="image" src="https://github.com/user-attachments/assets/ee863aa1-eefe-4806-813e-041c063a0dc2" />
 
 ## Building
 SoftX is provided as a Visual Studio 2019 solution.
