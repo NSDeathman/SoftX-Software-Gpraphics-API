@@ -25,8 +25,9 @@ public:
     {
         __m128 zero = _mm_setzero_ps();
         for (auto& level : mipChain) {
-            uint w = MipWidth(&level - mipChain.data());
-            uint h = MipHeight(&level - mipChain.data());
+            const uint mipIndex = static_cast<uint>(&level - mipChain.data());
+            const uint w = MipWidth(mipIndex);
+            const uint h = MipHeight(mipIndex);
             level.resize(w * h);
             for (auto& p : level)
                 _mm_store_ps(reinterpret_cast<float*>(&p), zero);

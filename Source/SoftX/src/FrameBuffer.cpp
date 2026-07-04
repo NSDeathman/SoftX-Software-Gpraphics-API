@@ -52,12 +52,10 @@ void FrameBuffer::PresentASCII(HANDLE hConsole, const uint2& consoleSize)
                     uint srcYStart = static_cast<uint>(y * scaleY);
                     uint srcYEnd = (y == dstH - 1) ? srcH : static_cast<uint>((y + 1) * scaleY);
                     if (srcYEnd == 0) srcYEnd = 1;
-                    uint srcYCount = srcYEnd - srcYStart;
 
                     uint srcXStart = static_cast<uint>(x * scaleX);
                     uint srcXEnd = (x == dstW - 1) ? srcW : static_cast<uint>((x + 1) * scaleX);
                     if (srcXEnd == 0) srcXEnd = 1;
-                    uint srcXCount = srcXEnd - srcXStart;
 
                     float rSum = 0, gSum = 0, bSum = 0;
                     uint samples = 0;

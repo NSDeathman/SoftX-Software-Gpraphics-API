@@ -46,7 +46,7 @@ public:
     void SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer);
     SOFTX_FORCE_INLINE std::shared_ptr<IRenderTarget> GetRenderTarget() const { return renderTarget; }
 
-    SOFTX_FORCE_INLINE void SetDepthBuffer(std::shared_ptr<DepthBuffer> depthBuffer) { this->depthBuffer = std::move(depthBuffer); }
+    SOFTX_FORCE_INLINE void SetDepthBuffer(std::shared_ptr<DepthBuffer> depth) { this->depthBuffer = std::move(depth); }
     SOFTX_FORCE_INLINE std::shared_ptr<DepthBuffer> GetDepthBuffer() const { return depthBuffer; }
 
     SOFTX_FORCE_INLINE void SetDepthWriteEnable(bool enable) { depthWriteEnable = enable; }

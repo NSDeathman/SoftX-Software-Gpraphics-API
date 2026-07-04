@@ -183,7 +183,6 @@ public:
             auto& curr = mipChain[m];
             uint nw = curr.resolution.x;
             uint nh = curr.resolution.y;
-            uint pw = prev.resolution.x;
             uint pwp = prev.widthPadded;
 
             for (uint y = 0; y < nh; ++y)
