@@ -33,14 +33,14 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
     int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
     int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
-    if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
+    if (iMinX > iMaxX || iMinY > iMaxY) SOFTX_UNLIKELY
         return;
 
     float area2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, v2.Position);
     CullMode cull = state.cullMode;
     if (cull == CullMode::Back  && area2 > 0) return;
     if (cull == CullMode::Front && area2 < 0) return;
-    if (std::abs(area2) < 1e-6f) UNLIKELY return;
+    if (std::abs(area2) < 1e-6f) SOFTX_UNLIKELY return;
 
     // Triangle edges
     float4 dx01 = v1.Position - v0.Position;

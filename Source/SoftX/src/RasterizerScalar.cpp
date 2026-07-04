@@ -75,7 +75,7 @@ void RasterizerScalar::RasterizeTriangle(
     int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
     int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
-    if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
+    if (iMinX > iMaxX || iMinY > iMaxY) SOFTX_UNLIKELY
         return;
 
     // ── Fixed-point vertex coordinates (28.4) ───────────────────────────────
@@ -91,7 +91,7 @@ void RasterizerScalar::RasterizeTriangle(
     const CullMode cull = state.cullMode;
     if (cull == CullMode::Back  && area2Int > 0) return;
     if (cull == CullMode::Front && area2Int < 0) return;
-    if (area2Int == 0) UNLIKELY return;
+    if (area2Int == 0) SOFTX_UNLIKELY return;
 
     // Normalise to CCW so the inside test is always f >= 0
     const int normSign = (area2Int > 0) ? 1 : -1;

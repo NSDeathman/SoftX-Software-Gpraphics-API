@@ -33,26 +33,26 @@ public:
         }
     }
 
-    __m128* GetRawPixels(uint level = 0) {
+    SOFTX_FORCE_INLINE __m128* GetRawPixels(uint level = 0) {
         level = std::min(level, (uint)mipChain.size() - 1);
         return mipChain[level].data();
     }
-    const __m128* GetRawPixels(uint level = 0) const {
+    SOFTX_FORCE_INLINE const __m128* GetRawPixels(uint level = 0) const {
         level = std::min(level, (uint)mipChain.size() - 1);
         return mipChain[level].data();
     }
 
-    __m128 Read(const uint2& coords) const {
+    SOFTX_FORCE_INLINE __m128 Read(const uint2& coords) const {
         assert(coords.x < resolution.x&& coords.y < resolution.y);
         return mipChain[0][coords.y * resolution.x + coords.x];
     }
 
-    __m128 Read(const uint& index) const {
+    SOFTX_FORCE_INLINE __m128 Read(const uint& index) const {
         assert(index < (uint)mipChain[0].size());
         return mipChain[0][index];
     }
 
-    __m128 SampleRaw(const float2& uv) const {
+    SOFTX_FORCE_INLINE __m128 SampleRaw(const float2& uv) const {
         uint x = (uint)(uv.x * resolution.x);
         uint y = (uint)(uv.y * resolution.y);
         if (x >= resolution.x) x = resolution.x - 1;
@@ -60,50 +60,50 @@ public:
         return mipChain[0][y * resolution.x + x];
     }
 
-    float4 Sample(const float2& uv) const override {
+    SOFTX_FORCE_INLINE float4 Sample(const float2& uv) const override {
         __m128 color = SampleRaw(uv);
         return float4(color);
     }
 
-    __m128 FetchRaw(const int& x, const int& y) const override {
+    SOFTX_FORCE_INLINE __m128 FetchRaw(const int& x, const int& y) const override {
         int2 coords = int2(x, y);
         coords.x = AfterMath::clamp(x, 0, (int)resolution.x - 1);
         coords.y = AfterMath::clamp(y, 0, (int)resolution.y - 1);
         return mipChain[0][uint(coords.y) * resolution.x + uint(coords.x)];
     }
 
-    __m128 SampleBilinearRaw(float2 uv) const {
+    SOFTX_FORCE_INLINE __m128 SampleBilinearRaw(float2 uv) const {
         return SampleBilinearRaw(uv, 0);
     }
 
-    float4 SampleBilinear(const float2& uv) const override {
+    SOFTX_FORCE_INLINE float4 SampleBilinear(const float2& uv) const override {
         return float4(SampleBilinearRaw(uv));
     }
 
-    void StreamWrite(uint2 coords, __m128 color) {
+    SOFTX_FORCE_INLINE void StreamWrite(uint2 coords, __m128 color) {
         StreamWrite(coords, color, 0);
     }
 
-    void StreamWrite(uint index, __m128 color) {
+    SOFTX_FORCE_INLINE void StreamWrite(uint index, __m128 color) {
         assert(index < (uint)mipChain[0].size());
         _mm_stream_ps(reinterpret_cast<float*>(&mipChain[0][index]), color);
     }
 
-    uint MipCount() const override {
+    SOFTX_FORCE_INLINE uint MipCount() const override {
         return (uint)mipChain.size();
     }
 
-    uint MipWidth(uint level) const {
+    SOFTX_FORCE_INLINE uint MipWidth(uint level) const {
         level = std::min(level, (uint)mipChain.size() - 1);
         return std::max(1u, resolution.x >> level);
     }
 
-    uint MipHeight(uint level) const {
+    SOFTX_FORCE_INLINE uint MipHeight(uint level) const {
         level = std::min(level, (uint)mipChain.size() - 1);
         return std::max(1u, resolution.y >> level);
     }
 
-    __m128 FetchRaw(const int& x, const int& y, const uint& level) const override {
+    SOFTX_FORCE_INLINE __m128 FetchRaw(const int& x, const int& y, const uint& level) const override {
         uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
         uint w = MipWidth(mipLevel);
         uint h = MipHeight(mipLevel);
@@ -113,7 +113,7 @@ public:
         return mipChain[mipLevel][uint(coords.y) * w + uint(coords.x)];
     }
 
-    __m128 SampleBilinearRaw(const float2& uv, const uint& level) const {
+    SOFTX_FORCE_INLINE __m128 SampleBilinearRaw(const float2& uv, const uint& level) const {
         uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
         uint w = MipWidth(mipLevel);
         uint h = MipHeight(mipLevel);
@@ -148,13 +148,13 @@ public:
             _mm_add_ps(_mm_mul_ps(c01, w01), _mm_mul_ps(c11, w11)));
     }
 
-    float4 SampleLevel(const float2& uv, const float& lod) const override {
+    SOFTX_FORCE_INLINE float4 SampleLevel(const float2& uv, const float& lod) const override {
         uint level = (uint)(lod + 0.5f);  // nearest mip
         level = std::max(0u, std::min(level, (uint)mipChain.size() - 1));
         return float4(SampleBilinearRaw(uv, level));
     }
 
-    void StreamWrite(const uint2& coords, const __m128& color, const uint& level) {
+    SOFTX_FORCE_INLINE void StreamWrite(const uint2& coords, const __m128& color, const uint& level) {
         uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
         uint w = MipWidth(mipLevel);
         uint index = coords.y * w + coords.x;
@@ -192,11 +192,11 @@ public:
         }
     }
 
-    uint Width() const override {
+    SOFTX_FORCE_INLINE uint Width() const override {
         return resolution.x;
     }
 
-    uint Height() const override {
+    SOFTX_FORCE_INLINE uint Height() const override {
         return resolution.y;
     }
 

@@ -10,12 +10,30 @@
 #define SOFTX_END }
 
 #if _HAS_CXX20
-#define LIKELY [[likely]]
-#define UNLIKELY [[unlikely]]
+#define SOFTX_LIKELY [[likely]]
+#define SOFTX_UNLIKELY [[unlikely]]
 #else
-#define LIKELY
-#define UNLIKELY
+#define SOFTX_LIKELY
+#define SOFTX_UNLIKELY
 #endif
+
+#if defined(_MSC_VER)
+#define SOFTX_FORCE_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define SOFTX_FORCE_INLINE __attribute__((always_inline)) inline
+#else
+#define SOFTX_FORCE_INLINE inline
+#endif
+
+#if defined(_MSC_VER)
+#define SOFTX_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define SOFTX_NOINLINE __attribute__((noinline))
+#else
+#define SOFTX_NOINLINE
+#endif
+
+#define SOFTX_INLINE_HINT inline
 
 #ifdef NDEBUG
 #define SOFTX_VERIFY(x)

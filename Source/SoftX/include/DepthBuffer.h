@@ -78,41 +78,41 @@ public:
         }
     }
 
-    float Read(const int2& coords) const
+    SOFTX_FORCE_INLINE float Read(const int2& coords) const
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    void Write(const int2& coords, const float& depth)
+    SOFTX_FORCE_INLINE void Write(const int2& coords, const float& depth)
     {
         FloatPtr()[coords.y * widthPadded0() + coords.x] = depth;
     }
 
-    float& At(const int2& coords)
+    SOFTX_FORCE_INLINE float& At(const int2& coords)
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    const float& At(const int2& coords) const
+    SOFTX_FORCE_INLINE const float& At(const int2& coords) const
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    float& At(const uint& index)
+    SOFTX_FORCE_INLINE float& At(const uint& index)
     {
         uint x = index % resolution0().x;
         uint y = index / resolution0().x;
         return At(int2(x, y));
     }
 
-    const float& At(const uint& index) const
+    SOFTX_FORCE_INLINE const float& At(const uint& index) const
     {
         uint x = index % resolution0().x;
         uint y = index / resolution0().x;
         return At(int2(x, y));
     }
 
-    __m128 Read4(const uint2& coords) const
+    SOFTX_FORCE_INLINE __m128 Read4(const uint2& coords) const
     {
         SOFTX_VERIFY(coords.x % 4 == 0);
         auto& lvl = mipChain[0];
@@ -121,7 +121,7 @@ public:
         return lvl.blocks[blockIdx];
     }
 
-    void Write4(const uint2& coords, const __m128& depths, const __m128& mask)
+    SOFTX_FORCE_INLINE void Write4(const uint2& coords, const __m128& depths, const __m128& mask)
     {
         SOFTX_VERIFY(coords.x % 4 == 0);
         auto& lvl = mipChain[0];
@@ -131,33 +131,33 @@ public:
         block = _mm_or_ps(_mm_and_ps(depths, mask), _mm_andnot_ps(mask, block));
     }
 
-    __m128 Test4(const uint2& coords, const __m128& depth4, const __m128& activeMask) const
+    SOFTX_FORCE_INLINE __m128 Test4(const uint2& coords, const __m128& depth4, const __m128& activeMask) const
     {
         __m128 buffered = Read4(coords);
         __m128 passed = _mm_cmplt_ps(depth4, buffered);
         return _mm_and_ps(passed, activeMask);
     }
 
-    uint Width()  const { return resolution0().x; }
-    uint Height() const { return resolution0().y; }
-    uint WidthPadded() const { return widthPadded0(); }
-    uint2 Size() const { return resolution0(); }
+    SOFTX_FORCE_INLINE uint Width()  const { return resolution0().x; }
+    SOFTX_FORCE_INLINE uint Height() const { return resolution0().y; }
+    SOFTX_FORCE_INLINE uint WidthPadded() const { return widthPadded0(); }
+    SOFTX_FORCE_INLINE uint2 Size() const { return resolution0(); }
 
-    float* Data() { return FloatPtr(); }
-    const float* Data() const { return FloatPtr(); }
+    SOFTX_FORCE_INLINE float* Data() { return FloatPtr(); }
+    SOFTX_FORCE_INLINE const float* Data() const { return FloatPtr(); }
 
-    uint MipCount() const { return (uint)mipChain.size(); }
+    SOFTX_FORCE_INLINE uint MipCount() const { return (uint)mipChain.size(); }
 
-    uint2 MipSize(uint level) const
+    SOFTX_FORCE_INLINE uint2 MipSize(uint level) const
     {
         level = std::min(level, (uint)mipChain.size() - 1);
         return mipChain[level].resolution;
     }
 
-    uint MipWidth(uint level) const { return MipSize(level).x; }
-    uint MipHeight(uint level) const { return MipSize(level).y; }
+    SOFTX_FORCE_INLINE uint MipWidth(uint level) const { return MipSize(level).x; }
+    SOFTX_FORCE_INLINE uint MipHeight(uint level) const { return MipSize(level).y; }
 
-    float Read(const int2& coords, const uint& level) const
+    SOFTX_FORCE_INLINE float Read(const int2& coords, const uint& level) const
     {
         int2 sampleCoords = coords;
         uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
@@ -167,7 +167,7 @@ public:
         return lvl.blocks[(sampleCoords.y * lvl.widthPadded + sampleCoords.x) / 4].m128_f32[sampleCoords.x % 4];
     }
 
-    __m128 Read4(const uint2& coords, const uint& level) const
+    SOFTX_FORCE_INLINE __m128 Read4(const uint2& coords, const uint& level) const
     {
         uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
         auto& lvl = mipChain[mipLevel];
@@ -216,20 +216,13 @@ public:
 private:
     std::vector<Level> mipChain;
 
-    const uint2& resolution0() const { return mipChain[0].resolution; }
-    uint widthPadded0() const { return mipChain[0].widthPadded; }
+    SOFTX_FORCE_INLINE const uint2& resolution0() const { return mipChain[0].resolution; }
+    SOFTX_FORCE_INLINE uint widthPadded0() const { return mipChain[0].widthPadded; }
 
-    float* FloatPtr()
-    {
-        return reinterpret_cast<float*>(mipChain[0].blocks.data());
-    }
+    SOFTX_FORCE_INLINE float* FloatPtr() { return reinterpret_cast<float*>(mipChain[0].blocks.data()); }
+    SOFTX_FORCE_INLINE const float* FloatPtr() const { return reinterpret_cast<const float*>(mipChain[0].blocks.data()); }
 
-    const float* FloatPtr() const
-    {
-        return reinterpret_cast<const float*>(mipChain[0].blocks.data());
-    }
-
-    static uint CalcMaxMips(uint w, uint h)
+    SOFTX_FORCE_INLINE static uint CalcMaxMips(uint w, uint h)
     {
         uint count = 1;
         while (w > 1 || h > 1)

@@ -66,7 +66,7 @@ uint QueryRasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
     int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
     int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
-    if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
+    if (iMinX > iMaxX || iMinY > iMaxY) SOFTX_UNLIKELY
         return 0;
 
     const int x0fp = RasterizerCommon::ToFixed(v0.Position.x);
@@ -80,7 +80,7 @@ uint QueryRasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
     const CullMode cull = state.cullMode;
     if (cull == CullMode::Back && area2Int < 0) return 0;
     if (cull == CullMode::Front && area2Int > 0) return 0;
-    if (area2Int == 0) UNLIKELY return 0;
+    if (area2Int == 0) SOFTX_UNLIKELY return 0;
 
     const int normSign = (area2Int > 0) ? 1 : -1;
     if (area2Int < 0)

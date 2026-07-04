@@ -36,7 +36,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
     int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
 
-    if (iMinX > iMaxX || iMinY > iMaxY) UNLIKELY
+    if (iMinX > iMaxX || iMinY > iMaxY) SOFTX_UNLIKELY
         return;
 
     // ── Fixed-point vertex coordinates (28.4 — 4 sub-pixel bits = 1/16 pixel) ──
@@ -56,7 +56,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     const CullMode cull = state.cullMode;
     if (cull == CullMode::Back  && area2Int > 0) return;
     if (cull == CullMode::Front && area2Int < 0) return;
-    if (area2Int == 0) UNLIKELY return;
+    if (area2Int == 0) SOFTX_UNLIKELY return;
 
     // ── Edge function steps ──────────────────────────────────────────────────
     // Pixel x → x+1:  ΔE = +S * Δy_fp

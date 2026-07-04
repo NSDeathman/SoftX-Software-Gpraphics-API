@@ -133,7 +133,7 @@ int main()
     Device device(params);
     DeviceContext& ctx = device.GetImmediateContext();
 
-    ctx.SetRenderTarget(&device.GetBackBuffer(), true);
+    ctx.SetRenderTarget(device.GetBackBuffer(), true);
     ctx.SetViewport(Viewport(0, 0, BACKBUFFER_WIDTH, BACKBUFFER_HEIGHT, 0.0f, 1.0f));
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
