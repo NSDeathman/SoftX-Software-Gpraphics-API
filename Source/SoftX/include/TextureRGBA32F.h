@@ -42,17 +42,17 @@ public:
         return mipChain[level].data();
     }
 
-    __m128 Read(uint2 coords) const {
+    __m128 Read(const uint2& coords) const {
         assert(coords.x < resolution.x&& coords.y < resolution.y);
         return mipChain[0][coords.y * resolution.x + coords.x];
     }
 
-    __m128 Read(uint index) const {
+    __m128 Read(const uint& index) const {
         assert(index < (uint)mipChain[0].size());
         return mipChain[0][index];
     }
 
-    __m128 SampleRaw(float2 uv) const {
+    __m128 SampleRaw(const float2& uv) const {
         uint x = (uint)(uv.x * resolution.x);
         uint y = (uint)(uv.y * resolution.y);
         if (x >= resolution.x) x = resolution.x - 1;
@@ -60,22 +60,23 @@ public:
         return mipChain[0][y * resolution.x + x];
     }
 
-    float4 Sample(float2 uv) const override {
+    float4 Sample(const float2& uv) const override {
         __m128 color = SampleRaw(uv);
         return float4(color);
     }
 
-    __m128 FetchRaw(int x, int y) const override {
-        x = AfterMath::clamp(x, 0, (int)resolution.x - 1);
-        y = AfterMath::clamp(y, 0, (int)resolution.y - 1);
-        return mipChain[0][uint(y) * resolution.x + uint(x)];
+    __m128 FetchRaw(const int& x, const int& y) const override {
+        int2 coords = int2(x, y);
+        coords.x = AfterMath::clamp(x, 0, (int)resolution.x - 1);
+        coords.y = AfterMath::clamp(y, 0, (int)resolution.y - 1);
+        return mipChain[0][uint(coords.y) * resolution.x + uint(coords.x)];
     }
 
     __m128 SampleBilinearRaw(float2 uv) const {
         return SampleBilinearRaw(uv, 0);
     }
 
-    float4 SampleBilinear(float2 uv) const override {
+    float4 SampleBilinear(const float2& uv) const override {
         return float4(SampleBilinearRaw(uv));
     }
 
@@ -102,19 +103,20 @@ public:
         return std::max(1u, resolution.y >> level);
     }
 
-    __m128 FetchRaw(int x, int y, uint level) const override {
-        level = std::min(level, (uint)mipChain.size() - 1);
-        uint w = MipWidth(level);
-        uint h = MipHeight(level);
-        x = AfterMath::clamp(x, 0, (int)w - 1);
-        y = AfterMath::clamp(y, 0, (int)h - 1);
-        return mipChain[level][uint(y) * w + uint(x)];
+    __m128 FetchRaw(const int& x, const int& y, const uint& level) const override {
+        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        uint w = MipWidth(mipLevel);
+        uint h = MipHeight(mipLevel);
+        int2 coords = int2(x, y);
+        coords.x = AfterMath::clamp(x, 0, (int)w - 1);
+        coords.y = AfterMath::clamp(y, 0, (int)h - 1);
+        return mipChain[mipLevel][uint(coords.y) * w + uint(coords.x)];
     }
 
-    __m128 SampleBilinearRaw(float2 uv, uint level) const {
-        level = std::min(level, (uint)mipChain.size() - 1);
-        uint w = MipWidth(level);
-        uint h = MipHeight(level);
+    __m128 SampleBilinearRaw(const float2& uv, const uint& level) const {
+        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        uint w = MipWidth(mipLevel);
+        uint h = MipHeight(mipLevel);
 
         float fx = uv.x * w - 0.5f;
         float fy = uv.y * h - 0.5f;
@@ -125,10 +127,10 @@ public:
         float tx = fx - x0;
         float ty = fy - y0;
 
-        __m128 c00 = FetchRaw(x0, y0, level);
-        __m128 c10 = FetchRaw(x0 + 1, y0, level);
-        __m128 c01 = FetchRaw(x0, y0 + 1, level);
-        __m128 c11 = FetchRaw(x0 + 1, y0 + 1, level);
+        __m128 c00 = FetchRaw(x0, y0, mipLevel);
+        __m128 c10 = FetchRaw(x0 + 1, y0, mipLevel);
+        __m128 c01 = FetchRaw(x0, y0 + 1, mipLevel);
+        __m128 c11 = FetchRaw(x0 + 1, y0 + 1, mipLevel);
 
         __m128 wtx = _mm_set1_ps(tx);
         __m128 wty = _mm_set1_ps(ty);
@@ -146,19 +148,17 @@ public:
             _mm_add_ps(_mm_mul_ps(c01, w01), _mm_mul_ps(c11, w11)));
     }
 
-    float4 SampleLevel(float2 uv, float lod) const override {
+    float4 SampleLevel(const float2& uv, const float& lod) const override {
         uint level = (uint)(lod + 0.5f);  // nearest mip
         level = std::max(0u, std::min(level, (uint)mipChain.size() - 1));
         return float4(SampleBilinearRaw(uv, level));
     }
 
-    void StreamWrite(uint2 coords, __m128 color, uint level) {
-        level = std::min(level, (uint)mipChain.size() - 1);
-        uint w = MipWidth(level);
-        uint h = MipHeight(level);
-        assert(coords.x < w && coords.y < h);
+    void StreamWrite(const uint2& coords, const __m128& color, const uint& level) {
+        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        uint w = MipWidth(mipLevel);
         uint index = coords.y * w + coords.x;
-        _mm_stream_ps(reinterpret_cast<float*>(&mipChain[level][index]), color);
+        _mm_stream_ps(reinterpret_cast<float*>(&mipChain[mipLevel][index]), color);
     }
 
     void GenerateMips() {

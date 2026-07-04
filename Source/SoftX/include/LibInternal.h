@@ -16,4 +16,10 @@
 #define LIKELY
 #define UNLIKELY
 #endif
+
+#ifdef NDEBUG
+#define SOFTX_VERIFY(x)
+#else
+#define SOFTX_VERIFY(x) assert(x)
+#endif
 /////////////////////////////////////////////////////////////////

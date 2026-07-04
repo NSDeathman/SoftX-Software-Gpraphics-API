@@ -54,8 +54,8 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
     int64_t area2Int = RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp, x2fp, y2fp);
 
     const CullMode cull = state.cullMode;
-    if (cull == CullMode::Back  && area2Int < 0) return;
-    if (cull == CullMode::Front && area2Int > 0) return;
+    if (cull == CullMode::Back  && area2Int > 0) return;
+    if (cull == CullMode::Front && area2Int < 0) return;
     if (area2Int == 0) UNLIKELY return;
 
     // ── Edge function steps ──────────────────────────────────────────────────

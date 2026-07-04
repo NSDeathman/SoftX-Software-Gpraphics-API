@@ -21,12 +21,20 @@
 SOFTX_BEGIN
 
 // Presentation parameters
+enum class PresentationMode
+{
+    Window,
+    Console
+};
+
 struct PresentParameters
 {
     uint2 BackBufferSize = uint2(1, 1);
     HWND hDeviceWindow = nullptr;
     bool Windowed = true;
     bool Headless = false;
+    PresentationMode Output = PresentationMode::Window;
+    uint2 ConsoleSize = uint2(1, 1);
 };
 
 // Input vertex structure (model space)
@@ -226,7 +234,7 @@ public:
     void SetTexture(const ITexture* tex) { texture = tex; }
     void SetSamplerState(SamplerState samp) { sampler = samp; }
 
-    float4 Sample(float2 uv) const
+    float4 Sample(const float2& uv) const
     {
         if (!texture)
             return float4(1.0f, 0.0f, 1.0f, 1.0f); // magenta
@@ -239,20 +247,20 @@ public:
             return texture->Sample(wrapped);
     }
 
-    float4 SampleLevel(float2 uv, float lod) const
+    float4 SampleLevel(const float2& uv, const float& lod) const
     {
         if (!texture)
             return float4(1.0f, 0.0f, 1.0f, 1.0f);
 
         float2 wrapped = sampler.ApplyWrap(uv);
 
-        lod = lod + sampler.lodBias;
-        lod = AfterMath::clamp(lod, sampler.minLOD, sampler.maxLOD);
+        float biasedLod = lod + sampler.lodBias;
+        biasedLod = AfterMath::clamp(biasedLod, sampler.minLOD, sampler.maxLOD);
 
         if (sampler.mipFilter == MipFilter::Nearest)
-            lod = std::floor(lod + 0.5f);
+            biasedLod = std::floor(biasedLod + 0.5f);
 
-        return texture->SampleLevel(wrapped, lod);
+        return texture->SampleLevel(wrapped, biasedLod);
     }
 
     uint2 GetDimensions() const
@@ -279,12 +287,12 @@ public:
         return emptyBinding;
     }
 
-    const float4 Sample(const std::string& name, float2 uv) const
+    const float4 Sample(const std::string& name, const float2& uv) const
     {
         return Get(name).Sample(uv);
     }
 
-    const float4 SampleLevel(const std::string& name, float2 uv, float lod) const
+    const float4 SampleLevel(const std::string& name, const float2& uv, const float& lod) const
     {
         return Get(name).SampleLevel(uv, lod);
     }

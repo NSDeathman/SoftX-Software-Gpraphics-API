@@ -78,60 +78,60 @@ public:
         }
     }
 
-    float Read(int2 coords) const
+    float Read(const int2& coords) const
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    void Write(int2 coords, float depth)
+    void Write(const int2& coords, const float& depth)
     {
         FloatPtr()[coords.y * widthPadded0() + coords.x] = depth;
     }
 
-    float& At(int2 coords)
+    float& At(const int2& coords)
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    const float& At(int2 coords) const
+    const float& At(const int2& coords) const
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    float& At(uint index)
+    float& At(const uint& index)
     {
         uint x = index % resolution0().x;
         uint y = index / resolution0().x;
         return At(int2(x, y));
     }
 
-    const float& At(uint index) const
+    const float& At(const uint& index) const
     {
         uint x = index % resolution0().x;
         uint y = index / resolution0().x;
         return At(int2(x, y));
     }
 
-    __m128 Read4(uint2 coords) const
+    __m128 Read4(const uint2& coords) const
     {
-        assert(coords.x % 4 == 0);
+        SOFTX_VERIFY(coords.x % 4 == 0);
         auto& lvl = mipChain[0];
-        assert(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
+        SOFTX_VERIFY(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
         uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
         return lvl.blocks[blockIdx];
     }
 
-    void Write4(uint2 coords, __m128 depths, __m128 mask)
+    void Write4(const uint2& coords, const __m128& depths, const __m128& mask)
     {
-        assert(coords.x % 4 == 0);
+        SOFTX_VERIFY(coords.x % 4 == 0);
         auto& lvl = mipChain[0];
-        assert(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
+        SOFTX_VERIFY(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
         uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
         __m128& block = lvl.blocks[blockIdx];
         block = _mm_or_ps(_mm_and_ps(depths, mask), _mm_andnot_ps(mask, block));
     }
 
-    __m128 Test4(uint2 coords, __m128 depth4, __m128 activeMask) const
+    __m128 Test4(const uint2& coords, const __m128& depth4, const __m128& activeMask) const
     {
         __m128 buffered = Read4(coords);
         __m128 passed = _mm_cmplt_ps(depth4, buffered);
@@ -157,21 +157,20 @@ public:
     uint MipWidth(uint level) const { return MipSize(level).x; }
     uint MipHeight(uint level) const { return MipSize(level).y; }
 
-    float Read(int2 coords, uint level) const
+    float Read(const int2& coords, const uint& level) const
     {
-        level = std::min(level, (uint)mipChain.size() - 1);
-        auto& lvl = mipChain[level];
-        coords.x = AfterMath::clamp(coords.x, 0, (int)lvl.resolution.x - 1);
-        coords.y = AfterMath::clamp(coords.y, 0, (int)lvl.resolution.y - 1);
-        return lvl.blocks[(coords.y * lvl.widthPadded + coords.x) / 4].m128_f32[coords.x % 4];
+        int2 sampleCoords = coords;
+        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        auto& lvl = mipChain[mipLevel];
+        sampleCoords.x = AfterMath::clamp(sampleCoords.x, 0, (int)lvl.resolution.x - 1);
+        sampleCoords.y = AfterMath::clamp(sampleCoords.y, 0, (int)lvl.resolution.y - 1);
+        return lvl.blocks[(sampleCoords.y * lvl.widthPadded + sampleCoords.x) / 4].m128_f32[sampleCoords.x % 4];
     }
 
-    __m128 Read4(uint2 coords, uint level) const
+    __m128 Read4(const uint2& coords, const uint& level) const
     {
-        level = std::min(level, (uint)mipChain.size() - 1);
-        auto& lvl = mipChain[level];
-        assert(coords.x % 4 == 0);
-        assert(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
+        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        auto& lvl = mipChain[mipLevel];
         uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
         return lvl.blocks[blockIdx];
     }

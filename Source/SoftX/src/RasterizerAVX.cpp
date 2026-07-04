@@ -38,8 +38,8 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
 
     float area2 = RasterizerCommon::EdgeFunction(v0.Position, v1.Position, v2.Position);
     CullMode cull = state.cullMode;
-    if (cull == CullMode::Back  && area2 < 0) return;
-    if (cull == CullMode::Front && area2 > 0) return;
+    if (cull == CullMode::Back  && area2 > 0) return;
+    if (cull == CullMode::Front && area2 < 0) return;
     if (std::abs(area2) < 1e-6f) UNLIKELY return;
 
     // Triangle edges

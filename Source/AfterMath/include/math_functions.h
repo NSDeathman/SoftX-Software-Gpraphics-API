@@ -338,10 +338,17 @@ AFTERMATH_BEGIN
     }
 
     inline float normalize_angle(float angle) {
-        // Приводим угол к диапазону [-pi, pi]
         while (angle > Constants::PI) angle -= Constants::TWO_PI;
         while (angle < -Constants::PI) angle += Constants::TWO_PI;
         return angle;
+    }
+
+    inline float radians(float degrees) noexcept {
+        return degrees * Constants::Constants<float>::DegToRad;
+    }
+
+    inline float degrees(float radians) noexcept {
+        return radians * Constants::Constants<float>::RadToDeg;
     }
 
 AFTERMATH_END

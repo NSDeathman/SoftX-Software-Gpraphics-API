@@ -18,7 +18,12 @@ class SOFTX_API Device
 {
 public:
     explicit Device(const PresentParameters& params);
-    ~Device() = default;
+    ~Device();
+
+    Device(Device&&) = default;
+    Device& operator=(Device&&) = default;
+    Device(const Device&) = delete;
+    Device& operator=(const Device&) = delete;
 
     Device CreateHeadless(uint2 backBufferSize);
 
@@ -46,10 +51,18 @@ public:
     const PresentParameters& GetPresentParams() const;
 
 private:
+    void SetupOutputConsole();
+    void DestroyOutputConsole();
+
+    void PresentToWindow();
+    void PresentToConsole();
+
+private:
     PresentParameters presentParams;
     Framebuffer backBuffer;
     DepthBuffer depthBuffer;
     DeviceContext immediateContext;
+    HANDLE hConsoleBuffer = nullptr;
 };
 
 SOFTX_END

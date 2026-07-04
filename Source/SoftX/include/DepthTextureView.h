@@ -21,7 +21,7 @@ public:
     uint Height() const override { return m_buffer->Height(); }
     uint MipCount() const override { return m_buffer->MipCount(); }
 
-    float4 Sample(float2 uv) const override
+    float4 Sample(const float2& uv) const override
     {
         uint x = (uint)(uv.x * m_buffer->Width());
         uint y = (uint)(uv.y * m_buffer->Height());
@@ -29,7 +29,7 @@ public:
         return float4(d, d, d, 1.0f);
     }
 
-    float4 SampleBilinear(float2 uv) const override
+    float4 SampleBilinear(const float2& uv) const override
     {
         int w = m_buffer->Width();
         int h = m_buffer->Height();
@@ -47,24 +47,23 @@ public:
         float d10 = m_buffer->Read(int2(x1, y0), 0);
         float d01 = m_buffer->Read(int2(x0, y1), 0);
         float d11 = m_buffer->Read(int2(x1, y1), 0);
-        float d = (1 - tx) * (1 - ty) * d00 + tx * (1 - ty) * d10 +
-            (1 - tx) * ty * d01 + tx * ty * d11;
+        float d = (1 - tx) * (1 - ty) * d00 + tx * (1 - ty) * d10 + (1 - tx) * ty * d01 + tx * ty * d11;
         return float4(d, d, d, 1.0f);
     }
 
-    __m128 FetchRaw(int x, int y) const override
+    __m128 FetchRaw(const int& x, const int& y) const override
     {
         float d = m_buffer->Read(int2(x, y), 0);
         return _mm_set_ps(1.0f, d, d, d);
     }
 
-    __m128 FetchRaw(int x, int y, uint level) const override
+    __m128 FetchRaw(const int& x, const int& y, const uint& level) const override
     {
         float d = m_buffer->Read(int2(x, y), level);
         return _mm_set_ps(1.0f, d, d, d);
     }
 
-    float4 SampleLevel(float2 uv, float lod) const override
+    float4 SampleLevel(const float2& uv, const float& lod) const override
     {
         uint level = (uint)(lod + 0.5f);
         level = std::max(0u, std::min(level, m_buffer->MipCount() - 1));
@@ -84,8 +83,7 @@ public:
         float d10 = m_buffer->Read(int2(x1, y0), level);
         float d01 = m_buffer->Read(int2(x0, y1), level);
         float d11 = m_buffer->Read(int2(x1, y1), level);
-        float d = (1 - tx) * (1 - ty) * d00 + tx * (1 - ty) * d10 +
-            (1 - tx) * ty * d01 + tx * ty * d11;
+        float d = (1 - tx) * (1 - ty) * d00 + tx * (1 - ty) * d10 + (1 - tx) * ty * d01 + tx * ty * d11;
         return float4(d, d, d, 1.0f);
     }
 
