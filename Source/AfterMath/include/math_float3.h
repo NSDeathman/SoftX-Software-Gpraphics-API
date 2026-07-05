@@ -493,24 +493,22 @@ inline float dot(const float3& a, const float3& b) noexcept {
 }
 
 inline float3 cross(const float3& a, const float3& b) noexcept {
-    return float3(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
-    );
+    return float3(a.y * b.z - a.z * b.y,
+                  a.z * b.x - a.x * b.z,
+                  a.x * b.y - a.y * b.x);
 }
 
 // Comparison
 inline bool approximately(const float3& a, const float3& b, float epsilon = EPSILON) noexcept {
     return std::abs(a.x - b.x) <= epsilon &&
-        std::abs(a.y - b.y) <= epsilon &&
-        std::abs(a.z - b.z) <= epsilon;
+           std::abs(a.y - b.y) <= epsilon &&
+           std::abs(a.z - b.z) <= epsilon;
 }
 
 inline bool approximately_zero(const float3& v, float epsilon = 1e-6f) noexcept {
     return std::abs(v.x) <= epsilon &&
-        std::abs(v.y) <= epsilon &&
-        std::abs(v.z) <= epsilon;
+           std::abs(v.y) <= epsilon &&
+           std::abs(v.z) <= epsilon;
 }
 
 inline bool isValid(const float3& v) noexcept {
@@ -619,11 +617,9 @@ inline float3 abs(const float3& v) noexcept {
 }
 
 inline float3 sign(const float3& v) noexcept {
-    return float3(
-        (v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
-        (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f),
-        (v.z > 0.0f) ? 1.0f : ((v.z < 0.0f) ? -1.0f : 0.0f)
-    );
+    return float3((v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
+                  (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f),
+                  (v.z > 0.0f) ? 1.0f : ((v.z < 0.0f) ? -1.0f : 0.0f));
 }
 
 inline float3 floor(const float3& v) noexcept {
@@ -639,27 +635,39 @@ inline float3 round(const float3& v) noexcept {
 }
 
 inline float3 frac(const float3& v) noexcept {
-    return float3(
-        v.x - std::floor(v.x),
-        v.y - std::floor(v.y),
-        v.z - std::floor(v.z)
-    );
+    return float3(v.x - std::floor(v.x),
+                  v.y - std::floor(v.y),
+                  v.z - std::floor(v.z));
+}
+
+inline float3 pow(const float3& base, const float3& exp) noexcept {
+    return float3(std::pow(base.x, exp.x),
+                  std::pow(base.y, exp.y),
+                  std::pow(base.z, exp.z));
+}
+
+inline float3 pow(const float3& base, float exp) noexcept {
+    return float3(std::pow(base.x, exp),
+                  std::pow(base.y, exp),
+                  std::pow(base.z, exp));
+}
+
+inline float3 pow(float base, const float3& exp) noexcept {
+    return float3(std::pow(base, exp.x),
+                  std::pow(base, exp.y),
+                  std::pow(base, exp.z));
 }
 
 inline float3 saturate(const float3& v) noexcept {
-    return float3(
-        std::max(0.0f, std::min(1.0f, v.x)),
-        std::max(0.0f, std::min(1.0f, v.y)),
-        std::max(0.0f, std::min(1.0f, v.z))
-    );
+    return float3(std::max(0.0f, std::min(1.0f, v.x)),
+                  std::max(0.0f, std::min(1.0f, v.y)),
+                  std::max(0.0f, std::min(1.0f, v.z)));
 }
 
 inline float3 step(float edge, const float3& v) noexcept {
-    return float3(
-        (v.x >= edge) ? 1.0f : 0.0f,
-        (v.y >= edge) ? 1.0f : 0.0f,
-        (v.z >= edge) ? 1.0f : 0.0f
-    );
+    return float3((v.x >= edge) ? 1.0f : 0.0f,
+                  (v.y >= edge) ? 1.0f : 0.0f,
+                  (v.z >= edge) ? 1.0f : 0.0f);
 }
 
 inline float3 smoothstep(float edge0, float edge1, const float3& v) noexcept {
@@ -671,35 +679,27 @@ inline float3 smoothstep(float edge0, float edge1, const float3& v) noexcept {
 }
 
 inline float3 min(const float3& a, const float3& b) noexcept {
-    return float3(
-        std::min(a.x, b.x),
-        std::min(a.y, b.y),
-        std::min(a.z, b.z)
-    );
+    return float3(std::min(a.x, b.x),
+                  std::min(a.y, b.y),
+                  std::min(a.z, b.z));
 }
 
 inline float3 max(const float3& a, const float3& b) noexcept {
-    return float3(
-        std::max(a.x, b.x),
-        std::max(a.y, b.y),
-        std::max(a.z, b.z)
-    );
+    return float3(std::max(a.x, b.x),
+                  std::max(a.y, b.y),
+                  std::max(a.z, b.z));
 }
 
 inline float3 clamp(const float3& v, const float3& min_val, const float3& max_val) noexcept {
-    return float3(
-        std::max(min_val.x, std::min(max_val.x, v.x)),
-        std::max(min_val.y, std::min(max_val.y, v.y)),
-        std::max(min_val.z, std::min(max_val.z, v.z))
-    );
+    return float3(std::max(min_val.x, std::min(max_val.x, v.x)),
+                  std::max(min_val.y, std::min(max_val.y, v.y)),
+                  std::max(min_val.z, std::min(max_val.z, v.z)));
 }
 
 inline float3 clamp(const float3& v, float min_val, float max_val) noexcept {
-    return float3(
-        std::max(min_val, std::min(max_val, v.x)),
-        std::max(min_val, std::min(max_val, v.y)),
-        std::max(min_val, std::min(max_val, v.z))
-    );
+    return float3(std::max(min_val, std::min(max_val, v.x)),
+                  std::max(min_val, std::min(max_val, v.y)),
+                  std::max(min_val, std::min(max_val, v.z)));
 }
 
 // ============================================================================

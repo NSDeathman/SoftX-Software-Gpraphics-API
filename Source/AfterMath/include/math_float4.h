@@ -16,9 +16,6 @@
 
 #include "AfterMathInternal.h"
 
-#pragma warning(push)
-#pragma warning(disable : AFTERMATH_DISABLED_WARNINGS)
-
 AFTERMATH_BEGIN
 
 // Forward declarations
@@ -326,9 +323,6 @@ public:
     float4 to_homogeneous() const noexcept {
         return float4(x, y, z, 1.0f);
     }
-
-    // Note: project() would require float3 header
-    // float3 project() const noexcept;
 };
 
 // ============================================================================
@@ -409,25 +403,25 @@ inline float dot3(const float4& a, const float4& b) noexcept {
 
 // Cross product (3D, ignores w component)
 inline float4 cross(const float4& a, const float4& b) noexcept {
-    return float4(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-        0.0f
-    );
+    return float4(a.y * b.z - a.z * b.y,
+                  a.z * b.x - a.x * b.z,
+                  a.x * b.y - a.y * b.x,
+                  0.0f);
 }
 
 // Comparison
 inline bool approximately(const float4& a, const float4& b, float epsilon = EPSILON) noexcept {
     return std::abs(a.x - b.x) <= epsilon &&
-        std::abs(a.y - b.y) <= epsilon &&
-        std::abs(a.z - b.z) <= epsilon &&
-        std::abs(a.w - b.w) <= epsilon;
+           std::abs(a.y - b.y) <= epsilon &&
+           std::abs(a.z - b.z) <= epsilon &&
+           std::abs(a.w - b.w) <= epsilon;
 }
 
 inline bool isValid(const float4& v) noexcept {
-    return std::isfinite(v.x) && std::isfinite(v.y) &&
-        std::isfinite(v.z) && std::isfinite(v.w);
+    return std::isfinite(v.x) && 
+           std::isfinite(v.y) &&
+           std::isfinite(v.z) && 
+           std::isfinite(v.w);
 }
 
 inline bool is_normalized(const float4& v, float epsilon = EPSILON) noexcept {
@@ -450,12 +444,10 @@ inline float4 abs(const float4& v) noexcept {
 }
 
 inline float4 sign(const float4& v) noexcept {
-    return float4(
-        (v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
-        (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f),
-        (v.z > 0.0f) ? 1.0f : ((v.z < 0.0f) ? -1.0f : 0.0f),
-        (v.w > 0.0f) ? 1.0f : ((v.w < 0.0f) ? -1.0f : 0.0f)
-    );
+    return float4((v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
+                  (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f),
+                  (v.z > 0.0f) ? 1.0f : ((v.z < 0.0f) ? -1.0f : 0.0f),
+                  (v.w > 0.0f) ? 1.0f : ((v.w < 0.0f) ? -1.0f : 0.0f));
 }
 
 inline float4 floor(const float4& v) noexcept {
@@ -471,12 +463,28 @@ inline float4 round(const float4& v) noexcept {
 }
 
 inline float4 frac(const float4& v) noexcept {
-    return float4(
-        v.x - std::floor(v.x),
-        v.y - std::floor(v.y),
-        v.z - std::floor(v.z),
-        v.w - std::floor(v.w)
-    );
+    return float4(v.x - std::floor(v.x),
+                  v.y - std::floor(v.y),
+                  v.z - std::floor(v.z),
+                  v.w - std::floor(v.w));
+}
+
+inline float3 pow(const float3& base, const float3& exp) noexcept {
+    return float3(std::pow(base.x, exp.x),
+                  std::pow(base.y, exp.y),
+                  std::pow(base.z, exp.z));
+}
+
+inline float3 pow(const float3& base, float exp) noexcept {
+    return float3(std::pow(base.x, exp),
+                  std::pow(base.y, exp),
+                  std::pow(base.z, exp));
+}
+
+inline float3 pow(float base, const float3& exp) noexcept {
+    return float3(std::pow(base, exp.x),
+                  std::pow(base, exp.y),
+                  std::pow(base, exp.z));
 }
 
 inline float4 saturate(const float4& v) noexcept {
@@ -488,12 +496,10 @@ inline float4 saturate(const float4& v) noexcept {
 }
 
 inline float4 step(float edge, const float4& v) noexcept {
-    return float4(
-        (v.x >= edge) ? 1.0f : 0.0f,
-        (v.y >= edge) ? 1.0f : 0.0f,
-        (v.z >= edge) ? 1.0f : 0.0f,
-        (v.w >= edge) ? 1.0f : 0.0f
-    );
+    return float4((v.x >= edge) ? 1.0f : 0.0f,
+                  (v.y >= edge) ? 1.0f : 0.0f,
+                  (v.z >= edge) ? 1.0f : 0.0f,
+                  (v.w >= edge) ? 1.0f : 0.0f);
 }
 
 inline float4 smoothstep(float edge0, float edge1, const float4& v) noexcept {
@@ -517,12 +523,10 @@ inline float4 clamp(const float4& v, const float4& min_val, const float4& max_va
 }
 
 inline float4 clamp(const float4& v, float min_val, float max_val) noexcept {
-    return float4(
-        std::max(min_val, std::min(max_val, v.x)),
-        std::max(min_val, std::min(max_val, v.y)),
-        std::max(min_val, std::min(max_val, v.z)),
-        std::max(min_val, std::min(max_val, v.w))
-    );
+    return float4(std::max(min_val, std::min(max_val, v.x)),
+                  std::max(min_val, std::min(max_val, v.y)),
+                  std::max(min_val, std::min(max_val, v.z)),
+                  std::max(min_val, std::min(max_val, v.w)));
 }
 
 // ============================================================================
@@ -601,5 +605,3 @@ AFTERMATH_INLINE_VAR const float4 float4_Brown(0.6f, 0.4f, 0.2f, 1.0f);
 AFTERMATH_INLINE_VAR const float4 float4_Pink(1.0f, 0.75f, 0.8f, 1.0f);
 
 AFTERMATH_END
-
-#pragma warning(pop)

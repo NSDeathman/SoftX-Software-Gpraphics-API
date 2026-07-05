@@ -48,27 +48,27 @@ public:
     // Конструкторы и базовые операции
     // ============================================================================
     half() noexcept : data(0) {}
-    half(float x) noexcept { data = float_to_half_correct(x); }
-    half(double x) noexcept { data = float_to_half_correct(float(x)); }
+    half(float x) noexcept { data = float_to_half(x); }
+    half(double x) noexcept { data = float_to_half(float(x)); }
     explicit half(storage_type bits) noexcept : data(bits) {}
     half(const half&) noexcept = default;
 
     template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
-    half(T x) noexcept : data(float_to_half_correct(static_cast<float>(x))) {}
+    half(T x) noexcept : data(float_to_half(static_cast<float>(x))) {}
 
     // Операторы присваивания
     half& operator=(const half&) noexcept = default;
-    half& operator=(float x) noexcept { data = float_to_half_correct(x); return *this; }
+    half& operator=(float x) noexcept { data = float_to_half(x); return *this; }
 
     template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
-    half& operator=(T x) noexcept { data = float_to_half_correct(static_cast<float>(x)); return *this; }
+    half& operator=(T x) noexcept { data = float_to_half(static_cast<float>(x)); return *this; }
 
     // Конвертации
-    explicit operator float() const noexcept { return half_to_float_correct(data); }
-    explicit operator double() const noexcept { return static_cast<double>(half_to_float_correct(data)); }
+    explicit operator float() const noexcept { return half_to_float(data); }
+    explicit operator double() const noexcept { return static_cast<double>(half_to_float(data)); }
 
     // ============================================================================
-    // Арифметические операторы (остаются в классе как базовые операции)
+    // Арифметические операторы
     // ============================================================================
     half operator+(half other) const noexcept { return half(float(*this) + float(other)); }
     half operator-(half other) const noexcept { return half(float(*this) - float(other)); }
@@ -91,7 +91,7 @@ public:
     half operator--(int) noexcept { half temp = *this; --(*this); return temp; }
 
     // ============================================================================
-    // Операторы сравнения (остаются в классе как базовые операции)
+    // Операторы сравнения
     // ============================================================================
     bool operator==(half other) const noexcept {
         if (is_nan() || other.is_nan()) return false;
@@ -116,7 +116,7 @@ public:
     bool operator>=(half other) const noexcept { return !(*this < other); }
 
     // ============================================================================
-    // Базовые проверки и свойства (остаются в классе как фундаментальные операции)
+    // Базовые проверки и свойства
     // ============================================================================
     bool is_zero() const noexcept { return (bits() & 0x7FFF) == 0; }
     bool is_positive_zero() const noexcept { return bits() == 0x0000; }
@@ -140,7 +140,7 @@ public:
     bool is_negative() const noexcept { return (data & 0x8000) != 0; }
 
     // ============================================================================
-    // Битвые операции (остаются в классе как фундаментальные)
+    // Битвые операции
     // ============================================================================
     storage_type bits() const noexcept { return data; }
     static half from_bits(storage_type bits) noexcept { return half(bits); }
@@ -149,13 +149,13 @@ public:
     int mantissa() const noexcept { return data & 0x03FF; }
 
     // ============================================================================
-    // Утилиты (остаются минимальные)
+    // Утилиты
     // ============================================================================
     bool is_valid() const noexcept { return is_finite() || is_inf() || is_nan(); }
     std::string to_string() const { return std::to_string(float(*this)); }
 
     // ============================================================================
-    // Статические константы (остаются как базовые константы типа)
+    // Статические константы
     // ============================================================================
     static half infinity() noexcept { return half(std::numeric_limits<float>::infinity()); }
     static half negative_infinity() noexcept { return half(-std::numeric_limits<float>::infinity()); }
@@ -167,67 +167,14 @@ public:
     static half epsilon() noexcept { return half(0x1400); }
     static half lowest() noexcept { return half(0xFBFF); }
 
-    // ============================================================================
-    // Отладочные методы (остаются как утилиты разработчика)
-    // ============================================================================
-    void debug_print(const char* name) const {
-        std::printf("%s: bits=0x%04X, float=%f, is_nan=%d, is_inf=%d, is_finite=%d\n",
-            name, data, float(*this), is_nan(), is_inf(), is_finite());
-    }
-
-    void debug_detailed(const char* name) const {
-        int exp = exponent();
-        int mant = mantissa();
-        int sign = sign_bit();
-
-        std::printf("%s:\n", name);
-        std::printf("  bits: 0x%04X\n", data);
-        std::printf("  float: %f\n", float(*this));
-        std::printf("  sign: %d, exp: %d (0x%02X), mant: %d (0x%03X)\n",
-            sign, exp, exp, mant, mant);
-        std::printf("  is_nan: %d (exp==31: %d, mant!=0: %d)\n",
-            is_nan(), (exp == 31), (mant != 0));
-        std::printf("  is_inf: %d (exp==31: %d, mant==0: %d)\n",
-            is_inf(), (exp == 31), (mant == 0));
-        std::printf("  is_finite: %d\n", is_finite());
-        std::printf("  std::isnan: %d, std::isinf: %d\n",
-            std::isnan(float(*this)), std::isinf(float(*this)));
-        std::printf("---\n");
-    }
-
-    static void debug_from_bits_detailed(storage_type bits, const char* name) {
-        half result(bits);
-        result.debug_detailed(name);
-    }
-
-    static void run_comprehensive_debug() {
-        std::cout << "=== COMPREHENSIVE HALF DEBUG ===" << std::endl;
-        debug_from_bits_detailed(0x0000, "Positive Zero");
-        debug_from_bits_detailed(0x8000, "Negative Zero");
-        debug_from_bits_detailed(0x7C00, "Positive Infinity");
-        debug_from_bits_detailed(0xFC00, "Negative Infinity");
-        debug_from_bits_detailed(0x7E00, "Quiet NaN");
-        debug_from_bits_detailed(0x7D00, "Signaling NaN");
-
-        half pos_inf_f(std::numeric_limits<float>::infinity());
-        half neg_inf_f(-std::numeric_limits<float>::infinity());
-        half nan_f(std::numeric_limits<float>::quiet_NaN());
-
-        pos_inf_f.debug_detailed("From Float +Inf");
-        neg_inf_f.debug_detailed("From Float -Inf");
-        nan_f.debug_detailed("From Float NaN");
-
-        std::cout << "=== END COMPREHENSIVE DEBUG ===" << std::endl;
-    }
-
 public:
     storage_type data;
 
 private:
     // ============================================================================
-    // Внутренние реализации конвертации (остаются приватными)
+    // Внутренние реализации конвертации
     // ============================================================================
-    static storage_type float_to_half_correct(float f) noexcept
+    static storage_type float_to_half(float f) noexcept
     {
         if (std::isnan(f)) {
             uint32_t bits;
@@ -294,37 +241,22 @@ private:
         return static_cast<storage_type>((sign >> 16) | (exp << 10) | (mant >> 13));
     }
 
-    static float half_to_float_correct(storage_type h) noexcept {
-        uint32_t sign = (h & 0x8000) << 16;
-        uint32_t exp = (h >> 10) & 0x1F;
-        uint32_t mant = h & 0x03FF;
+    static float half_to_float(storage_type h) noexcept {
+        uint32_t sign = (h & 0x8000u) << 16;
+        uint32_t exp_mant = h & 0x7FFFu;
 
-        if (exp == 0) {
-            if (mant == 0) return (sign ? -0.0f : 0.0f);
-            while ((mant & 0x0400) == 0) {
-                mant <<= 1;
-                exp--;
-            }
-            exp++;
-            mant &= 0x03FF;
-        }
-        else if (exp == 31) {
-            if (mant == 0) {
-                uint32_t inf = sign | 0x7F800000;
-                float result;
-                std::memcpy(&result, &inf, 4);
-                return result;
-            }
-            else {
-                uint32_t nan = sign | 0x7FC00000 | (mant << 13);
-                float result;
-                std::memcpy(&result, &nan, 4);
-                return result;
-            }
-        }
+        // Нормализованные + inf/nan: просто сдвигаем экспоненту
+        uint32_t normal = ((uint32_t)(exp_mant + 0x1C000u)) << 13;
 
-        exp += 112;
-        uint32_t result = sign | (exp << 23) | (mant << 13);
+        // Денормализованные: нормализуем через float-трюк
+        // Добавляем скрытый бит и вычитаем смещение через float арифметику
+        float    denorm_f = static_cast<float>(exp_mant) * (1.0f / 16777216.0f); // * 2^-24
+        uint32_t denorm;
+        std::memcpy(&denorm, &denorm_f, 4);
+
+        // Выбираем: если exp_mant < 0x0400 -> денормаль, иначе нормаль
+        uint32_t is_denorm = (exp_mant < 0x0400u) ? ~0u : 0u;
+        uint32_t result = sign | ((is_denorm & denorm) | (~is_denorm & normal));
         float f;
         std::memcpy(&f, &result, 4);
         return f;

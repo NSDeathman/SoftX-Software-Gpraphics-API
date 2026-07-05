@@ -382,6 +382,18 @@ inline float2 frac(const float2& v) noexcept {
     return float2(v.x - std::floor(v.x), v.y - std::floor(v.y));
 }
 
+inline float2 pow(const float2& base, const float2& exp) noexcept {
+    return float2(std::pow(base.x, exp.x), std::pow(base.y, exp.y));
+}
+
+inline float2 pow(const float2& base, float exp) noexcept {
+    return float2(std::pow(base.x, exp), std::pow(base.y, exp));
+}
+
+inline float2 pow(float base, const float2& exp) noexcept {
+    return float2(std::pow(base, exp.x), std::pow(base, exp.y));
+}
+
 inline float2 saturate(const float2& v) noexcept {
     return float2(
         std::max(0.0f, std::min(1.0f, v.x)),
