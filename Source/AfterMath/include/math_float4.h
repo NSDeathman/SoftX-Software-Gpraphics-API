@@ -469,22 +469,25 @@ inline float4 frac(const float4& v) noexcept {
                   v.w - std::floor(v.w));
 }
 
-inline float3 pow(const float3& base, const float3& exp) noexcept {
-    return float3(std::pow(base.x, exp.x),
+inline float4 pow(const float4& base, const float4& exp) noexcept {
+    return float4(std::pow(base.x, exp.x),
                   std::pow(base.y, exp.y),
-                  std::pow(base.z, exp.z));
+                  std::pow(base.z, exp.z),
+                  std::pow(base.w, exp.w));
 }
 
-inline float3 pow(const float3& base, float exp) noexcept {
-    return float3(std::pow(base.x, exp),
+inline float4 pow(const float4& base, float exp) noexcept {
+    return float4(std::pow(base.x, exp),
                   std::pow(base.y, exp),
-                  std::pow(base.z, exp));
+                  std::pow(base.z, exp),
+                  std::pow(base.w, exp));
 }
 
-inline float3 pow(float base, const float3& exp) noexcept {
-    return float3(std::pow(base, exp.x),
+inline float4 pow(float base, const float4& exp) noexcept {
+    return float4(std::pow(base, exp.x),
                   std::pow(base, exp.y),
-                  std::pow(base, exp.z));
+                  std::pow(base, exp.z),
+                  std::pow(base, exp.w));
 }
 
 inline float4 saturate(const float4& v) noexcept {
