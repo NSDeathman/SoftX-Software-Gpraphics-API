@@ -4,10 +4,9 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "pch.h"
-
-#include <SoftX.h>
+#include "../include/SoftX.h"
+#include "../include/RasterizerInterface.h"
 #include "Renderer.h"
-#include "RasterizerInterface.h"
 #include "ThreadPoolManager.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN

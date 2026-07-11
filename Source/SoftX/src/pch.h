@@ -13,5 +13,5 @@
 #include <string>
 #include <vector>
 
-#include <SoftX.h>
+#include "../include/SoftX.h"
 /////////////////////////////////////////////////////////////////

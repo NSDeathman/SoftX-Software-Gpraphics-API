@@ -7,7 +7,7 @@
 
 #include <ppl.h>
 
-#include <SoftX.h>
+#include "../include/SoftX.h"
 #include "RasterizerCommon.h"
 #include "Renderer.h"
 #include "ThreadPoolManager.h"

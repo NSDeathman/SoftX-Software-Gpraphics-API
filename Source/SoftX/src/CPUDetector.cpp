@@ -4,7 +4,7 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "pch.h"
-#include <SoftX.h>
+#include "../include/SoftX.h"
 #include "CPUDetector.h"
 
 #include <array>

@@ -5,7 +5,7 @@
 /////////////////////////////////////////////////////////////////
 #include "pch.h"
 
-#include <SoftX.h>
+#include "../include/SoftX.h"
 #include "RasterizerCommon.h"
 #include "QueryRasterizerAVX.h"
 

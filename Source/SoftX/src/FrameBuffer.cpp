@@ -6,7 +6,7 @@
 #include "pch.h"
 
 #include "ThreadPoolManager.h"
-#include <SoftX.h>
+#include "../include/SoftX.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 

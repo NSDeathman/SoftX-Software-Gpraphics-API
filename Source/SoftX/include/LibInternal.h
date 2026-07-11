@@ -6,7 +6,7 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #define SOFTX_API
-#define SOFTX_BEGIN namespace SoftX {
+#define SOFTX_BEGIN namespace SoftX { using namespace AfterMath;
 #define SOFTX_END }
 
 #if _HAS_CXX20

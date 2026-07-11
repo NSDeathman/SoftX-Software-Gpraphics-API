@@ -8,7 +8,7 @@
 #include <ppl.h>
 
 #include "RasterizerCommon.h"
-#include <SoftX.h>
+#include "../include/SoftX.h"
 #include "ThreadPoolManager.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
