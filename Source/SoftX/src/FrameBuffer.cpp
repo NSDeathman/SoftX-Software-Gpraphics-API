@@ -3,8 +3,6 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "pch.h"
-
 #include "ThreadPoolManager.h"
 #include "../include/SoftX.h"
 /////////////////////////////////////////////////////////////////
@@ -13,7 +11,7 @@ SOFTX_BEGIN
 // Inspired by Onigiri :D
 // https://www.youtube.com/watch?v=n4zUgtDk95w
 // https://github.com/ArtemOnigiri/Console3D/blob/main/ConsoleRayTracing.cpp
-void FrameBuffer::PresentASCII(HANDLE hConsole, const uint2& consoleSize)
+void FrameBuffer::PresentASCII(HANDLE hConsole, uint2 consoleSize)
 {
     PROFILE_SCOPE("FrameBuffer::PresentASCII");
 
@@ -103,7 +101,7 @@ void FrameBuffer::PresentASCII(HANDLE hConsole, const uint2& consoleSize)
         coord, &written);
 }
 
-void FrameBuffer::PresentBitmap(HDC hdc, const int2& dstPos, const int2& dstSize)
+void FrameBuffer::PresentBitmap(HDC hdc, int2 dstPos, int2 dstSize)
 {
     PROFILE_SCOPE("FrameBuffer::PresentBitmap");
 

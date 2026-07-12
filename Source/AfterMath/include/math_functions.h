@@ -128,17 +128,18 @@ AFTERMATH_BEGIN
         */
     inline bool approximately_ulps(float a, float b, int max_ulps = 4) noexcept {
         // Reinterpret float bits as integer for bitwise comparison
-        std::int32_t int_a, int_b;
+        std::uint32_t ua, ub;
         static_assert(sizeof(float) == sizeof(std::int32_t), "float and int32_t size mismatch");
 
-        std::memcpy(&int_a, &a, sizeof(float));
-        std::memcpy(&int_b, &b, sizeof(float));
+        std::memcpy(&ua, &a, sizeof(float));
+        std::memcpy(&ub, &b, sizeof(float));
 
         // Handle sign bits by making negative numbers comparable
-        if (int_a < 0) int_a = 0x80000000 - int_a;
-        if (int_b < 0) int_b = 0x80000000 - int_b;
+        if(ua & 0x80000000) ua = 0x80000000 - ua;
+        if (ub & 0x80000000) ub = 0x80000000 - ub;
 
-        return std::abs(int_a - int_b) <= max_ulps;
+        std::int32_t diff = static_cast<std::int32_t>(ua - ub);
+        return std::abs(diff) <= max_ulps;
     }
 
     /**

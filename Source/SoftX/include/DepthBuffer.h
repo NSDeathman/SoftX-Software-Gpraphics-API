@@ -27,9 +27,9 @@ public:
 
     struct Level
     {
+        std::vector<__m128> blocks;
         uint2 resolution;
         uint widthPadded;
-        std::vector<__m128> blocks;
     };
 
     explicit DepthBuffer(uint2 size, uint numMips = 1)
@@ -78,41 +78,41 @@ public:
         }
     }
 
-    SOFTX_FORCE_INLINE float Read(const int2& coords) const
+    SOFTX_FORCE_INLINE float Read(int2 coords) const
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    SOFTX_FORCE_INLINE void Write(const int2& coords, const float& depth)
+    SOFTX_FORCE_INLINE void Write(int2 coords, float depth)
     {
         FloatPtr()[coords.y * widthPadded0() + coords.x] = depth;
     }
 
-    SOFTX_FORCE_INLINE float& At(const int2& coords)
+    SOFTX_FORCE_INLINE float& At(int2 coords)
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    SOFTX_FORCE_INLINE const float& At(const int2& coords) const
+    SOFTX_FORCE_INLINE const float& At(int2 coords) const
     {
         return FloatPtr()[coords.y * widthPadded0() + coords.x];
     }
 
-    SOFTX_FORCE_INLINE float& At(const uint& index)
+    SOFTX_FORCE_INLINE float& At(uint index)
     {
         uint x = index % resolution0().x;
         uint y = index / resolution0().x;
-        return At(int2(x, y));
+        return At(int2(static_cast<int>(x), static_cast<int>(y)));
     }
 
-    SOFTX_FORCE_INLINE const float& At(const uint& index) const
+    SOFTX_FORCE_INLINE const float& At(uint index) const
     {
         uint x = index % resolution0().x;
         uint y = index / resolution0().x;
-        return At(int2(x, y));
+        return At(int2(static_cast<int>(x), static_cast<int>(y)));
     }
 
-    SOFTX_FORCE_INLINE __m128 Read4(const uint2& coords) const
+    SOFTX_FORCE_INLINE __m128 Read4(uint2 coords) const
     {
         SOFTX_VERIFY(coords.x % 4 == 0);
         auto& lvl = mipChain[0];
@@ -121,7 +121,7 @@ public:
         return lvl.blocks[blockIdx];
     }
 
-    SOFTX_FORCE_INLINE void Write4(const uint2& coords, const __m128& depths, const __m128& mask)
+    SOFTX_FORCE_INLINE void Write4(uint2 coords, __m128 depths, __m128 mask)
     {
         SOFTX_VERIFY(coords.x % 4 == 0);
         auto& lvl = mipChain[0];
@@ -131,7 +131,7 @@ public:
         block = _mm_or_ps(_mm_and_ps(depths, mask), _mm_andnot_ps(mask, block));
     }
 
-    SOFTX_FORCE_INLINE __m128 Test4(const uint2& coords, const __m128& depth4, const __m128& activeMask) const
+    SOFTX_FORCE_INLINE __m128 Test4(uint2 coords, __m128 depth4, __m128 activeMask) const
     {
         __m128 buffered = Read4(coords);
         __m128 passed = _mm_cmplt_ps(depth4, buffered);
@@ -146,30 +146,30 @@ public:
     SOFTX_FORCE_INLINE float* Data() { return FloatPtr(); }
     SOFTX_FORCE_INLINE const float* Data() const { return FloatPtr(); }
 
-    SOFTX_FORCE_INLINE uint MipCount() const { return (uint)mipChain.size(); }
+    SOFTX_FORCE_INLINE uint MipCount() const { return static_cast<uint>(mipChain.size()); }
 
     SOFTX_FORCE_INLINE uint2 MipSize(uint level) const
     {
-        level = std::min(level, (uint)mipChain.size() - 1);
+        level = std::min(level, static_cast<uint>(mipChain.size()) - 1);
         return mipChain[level].resolution;
     }
 
     SOFTX_FORCE_INLINE uint MipWidth(uint level) const { return MipSize(level).x; }
     SOFTX_FORCE_INLINE uint MipHeight(uint level) const { return MipSize(level).y; }
 
-    SOFTX_FORCE_INLINE float Read(const int2& coords, const uint& level) const
+    SOFTX_FORCE_INLINE float Read(int2 coords, uint level) const
     {
         int2 sampleCoords = coords;
-        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        uint mipLevel = std::min(level, static_cast<uint>(mipChain.size()) - 1);
         auto& lvl = mipChain[mipLevel];
-        sampleCoords.x = AfterMath::clamp(sampleCoords.x, 0, (int)lvl.resolution.x - 1);
-        sampleCoords.y = AfterMath::clamp(sampleCoords.y, 0, (int)lvl.resolution.y - 1);
+        sampleCoords.x = AfterMath::clamp(sampleCoords.x, 0, static_cast<int>(lvl.resolution.x) - 1);
+        sampleCoords.y = AfterMath::clamp(sampleCoords.y, 0, static_cast<int>(lvl.resolution.y) - 1);
         return lvl.blocks[(sampleCoords.y * lvl.widthPadded + sampleCoords.x) / 4].m128_f32[sampleCoords.x % 4];
     }
 
-    SOFTX_FORCE_INLINE __m128 Read4(const uint2& coords, const uint& level) const
+    SOFTX_FORCE_INLINE __m128 Read4(uint2 coords, uint level) const
     {
-        uint mipLevel = std::min(level, (uint)mipChain.size() - 1);
+        uint mipLevel = std::min(level, static_cast<uint>(mipChain.size()) - 1);
         auto& lvl = mipChain[mipLevel];
         uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
         return lvl.blocks[blockIdx];

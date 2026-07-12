@@ -19,6 +19,9 @@ public:
     DeviceContext();
     ~DeviceContext();
 
+    DeviceContext(const DeviceContext&) = delete;
+    DeviceContext& operator=(const DeviceContext&) = delete;
+
     DeviceContext(DeviceContext&&) = default;
     DeviceContext& operator=(DeviceContext&&) = default;
 
@@ -101,10 +104,10 @@ private:
     CullMode cullMode = CullMode::Back;
     FillMode fillMode = FillMode::Solid;
     ComparisonFunc depthFunc = ComparisonFunc::Less;
-    bool depthWriteEnable = true;
 
     Viewport viewport;
     uint tileSize = 64;
+    bool depthWriteEnable = true;
 };
 
 SOFTX_END

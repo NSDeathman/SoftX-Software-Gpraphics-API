@@ -20,10 +20,11 @@ public:
     explicit Device(const PresentParameters& params);
     ~Device();
 
-    Device(Device&&) = default;
-    Device& operator=(Device&&) = default;
     Device(const Device&) = delete;
     Device& operator=(const Device&) = delete;
+
+    Device(Device&&) = default;
+    Device& operator=(Device&&) = default;
 
     Device CreateHeadless(uint2 backBufferSize);
 
@@ -52,11 +53,11 @@ private:
     void PresentToConsole();
 
 private:
-    PresentParameters presentParams;
+    DeviceContext immediateContext;
     std::shared_ptr<FrameBuffer> backBuffer;
     std::shared_ptr<DepthBuffer> depthBuffer;
-    DeviceContext immediateContext;
     HANDLE hConsoleBuffer = nullptr;
+    PresentParameters presentParams;
 };
 
 SOFTX_END

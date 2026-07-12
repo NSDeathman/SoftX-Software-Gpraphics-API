@@ -3,8 +3,6 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "pch.h"
-
 #include "../include/SoftX.h"
 #include "RasterizerFactory.h"
 #include "ThreadPoolManager.h"
@@ -116,7 +114,7 @@ bool DeviceContext::Validate(std::string* errorMsg) const
             *errorMsg += "Render target not set ";
         result = false;
     }
-    if (viewport.size.x <= 0.0f || viewport.size.y <= 0.0f)
+    if (viewport.size.x <= 0 || viewport.size.y <= 0)
     {
         if (errorMsg)
             *errorMsg += "Viewport has non-positive size ";

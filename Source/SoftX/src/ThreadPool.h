@@ -12,6 +12,8 @@
 #include <queue>
 #include <thread>
 #include <vector>
+
+#include "../include/SoftX.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -35,7 +37,7 @@ class SOFTX_API ThreadPool
 
 						task = std::move(tasks.front());
 						tasks.pop();
-						++activeTasks; // под локом
+						++activeTasks;
 					}
 
 					task();
@@ -43,10 +45,6 @@ class SOFTX_API ThreadPool
 					{
 						std::unique_lock<std::mutex> lock(queueMutex);
 						--activeTasks;
-						// notify_all внутри лока — главный поток не может
-						// пропустить сигнал: он либо ещё не вошёл в wait()
-						// (тогда увидит актуальный activeTasks при входе),
-						// либо уже спит (тогда разбудим его)
 						condition.notify_all();
 					}
 				}
@@ -64,6 +62,11 @@ class SOFTX_API ThreadPool
 		for (auto& worker : workers)
 			worker.join();
 	}
+
+	ThreadPool(const ThreadPool&) = delete;
+	ThreadPool& operator=(const ThreadPool&) = delete;
+	ThreadPool(ThreadPool&&) = delete;
+	ThreadPool& operator=(ThreadPool&&) = delete;
 
 	template <class F> void enqueue(F&& task)
 	{
@@ -92,8 +95,8 @@ class SOFTX_API ThreadPool
 	std::queue<std::function<void()>> tasks;
 	std::mutex queueMutex;
 	std::condition_variable condition;
-	bool stop;
 	std::atomic<int> activeTasks;
+	bool stop;
 };
 
 SOFTX_END

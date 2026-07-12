@@ -3,8 +3,6 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "pch.h"
-
 #include <ppl.h>
 
 #include "../include/SoftX.h"

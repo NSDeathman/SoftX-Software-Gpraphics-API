@@ -174,8 +174,8 @@ namespace RasterizerCommon
         float yNDC = vert.Position.y * invW;
         float zNDC = vert.Position.z * invW;
 
-        vert.Position.x = vp.pos.x + (xNDC * 0.5f + 0.5f) * vp.size.x;
-        vert.Position.y = vp.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * vp.size.y;
+        vert.Position.x = vp.pos.x + (xNDC * 0.5f + 0.5f) * static_cast<float>(vp.size.x);
+        vert.Position.y = vp.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * static_cast<float>(vp.size.y);
         vert.Position.z = vp.minZ + zNDC * (vp.maxZ - vp.minZ);
         vert.Position.w = invW; // DX11 style: Position.w = 1/w after rasterization
     }

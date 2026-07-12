@@ -25,6 +25,9 @@ public:
     OcclusionQuery();
     ~OcclusionQuery();
 
+    OcclusionQuery(const OcclusionQuery&) = delete;
+    OcclusionQuery& operator=(const OcclusionQuery&) = delete;
+
     SOFTX_FORCE_INLINE void SetVertexBuffer(const VertexBuffer& vb) { currentVB = vb; }
     SOFTX_FORCE_INLINE void SetIndexBuffer(const IndexBuffer& ib) { currentIB = ib; }
     SOFTX_FORCE_INLINE void SetConstantBuffer(const ConstantBuffer& cb) { currentCB = cb; }
@@ -59,25 +62,21 @@ private:
     };
 
     std::shared_ptr<DepthBuffer> depthBuffer;
-    Viewport viewport;
     VertexBuffer currentVB;
     IndexBuffer currentIB;
     ConstantBuffer currentCB;
     OcclusionVertexShader currentVS;
-
+    std::vector<DrawCall> drawCalls;
+    std::future<void> future;
+    std::unique_ptr<IQueryRasterizer> rasterizer;
+    Viewport viewport;
     CullMode cullMode = CullMode::Back;
     ComparisonFunc depthFunc = ComparisonFunc::Less;
+    uint totalVisibleSamples = 0;
     bool depthWriteEnable = false;
-
-    std::vector<DrawCall> drawCalls;
     bool begun = false;
     bool ended = false;
-
-    std::future<void> future;
     std::atomic<bool> ready{ false };
-    uint totalVisibleSamples = 0;
-
-    std::unique_ptr<IQueryRasterizer> rasterizer;
 
     void ProcessDrawCall(DrawCall& dc,
                          DepthBuffer& db,

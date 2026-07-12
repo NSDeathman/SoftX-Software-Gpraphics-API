@@ -24,24 +24,23 @@ enum class PresentationMode { Window, Console };
 struct PresentParameters
 {
     uint2 BackBufferSize = uint2(1, 1);
+    uint2 ConsoleSize = uint2(1, 1);
     HWND hDeviceWindow = nullptr;
+    PresentationMode Output = PresentationMode::Window;
     bool Windowed = true;
     bool Headless = false;
-    PresentationMode Output = PresentationMode::Window;
-    uint2 ConsoleSize = uint2(1, 1);
 };
 
 // ── Geometry data ───────────────────────────────────────────
 struct VertexInput
 {
+    float4 Color;
     float3 Position;
     float3 Normal;
-    float4 Color;
     float2 UV;
 
-    VertexInput() : Position(0, 0, 0), Normal(0, 0, 0), Color(0, 0, 0, 0), UV(0, 0) {}
-    VertexInput(const float3& pos, const float3& norm, const float4& col, const float2& uv = float2(0, 0))
-        : Position(pos), Normal(norm), Color(col), UV(uv) {}
+    VertexInput() : Color(0, 0, 0, 0), Position(0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
+    VertexInput(float3 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Color(col), Position(pos), Normal(norm), UV(uv) {}
 };
 
 struct VertexOutput
@@ -51,9 +50,8 @@ struct VertexOutput
     float3 Normal;
     float2 UV;
 
-    VertexOutput() : Position(0, 0, 0, 0), Normal(0, 0, 0), Color(0, 0, 0, 0), UV(0, 0) {}
-    VertexOutput(const float4& pos, const float3& norm, const float4& col, const float2& uv = float2(0, 0))
-        : Position(pos), Normal(norm), Color(col), UV(uv) {}
+    VertexOutput() : Position(0, 0, 0, 0), Color(0, 0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
+    VertexOutput(float4 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Position(pos), Color(col), Normal(norm), UV(uv) {}
 };
 
 // ── Buffers ──────────────────────────────────────────────────
@@ -171,6 +169,7 @@ struct SamplerState
     {
         switch (mode)
         {
+        case Wrap::Repeat: return uv - std::floor(uv);
         case Wrap::Clamp:  return AfterMath::clamp(uv, 0.0f, 1.0f);
         case Wrap::Mirror: {
             float t = std::fmod(std::abs(uv), 2.0f);

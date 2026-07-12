@@ -463,7 +463,7 @@ namespace FastMath
         const float m2 = m * m;
         const float m3 = m * m2;
 
-        return (m - m2 / 2.0f + m3 / 3.0f) + exponent * 0.69314718056f; // ln(2)
+        return (m - m2 / 2.0f + m3 / 3.0f) + static_cast<float>(exponent) * 0.69314718056f; // ln(2)
     }
 
     /**

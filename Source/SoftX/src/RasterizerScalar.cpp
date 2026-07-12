@@ -3,8 +3,6 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "pch.h"
-
 #include "../include/SoftX.h"
 #include "RasterizerCommon.h"
 #include "RasterizerScalar.h"
@@ -13,15 +11,14 @@ SOFTX_BEGIN
 
 // Shared depth test + pixel write — called from both traversal paths.
 // Inlined by the compiler; extracted here to avoid duplicating the switch.
-static inline void ShadeSinglePixel(
-    uint x, uint y,
-    int64_t sf12, int64_t sf20, int64_t sf01,
-    int64_t area2Int,
-    const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2,
-    DepthBuffer& depthBuffer, IRenderTarget* renderTarget,
-    const PixelShader& ps, const ConstantBuffer& cb, const TextureTable* tt,
-    const RasterizerState& state,
-    uint width)
+static inline void ShadeSinglePixel(uint x, uint y,
+                                    int64_t sf12, int64_t sf20, int64_t sf01,
+                                    int64_t area2Int,
+                                    const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2,
+                                    DepthBuffer& depthBuffer, IRenderTarget* renderTarget,
+                                    const PixelShader& ps, const ConstantBuffer& cb, const TextureTable* tt,
+                                    const RasterizerState& state,
+                                    uint width)
 {
     const float fa = float(sf12) / float(area2Int); // weight for v0
     const float fb = float(sf20) / float(area2Int); // weight for v1
