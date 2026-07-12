@@ -5,7 +5,7 @@ project(SoftXDemo LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(SoftXDemo SoftxDemo.cpp)
+add_executable(SoftXDemo WIN32 SoftxDemo.cpp)
 
 target_link_libraries(SoftXDemo PRIVATE SoftX)
 

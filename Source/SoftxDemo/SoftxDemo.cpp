@@ -1,173 +1,370 @@
-﻿// ConsoleCubeDemo.cpp
-#define WIN32_LEAN_AND_MEAN
+﻿#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#include <conio.h>
-#include <cmath>
+#include <memory>
 #include <vector>
-#include <SoftX.h>
+#include <cmath>
+#include <ctime>
 
-#pragma comment(lib, "SoftX.lib")
+#include <SoftX.h>
 
 using namespace SoftX;
 using namespace AfterMath;
 
-// ─── Настройки ─────────────────────────────────────────────
-constexpr float CONSOLE_PIXEL_ASPECT = 0.5f;
-constexpr int CONSOLE_WIDTH = 120;
-constexpr int CONSOLE_HEIGHT = 60;
-constexpr int BACKBUFFER_WIDTH = CONSOLE_WIDTH * 4;
-constexpr int BACKBUFFER_HEIGHT = CONSOLE_HEIGHT * 4;
-constexpr int TILE_SIZE = 32;
+static constexpr int WINDOW_WIDTH = 1280;
+static constexpr int WINDOW_HEIGHT = 768;
+static constexpr int CUBE_COUNT = 100;
 
-// ─── Константный буфер (расширен) ──────────────────────────
+static HWND g_hWnd = nullptr;
+static Device* g_device = nullptr;
+static const int QUERY_POOL_SIZE = 2;
+static OcclusionQuery g_queryPool[QUERY_POOL_SIZE];
+static int g_currentQueryIndex = 0;
+static OcclusionQuery* g_pendingQuery = nullptr;
+
+struct Mesh
+{
+    VertexBuffer           vb;
+    IndexBuffer            ib;
+    float4x4               worldMatrix;
+    OcclusionQuery::queryID queryId = 0;
+    bool                   visible = true;
+};
+
 struct CbData
 {
     float4x4 modelViewProjection;
-    float4x4 world;
+    float4 objectTypeColor;
 };
 
-// ─── Шейдеры (с освещением) ────────────────────────────────
-VertexOutput MainVS(const VertexInput& in, const ConstantBuffer& cb, const TextureTable&)
+struct CbDataQuery
 {
-    const CbData& data = *reinterpret_cast<const CbData*>(cb.Data());
-    VertexOutput out;
+    float4x4 modelViewProjection;
+};
 
-    out.Position = float4(in.Position, 1.0f) * data.modelViewProjection;
-
-    // Нормаль в мировое пространство
-    float4 worldNormal = float4(in.Normal, 0.0f) * data.world;
-    worldNormal = normalize(worldNormal);
-    out.Normal = worldNormal.xyz();
-
-    out.Color = in.Color;
-    out.UV = in.UV;
-    return out;
-}
-
-float4 MainPS(const VertexOutput& in, const ConstantBuffer&, const TextureTable&)
+void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
 {
-    const float3 lightDir = normalize(float3(0.5f, 1.0f, -0.3f));
-    float3 N = normalize(in.Normal);
-    float NdotL = std::max(dot(N, lightDir), 0.0f);
+    //     7-------6
+    //    /|      /|
+    //   3-------2  |
+    //   |  4----|--5     y
+    //   | /     | /      |
+    //   0-------1        +--x
+    //                   /
+    //                  z
+    const float3 positions[8] = {
+        {-0.5f, -0.5f, -0.5f}, // 0
+        { 0.5f, -0.5f, -0.5f}, // 1
+        { 0.5f,  0.5f, -0.5f}, // 2
+        {-0.5f,  0.5f, -0.5f}, // 3
+        {-0.5f, -0.5f,  0.5f}, // 4
+        { 0.5f, -0.5f,  0.5f}, // 5
+        { 0.5f,  0.5f,  0.5f}, // 6
+        {-0.5f,  0.5f,  0.5f}  // 7
+    };
 
-    float3 ambient = in.Color.xyz() * 0.2f;
-    float3 diffuse = in.Color.xyz() * NdotL;
-    float3 lighting = ambient + diffuse;
+    struct Face { int i[4]; float3 normal; };
+    const Face faces[6] = {
+        // +X
+        {{1, 5, 6, 2}, float3(1,0,0)},
+        // -X
+        {{4, 0, 3, 7}, float3(-1,0,0)},
+        // +Y
+        {{2, 6, 7, 3}, float3(0,1,0)},
+        // -Y
+        {{4, 5, 1, 0}, float3(0,-1,0)},
+        // +Z
+        {{5, 4, 7, 6}, float3(0,0,1)},
+        // -Z
+        {{0, 1, 2, 3}, float3(0,0,-1)}
+    };
 
-    return float4(lighting, 1.0f);
-}
+    std::vector<VertexInput> vertices;
+    std::vector<uint>        indices;
 
-// ─── Генерация сферы (радиус 1, центр в 0) ──────────────────
-void CreateSphere(VertexBuffer& vb, IndexBuffer& ib,
-    const float4& color,
-    int slices = 32, int stacks = 16)
-{
-    std::vector<VertexInput> verts;
-    std::vector<uint>        inds;
-
-    // Параметризация:
-    // phi   [0, PI]    – широта (от верхнего полюса)
-    // theta [0, 2*PI]  – долгота
-    // Ось Y вверх, камера смотрит вдоль +Z
-
-    const float radius = 1.0f;
-    for (int i = 0; i <= stacks; ++i)
+    for (const auto& face : faces)
     {
-        float phi = (float)i / stacks * 3.14159265359f; // от 0 до PI
-        float sinPhi = sinf(phi);
-        float cosPhi = cosf(phi);
+        uint base = (uint)vertices.size();
+        for (int idx : face.i)
+            vertices.push_back({ positions[idx], face.normal, color });
 
-        for (int j = 0; j <= slices; ++j)
+        // Two triangles: 0-1-2 и 2-3-0 (CCW)
+        indices.push_back(base + 0);
+        indices.push_back(base + 1);
+        indices.push_back(base + 2);
+        indices.push_back(base + 2);
+        indices.push_back(base + 3);
+        indices.push_back(base + 0);
+    }
+
+    vb = VertexBuffer(std::move(vertices));
+    ib = IndexBuffer(std::move(indices));
+}
+
+VertexOutput MainVS(const VertexInput& input, const ConstantBuffer& cb, const TextureTable& tex)
+{
+    (void)tex;
+    const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
+    VertexOutput output;
+    output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f) * data->modelViewProjection;
+    output.Color = input.Color;
+    output.Normal = input.Normal;
+    output.UV = input.UV;
+    return output;
+}
+
+float4 MainPS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
+{
+    (void)tex;
+    const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
+
+    return data->objectTypeColor;
+}
+
+VertexOutput OcclusionVS(const VertexInput& input, const ConstantBuffer& cb)
+{
+    const CbDataQuery* data = reinterpret_cast<const CbDataQuery*>(cb.Data());
+    VertexOutput output;
+    output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f) * data->modelViewProjection;
+    output.Color = float4(0, 0, 0, 0);
+    output.Normal = float3(0, 0, 0);
+    output.UV = float2(0, 0);
+    return output;
+}
+
+float randomFloat(float min, float max)
+{
+    return min + (max - min) * (float(rand()) / RAND_MAX);
+}
+
+void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
+{
+    PROFILE_SCOPE("DrawFrame");
+
+    DeviceContext& ctx = g_device->GetImmediateContext();
+
+    const float aspect = float(WINDOW_WIDTH) / float(WINDOW_HEIGHT);
+    float4x4 proj = perspective(Constants::degrees_to_radians(60.0f), aspect);
+    float3 eye(0.0f, 30.0f, -1.0f);
+    float3 target(0.0f, 0.0f, 0.0f);
+    float4x4 view = look_at(eye, target);
+
+    ctx.ClearColorAndDepth(float4(0.05f, 0.10f, 0.18f, 1.0f), 1.0f);
+
+    {
+        PROFILE_SCOPE("Draw occluder");
+        float3 occluderPos(0.25f * cosf(occluderAngle), 2.0f, 1.0f * sinf(occluderAngle));
+        float4x4 occluderWorld = translation(occluderPos) * scaling(float3(40, 0.5f, 15));
+        float4x4 mvp = occluderWorld * view * proj;
+        CbData cbData;
+        cbData.modelViewProjection = mvp;
+        cbData.objectTypeColor = float4(0.6f, 0.6f, 0.6f, 1.0f);
+        ConstantBuffer cb(&cbData, sizeof(cbData));
+
+        ctx.SetConstantBuffer(cb);
+        ctx.SetVertexBuffer(occluder.vb);
+        ctx.SetIndexBuffer(occluder.ib);
+        ctx.SetVertexShader(MainVS);
+        ctx.SetPixelShader(MainPS);
+        ctx.SetTileSize(WINDOW_WIDTH / 16);
+        ctx.DrawIndexed();
+    }
+
+    if (g_pendingQuery && g_pendingQuery->IsReady())
+    {
+        PROFILE_SCOPE("Retrieve last frame query results");
+        for (auto& cube : cubes)
         {
-            float theta = (float)j / slices * 2.0f * 3.14159265359f;
-            float sinTheta = sinf(theta);
-            float cosTheta = cosf(theta);
+            uint visibleSamples = 0;
+            if (g_pendingQuery->GetResult(cube.queryId, &visibleSamples))
+                cube.visible = (visibleSamples > 0);
+            else
+                cube.visible = false;
+        }
+        g_pendingQuery = nullptr;
+    }
 
-            float x = radius * sinPhi * cosTheta;
-            float y = radius * cosPhi;          // Y вверх
-            float z = radius * sinPhi * sinTheta;
+    {
+        PROFILE_SCOPE("Begin new occlusion query");
 
-            // Нормаль для единичной сферы равна позиции
-            float3 pos(x, y, z);
-            float3 normal = normalize(pos);
+        OcclusionQuery& currentQuery = g_queryPool[g_currentQueryIndex];
 
-            verts.push_back({ pos, normal, color, float2(0,0) });
+        if (!currentQuery.IsReady())
+            currentQuery.Flush();
+
+        g_currentQueryIndex = (g_currentQueryIndex + 1) % QUERY_POOL_SIZE;
+
+        currentQuery.SetDepthBuffer(ctx.GetDepthBuffer());
+        currentQuery.SetViewport(ctx.GetViewport());
+        currentQuery.Begin();
+
+        for (auto& cube : cubes)
+        {
+            float4x4 mvp = cube.worldMatrix * view * proj;
+            CbDataQuery cbData;
+            cbData.modelViewProjection = mvp;
+            ConstantBuffer cb(&cbData, sizeof(cbData));
+
+            currentQuery.SetVertexBuffer(cube.vb);
+            currentQuery.SetIndexBuffer(cube.ib);
+            currentQuery.SetConstantBuffer(cb);
+            currentQuery.SetVertexShader(OcclusionVS);
+
+            cube.queryId = currentQuery.DrawIndexed();
+        }
+
+        currentQuery.End();
+        g_pendingQuery = &currentQuery;
+    }
+
+    int visibleCount = 0;
+    {
+        PROFILE_SCOPE("Draw visible cubes");
+        for (auto& cube : cubes)
+        {
+            if (!cube.visible) continue;
+            ++visibleCount;
+
+            float4x4 mvp = cube.worldMatrix * view * proj;
+            CbData cbData;
+            cbData.modelViewProjection = mvp;
+            cbData.objectTypeColor = float4(0.2f, 0.8f, 0.3f, 1.0f);
+            ConstantBuffer cb(&cbData, sizeof(cbData));
+
+            ctx.SetConstantBuffer(cb);
+            ctx.SetVertexBuffer(cube.vb);
+            ctx.SetIndexBuffer(cube.ib);
+            ctx.SetVertexShader(MainVS);
+            ctx.SetPixelShader(MainPS);
+            ctx.SetTileSize(WINDOW_WIDTH / 32);
+            ctx.DrawIndexed();
         }
     }
 
-    // Индексы (против часовой для внешней стороны)
-    for (int i = 0; i < stacks; ++i)
     {
-        for (int j = 0; j < slices; ++j)
+        PROFILE_SCOPE("Draw invisible cubes");
+
+        ComparisonFunc prevDepthFunc = ctx.GetDepthFunc();
+        FillMode prevFillMode = ctx.GetFillMode();
+        bool prevDepthWrite = ctx.GetDepthWriteEnable();
+        ctx.SetDepthFunc(ComparisonFunc::Always);
+        ctx.SetDepthWriteEnable(false);
+        ctx.SetFillMode(FillMode::Wireframe);
+
+        for (auto& cube : cubes)
         {
-            uint first = i * (slices + 1) + j;
-            uint second = first + slices + 1;
+            if (cube.visible) continue;
 
-            // Два треугольника на квад
-            inds.push_back(first);
-            inds.push_back(second);
-            inds.push_back(first + 1);
+            float4x4 mvp = cube.worldMatrix * view * proj;
+            CbData cbData;
+            cbData.modelViewProjection = mvp;
+            cbData.objectTypeColor = float4(0.8f, 0.2f, 0.3f, 1.0f);
+            ConstantBuffer cb(&cbData, sizeof(cbData));
 
-            inds.push_back(second);
-            inds.push_back(second + 1);
-            inds.push_back(first + 1);
+            ctx.SetConstantBuffer(cb);
+            ctx.SetVertexBuffer(cube.vb);
+            ctx.SetIndexBuffer(cube.ib);
+            ctx.SetVertexShader(MainVS);
+            ctx.SetPixelShader(MainPS);
+            ctx.SetTileSize(WINDOW_WIDTH / 32);
+            ctx.DrawIndexed();
         }
+
+        ctx.SetFillMode(prevFillMode);
+        ctx.SetDepthFunc(prevDepthFunc);
+        ctx.SetDepthWriteEnable(prevDepthWrite);
     }
 
-    vb = VertexBuffer(std::move(verts));
-    ib = IndexBuffer(std::move(inds));
+    static char title[256];
+    sprintf_s(title, "SoftX Occlusion Query Demo | Visible cubes: %d / %d", visibleCount, CUBE_COUNT);
+    SetWindowTextA(g_hWnd, title);
+
+    g_device->Present();
 }
 
-int main()
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE) DestroyWindow(hWnd);
+        return 0;
+    }
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    VertexBuffer vb;
-    IndexBuffer  ib;
-    CreateSphere(vb, ib, float4(1.0f, 0.3f, 0.2f, 1.0f), 32, 16);
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
+    wc.lpszClassName = "SoftXOcclusionDemo";
+    RegisterClassEx(&wc);
+
+    RECT rc = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
+    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+    g_hWnd = CreateWindowEx(0, "SoftXOcclusionDemo", "SoftX Occlusion Query Demo",
+                            WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                            rc.right - rc.left, rc.bottom - rc.top,
+                            nullptr, nullptr, hInstance, nullptr);
+    if (!g_hWnd) return -1;
+    ShowWindow(g_hWnd, nCmdShow);
+    UpdateWindow(g_hWnd);
 
     PresentParameters params;
-    params.BackBufferSize = uint2(BACKBUFFER_WIDTH, BACKBUFFER_HEIGHT);
-    params.Output = PresentationMode::Console;
-    params.ConsoleSize = uint2(CONSOLE_WIDTH, CONSOLE_HEIGHT);
+    params.BackBufferSize = uint2(WINDOW_WIDTH, WINDOW_HEIGHT);
+    params.hDeviceWindow = g_hWnd;
+    params.Windowed = true;
 
     Device device(params);
-    DeviceContext& ctx = device.GetImmediateContext();
+    g_device = &device;
 
+    DeviceContext& ctx = g_device->GetImmediateContext();
     ctx.SetRenderTarget(device.GetBackBuffer(), true);
-    ctx.SetViewport(Viewport(0, 0, BACKBUFFER_WIDTH, BACKBUFFER_HEIGHT, 0.0f, 1.0f));
+    ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
+    ctx.SetTileSize(128);
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
     ctx.SetFillMode(FillMode::Solid);
-    ctx.SetTileSize(TILE_SIZE);
+    ctx.SetTileSize(64);
 
-    float aspect = float(BACKBUFFER_WIDTH) / float(BACKBUFFER_HEIGHT) * CONSOLE_PIXEL_ASPECT;
-    float4x4 proj = perspective(radians(60.0f), aspect);
-    float4x4 view = look_at(float3(0, 0, -2), float3(0, 0, 0));
+    srand((unsigned)time(nullptr));
 
-    float angle = 0.0f;
-
-    while (true)
+    std::vector<Mesh> cubes(CUBE_COUNT);
+    for (int i = 0; i < CUBE_COUNT; ++i)
     {
-        ctx.ClearColorAndDepth(float4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f);
+        float3 pos(randomFloat(-30.0f, 30.0f), randomFloat(-2.5f, 0.0f), randomFloat(-20.0f, 20.0f));
+        float4 color(0.2f, 0.8f, 0.3f, 1.0f);
 
-        angle += 0.03f;
-        float4x4 world = rotation_y(angle) * rotation_x(angle * 0.5f);
-        float4x4 mvp = world * view * proj;
-
-        CbData cb;
-        cb.modelViewProjection = mvp;
-        cb.world = world;
-        ConstantBuffer cbuffer(&cb, sizeof(cb));
-
-        ctx.SetConstantBuffer(cbuffer);
-        ctx.SetVertexBuffer(vb);
-        ctx.SetIndexBuffer(ib);
-        ctx.SetVertexShader(MainVS);
-        ctx.SetPixelShader(MainPS);
-
-        ctx.DrawIndexed();
-        device.Present();
+        CreateCube(cubes[i].vb, cubes[i].ib, color);
+        cubes[i].worldMatrix = translation(pos) * scaling(float3(1.0f));
     }
 
-    return 0;
+    Mesh occluder;
+    CreateCube(occluder.vb, occluder.ib, float4(0.6f, 0.6f, 0.6f, 1.0f));
+
+    MSG msg = {};
+    float occluderAngle = 0.0f;
+
+    while (msg.message != WM_QUIT)
+    {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else
+        {
+            PROFILE_FRAME("SoftX");
+            DrawFrame(cubes, occluder, occluderAngle);
+            occluderAngle += 0.015f;
+        }
+    }
+
+    return int(msg.wParam);
 }

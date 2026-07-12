@@ -99,10 +99,9 @@ set_target_properties(SoftX PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Source/SoftX/lib/$<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>,x64,x86>"
 )
 
-source_group("Source Files\\Core"          FILES src/Device.cpp src/DeviceContext.cpp src/DeviceContextDebug.cpp src/DeviceContextDraw.cpp src/Renderer.cpp)
+source_group("Source Files\\Core"          FILES src/Device.cpp src/DeviceContext.cpp src/DeviceContextDebug.cpp src/DeviceContextDraw.cpp src/Renderer.cpp src/OcclusionQuery.cpp)
 source_group("Source Files\\Rasterizer"    FILES src/RasterizerAVX.cpp src/RasterizerFactory.cpp src/RasterizerScalar.cpp src/RasterizerSSE.cpp
-                                                 src/QueryRasterizerAVX.cpp src/QueryRasterizerFactory.cpp src/QueryRasterizerScalar.cpp src/QueryRasterizerSSE.cpp
-                                                 src/OcclusionQuery.cpp)
+                                                 src/QueryRasterizerAVX.cpp src/QueryRasterizerFactory.cpp src/QueryRasterizerScalar.cpp src/QueryRasterizerSSE.cpp)
 source_group("Source Files\\Tools"         FILES src/CPUDetector.cpp src/ThreadPoolManager.cpp)
 source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp src/TextureRGBA32F.cpp)
 
