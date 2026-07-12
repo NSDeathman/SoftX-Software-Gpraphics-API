@@ -30,9 +30,25 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
         return;
 
     uint idx = y * rt->Width() + x;
-    if (z < depthBuffer->At(idx))
+    float depthValue = depthBuffer->At(idx);
+
+    bool pass = false;
+    switch (depthFunc)
     {
-        if(depthWriteEnable) depthBuffer->At(idx) = z;
+    case ComparisonFunc::Never:        pass = false; break;
+    case ComparisonFunc::Less:         pass = (z < depthValue); break;
+    case ComparisonFunc::Equal:        pass = (z == depthValue); break;
+    case ComparisonFunc::LessEqual:    pass = (z <= depthValue); break;
+    case ComparisonFunc::Greater:      pass = (z > depthValue); break;
+    case ComparisonFunc::NotEqual:     pass = (z != depthValue); break;
+    case ComparisonFunc::GreaterEqual: pass = (z >= depthValue); break;
+    case ComparisonFunc::Always:       pass = true; break;
+    default:                           pass = (z < depthValue); break;
+    }
+
+    if (pass)
+    {
+        if (depthWriteEnable) depthBuffer->At(idx) = z;
         if (renderTarget) rt->SetPixel(uint2(x, y), color);
     }
 }
