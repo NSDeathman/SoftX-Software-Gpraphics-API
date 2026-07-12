@@ -19,7 +19,6 @@ XRay.code-workspace
 
 # Build results
 obj/
-Build*/
 intermediate/
 libraries/
 binaries/
@@ -35,16 +34,6 @@ UpgradeLog*.htm
 # C++ Builder backups
 *.~*
 
-# X-Ray resources
-mods/
-*.db*
-
-# X-Ray user files
-_appdata_*/
-fs_*.ltx
-fsgame_*.ltx
-fsfactory_*.ltx
-
 # masOS cache
 .DS_Store
 
@@ -59,7 +48,6 @@ packages/
 
 # Temporary files
 temp/
-gamedata_origin/
 patch/
 
 # Generated files
@@ -72,5 +60,5 @@ cmake-build*/
 *.pdb
 *.exp
 
-Source/SoftxDemo/enc_temp_folder/*
 Source/SoftX/lib/*
+/Build/generated
