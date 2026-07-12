@@ -6,9 +6,9 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #include "LibInternal.h"
+#include "ThirdPartyIncluding.h"
 #include "RenderTargetInterface.h"
 #include "TextureRGBA32F.h"
-#include "ThirdPartyIncluding.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 

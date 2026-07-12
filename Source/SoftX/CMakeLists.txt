@@ -13,6 +13,7 @@ set(SOFTX_SOURCES
     src/DeviceContextDebug.cpp
     src/DeviceContextDraw.cpp
     src/FrameBuffer.cpp
+    src/TextureRGBA32F.cpp
     src/OcclusionQuery.cpp
     src/QueryRasterizerAVX.cpp
     src/QueryRasterizerFactory.cpp
@@ -103,7 +104,7 @@ source_group("Source Files\\Rasterizer"    FILES src/RasterizerAVX.cpp src/Raste
                                                  src/QueryRasterizerAVX.cpp src/QueryRasterizerFactory.cpp src/QueryRasterizerScalar.cpp src/QueryRasterizerSSE.cpp
                                                  src/OcclusionQuery.cpp)
 source_group("Source Files\\Tools"         FILES src/CPUDetector.cpp src/ThreadPoolManager.cpp)
-source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp)
+source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp src/TextureRGBA32F.cpp)
 
 source_group("Header Files\\Core"          FILES src/Renderer.h)
 source_group("Header Files\\Rasterizer"    FILES src/RasterizerAVX.h src/RasterizerCommon.h src/RasterizerFactory.h src/RasterizerScalar.h src/RasterizerSSE.h
