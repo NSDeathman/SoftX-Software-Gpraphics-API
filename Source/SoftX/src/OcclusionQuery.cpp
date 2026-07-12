@@ -101,33 +101,22 @@ void OcclusionQuery::End()
 
     future = std::async(std::launch::async, [this, drawCallsCopy, db, vpData, rast]()
     {
-            PROFILE_THREAD("OcclusionQuery::AsyncExecution");
-            PROFILE_SCOPE("OcclusionQuery::AsyncExecution");
-            std::atomic<uint32_t> totalVisible(0);
+        PROFILE_THREAD("OcclusionQuery::AsyncExecution");
+        PROFILE_SCOPE("OcclusionQuery::AsyncExecution");
+        std::atomic<uint32_t> totalVisible(0);
 
-            std::atomic<size_t> idx(0);
-            size_t count = drawCallsCopy->size();
+        std::atomic<size_t> idx(0);
+        size_t count = drawCallsCopy->size();
+        for (size_t i = 0; i < count; ++i)
+        {
+            ProcessDrawCall((*drawCallsCopy)[i], *db, vpData, *rast, totalVisible);
+        }
 
-            auto& pool = ThreadPoolManager::Get();
-            for (size_t t = 0; t < pool.threadCount(); ++t)
-            {
-                pool.enqueue([&]()
-                    {
-                        while (true)
-                        {
-                            size_t i = idx.fetch_add(1);
-                            if (i >= count) break;
-                            ProcessDrawCall((*drawCallsCopy)[i], *db, vpData, *rast, totalVisible);
-                        }
-                    });
-            }
-            pool.wait();
+        for (size_t i = 0; i < drawCalls.size(); ++i)
+            drawCalls[i].visibleSamples = (*drawCallsCopy)[i].visibleSamples;
 
-            for (size_t i = 0; i < drawCalls.size(); ++i)
-                drawCalls[i].visibleSamples = (*drawCallsCopy)[i].visibleSamples;
-
-            totalVisibleSamples = totalVisible.load();
-            ready = true;
+        totalVisibleSamples = totalVisible.load();
+        ready = true;
     });
 }
 
