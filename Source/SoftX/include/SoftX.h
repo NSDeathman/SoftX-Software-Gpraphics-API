@@ -7,15 +7,9 @@
 /////////////////////////////////////////////////////////////////
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
-
+#include "Exeptions.h"
 #include "Types.h"
-
-#include "DepthBuffer.h"
-#include "FrameBuffer.h"
-#include "RenderTargetTexture.h"
-
-#include "OcclusionQuery.h"
-
 #include "Device.h"
 #include "DeviceContext.h"
+#include "OcclusionQuery.h"
 /////////////////////////////////////////////////////////////////

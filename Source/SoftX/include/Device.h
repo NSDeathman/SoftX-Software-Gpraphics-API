@@ -28,20 +28,22 @@ public:
 
     Device CreateHeadless(uint2 backBufferSize);
 
-    SOFTX_FORCE_INLINE void SetDeviceContext(DeviceContext ctx) { immediateContext = std::move(ctx); }
+    void SetDeviceContext(DeviceContext ctx) { immediateContext = std::move(ctx); }
     SOFTX_FORCE_INLINE DeviceContext& GetDeviceContext() { return immediateContext; }
     SOFTX_FORCE_INLINE const DeviceContext& GetDeviceContext() const { return immediateContext; }
 
     SOFTX_FORCE_INLINE DeviceContext& GetImmediateContext() { return immediateContext; }
     SOFTX_FORCE_INLINE const DeviceContext& GetImmediateContext() const { return immediateContext; }
 
-    SOFTX_FORCE_INLINE std::unique_ptr<DeviceContext> CreateDeferredContext() { return std::make_unique<DeviceContext>(); }
+    std::unique_ptr<DeviceContext> CreateDeferredContext() { return std::make_unique<DeviceContext>(); }
 
     SOFTX_FORCE_INLINE std::shared_ptr<FrameBuffer> GetBackBuffer() { return backBuffer; }
     SOFTX_FORCE_INLINE std::shared_ptr<DepthBuffer> GetDepthBuffer() { return depthBuffer; }
 
     SOFTX_FORCE_INLINE PresentParameters& GetPresentParams() { return presentParams; }
     SOFTX_FORCE_INLINE const PresentParameters& GetPresentParams() const { return presentParams; }
+
+    void Reset(const PresentParameters& newParams);
 
     void Present();
 
@@ -58,6 +60,7 @@ private:
     std::shared_ptr<DepthBuffer> depthBuffer;
     HANDLE hConsoleBuffer = nullptr;
     PresentParameters presentParams;
+    mutable std::mutex m_mutex;
 };
 
 SOFTX_END

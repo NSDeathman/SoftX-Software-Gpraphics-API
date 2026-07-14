@@ -10,48 +10,40 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-Renderer::Renderer(IRasterizer& rasterizer,
-                   IRenderTarget* rt,
-                   DepthBuffer& db,
-                   const PixelShader& ps,
-                   const ConstantBuffer& cb,
-                   const TextureTable* tt,
-                   const RasterizerState& state,
-                   uint tileSize) : 
-                   rasterizer(rasterizer),
-                   renderTarget(rt),
-                   depthBuffer(db),
-                   pixelShader(ps),
-                   constantBuffer(cb),
-                   textureTable(tt),
-                   state(state),
-                   tileSize(tileSize)
+Renderer::Renderer(IRasterizer& rasterizer) : rasterizer(rasterizer)
 {
-    if (renderTarget != nullptr)
+}
+
+void Renderer::Execute(const PipelineStateObject& pso,
+                      const std::vector<VertexOutput>& verts,
+                      const std::vector<int3>& triangles)
+{
+    PROFILE_SCOPE("Renderer::Execute");
+
+    if (pso.renderTarget)
     {
-        width = renderTarget->Width();
-        height = renderTarget->Height();
+        width = pso.renderTarget->Width();
+        height = pso.renderTarget->Height();
+    }
+    else if (pso.depthBuffer)
+    {
+        width = pso.depthBuffer->Width();
+        height = pso.depthBuffer->Height();
     }
     else
     {
-        width = depthBuffer.Width();
-        height = depthBuffer.Height();
+        return;
     }
+
+    tileSize = pso.tileSize;
+
+    BuildTiles(width, height, tileSize);
+    BinTriangles(verts, triangles, width, height, tileSize);
+    RenderTiles(pso, verts, triangles);
 }
 
-void Renderer::Execute(const std::vector<VertexOutput>& inputVerts, const std::vector<int3>& inputTriangles)
-{
-    PROFILE_SCOPE("Renderer::Execute");
-    this->verts = &inputVerts;
-    this->triangles = &inputTriangles;
-    BuildTiles(width, height);
-    BinTriangles(inputVerts, inputTriangles);
-    RenderTiles();
-    this->verts = nullptr;
-    this->triangles = nullptr;
-}
 
-void Renderer::BuildTiles(uint global_width, uint global_height)
+void Renderer::BuildTiles(uint global_width, uint global_height, uint global_tileSize)
 {
     PROFILE_SCOPE("Renderer::BuildTiles");
     tiles.clear();
@@ -70,7 +62,11 @@ void Renderer::BuildTiles(uint global_width, uint global_height)
     }
 }
 
-void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts, const std::vector<int3>& inputTriangles)
+void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts,
+                            const std::vector<int3>& inputTriangles,
+                            uint width,
+                            uint height,
+                            uint tileSize)
 {
     PROFILE_SCOPE("Renderer::BinTriangles");
     for (auto& t : tiles)
@@ -119,13 +115,22 @@ void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts, const s
     }
 }
 
-void Renderer::RenderTiles()
+void Renderer::RenderTiles(const PipelineStateObject& pso,
+                           const std::vector<VertexOutput>& verts,
+                           const std::vector<int3>& triangles)
 {
     PROFILE_SCOPE("Renderer::RenderTiles");
+
+    RasterizerState rasterState;
+    rasterState.cullMode = pso.cullMode;
+    rasterState.fillMode = pso.fillMode;
+    rasterState.depthFunc = pso.depthFunc;
+    rasterState.depthWriteEnable = pso.depthWriteEnable;
+
     uint numTiles = static_cast<uint>(tiles.size());
     std::atomic<int> tileIndex(0);
 
-    auto worker = [this, &tileIndex, numTiles]()
+    auto worker = [&]()
     {
         PROFILE_SCOPE("RenderTiles::tile worker");
         while (true)
@@ -137,20 +142,19 @@ void Renderer::RenderTiles()
             const Tile& tile = tiles[idx];
             for (int triIdx : tile.triangleIndices)
             {
-                const int3& tri = (*triangles)[triIdx];
+                const int3& tri = triangles[triIdx];
 
-                rasterizer.RasterizeTriangle(
-                    (*verts)[tri.x],
-                    (*verts)[tri.y],
-                    (*verts)[tri.z],
-                    state,
-                    depthBuffer,
-                    renderTarget,
-                    pixelShader,
-                    constantBuffer,
-                    textureTable,
-                    tile.min,
-                    tile.max);
+                rasterizer.RasterizeTriangle(verts[tri.x],
+                                             verts[tri.y],
+                                             verts[tri.z],
+                                             rasterState,
+                                             *pso.depthBuffer,
+                                             pso.renderTarget.get(),
+                                             pso.pixelShader,
+                                             pso.constantBuffer,
+                                             &pso.textureTable,
+                                             tile.min,
+                                             tile.max);
             }
         }
     };

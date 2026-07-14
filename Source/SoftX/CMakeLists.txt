@@ -48,6 +48,7 @@ set(SOFTX_PUBLIC_HEADERS
     include/DepthTextureView.h
     include/Device.h
     include/DeviceContext.h
+    include/Exeptions.h
     include/FrameBuffer.h
     include/LibInternal.h
     include/OcclusionQuery.h
@@ -110,6 +111,6 @@ source_group("Header Files\\Rasterizer"    FILES src/RasterizerAVX.h src/Rasteri
                                                  src/QueryRasterizerAVX.h src/QueryRasterizerFactory.h src/QueryRasterizerScalar.h src/QueryRasterizerSSE.h)
 source_group("Header Files\\Tools"         FILES src/CPUDetector.h src/ThreadPool.h src/ThreadPoolManager.h)
 source_group("Header Files\\API"           FILES include/SoftX.h include/Device.h include/DeviceContext.h include/OcclusionQuery.h include/Types.h
-                                                 include/DepthBuffer.h include/DepthTextureView.h include/FrameBuffer.h
+                                                 include/DepthBuffer.h include/DepthTextureView.h include/FrameBuffer.h include/Exeptions.h
                                                  include/RenderTargetInterface.h include/RenderTargetTexture.h include/TextureRGBA32F.h include/TextureInterface.h
                                                  include/LibInternal.h include/ThirdPartyIncluding.h include/QueryRasterizerInterface.h include/RasterizerInterface.h)

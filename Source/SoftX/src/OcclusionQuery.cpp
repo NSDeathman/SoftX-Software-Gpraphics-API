@@ -10,7 +10,7 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-OcclusionQuery::OcclusionQuery()
+OcclusionQuery::OcclusionQuery() : stateMutex(std::make_unique<std::mutex>())
 {
     rasterizer = CreateBestQueryRasterizer();
 }
@@ -21,36 +21,58 @@ OcclusionQuery::~OcclusionQuery()
         future.wait();
 }
 
-bool OcclusionQuery::GetData(uint* outVisibleSamples) const
+void OcclusionQuery::SetVertexBuffer(const VertexBuffer& vb) 
 {
-    if (!ready)
-    {
-        if (outVisibleSamples) *outVisibleSamples = 0;
-        return false;
-    }
-    if (outVisibleSamples)
-        *outVisibleSamples = totalVisibleSamples;
-    return totalVisibleSamples > 0;
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.vertexBuffer = vb;
 }
 
-bool OcclusionQuery::GetResult(queryID id, uint* outSamples) const
+void OcclusionQuery::SetIndexBuffer(const IndexBuffer& ib) 
 {
-    if (!ready || id >= drawCalls.size())
-        return false;
-    const DrawCall& dc = drawCalls[id];
-    if (outSamples)
-        *outSamples = dc.visibleSamples;
-    return dc.visibleSamples > 0;
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.indexBuffer = ib;
 }
 
-bool OcclusionQuery::Validate() const
+void OcclusionQuery::SetConstantBuffer(const ConstantBuffer& cb) 
 {
-    if (!depthBuffer) return false;
-    if (viewport.size.x <= 0 || viewport.size.y <= 0) return false;
-    if (currentVB.IsEmpty() || currentIB.IsEmpty()) return false;
-    if (!currentVS) return false;
-    if (!begun || ended) return false;
-    return true;
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.constantBuffer = cb;
+}
+
+void OcclusionQuery::SetVertexShader(OcclusionVertexShader vs) 
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.vertexShader = std::move(vs);
+}
+
+void OcclusionQuery::SetDepthBuffer(std::shared_ptr<DepthBuffer> db) 
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.depthBuffer = std::move(db);
+}
+
+void OcclusionQuery::SetViewport(const Viewport& vp) 
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.viewport = vp;
+}
+
+void OcclusionQuery::SetCullMode(CullMode mode) 
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.cullMode = mode;
+}
+
+void OcclusionQuery::SetDepthFunc(ComparisonFunc func) 
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.depthFunc = func;
+}
+
+void OcclusionQuery::SetDepthWriteEnable(bool enable) 
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.depthWriteEnable = enable;
 }
 
 void OcclusionQuery::Begin()
@@ -69,13 +91,23 @@ void OcclusionQuery::Begin()
 
 OcclusionQuery::queryID OcclusionQuery::DrawIndexed()
 {
-    assert(Validate() && "OcclusionQuery: state is invalid before DrawIndexed");
+    if (!begun || ended)
+        SOFTX_THROW(InvalidState("OcclusionQuery::DrawIndexed called outside Begin/End"));
+
+    OcclusionPipelineState stateCaptured;
+    {
+        std::lock_guard<std::mutex> lock(*stateMutex);
+        stateCaptured = state;
+    }
+
+    if (stateCaptured.vertexBuffer.IsEmpty() || stateCaptured.indexBuffer.IsEmpty() || !stateCaptured.vertexShader)
+        SOFTX_THROW(InvalidState("OcclusionQuery: vertex buffer, index buffer or vertex shader not set"));
 
     DrawCall dc;
-    dc.vb = currentVB;
-    dc.ib = currentIB;
-    dc.constantBuffer = currentCB;
-    dc.vertexShader = std::move(currentVS);
+    dc.vb = stateCaptured.vertexBuffer;
+    dc.ib = stateCaptured.indexBuffer;
+    dc.constantBuffer = stateCaptured.constantBuffer;
+    dc.vertexShader = stateCaptured.vertexShader;
     dc.visibleSamples = 0;
 
     queryID id = static_cast<queryID>(drawCalls.size());
@@ -87,19 +119,27 @@ void OcclusionQuery::End()
 {
     PROFILE_SCOPE("OcclusionQuery::End");
 
-    assert(begun && !ended);
+    if (!begun || ended)
+        SOFTX_THROW(InvalidState("OcclusionQuery::End called without Begin"));
+
     ended = true;
     begun = false;
 
+    OcclusionPipelineState stateCaptured;
+    {
+        std::lock_guard<std::mutex> lock(*stateMutex);
+        stateCaptured = state;
+    }
+
     auto drawCallsCopy = std::make_shared<std::vector<DrawCall>>(drawCalls);
-    DepthBuffer* db = depthBuffer.get();
-    Viewport vpData = viewport;
+    DepthBuffer* db = stateCaptured.depthBuffer.get();
+    Viewport vpData = stateCaptured.viewport;
     IQueryRasterizer* rast = rasterizer.get();
 
     ready = false;
     totalVisibleSamples = 0;
 
-    future = std::async(std::launch::async, [this, drawCallsCopy, db, vpData, rast]()
+    future = std::async(std::launch::async, [this, drawCallsCopy, stateCaptured, db, rast]()
     {
         PROFILE_THREAD("OcclusionQuery::AsyncExecution");
         PROFILE_SCOPE("OcclusionQuery::AsyncExecution");
@@ -108,9 +148,7 @@ void OcclusionQuery::End()
         std::atomic<size_t> idx(0);
         size_t count = drawCallsCopy->size();
         for (size_t i = 0; i < count; ++i)
-        {
-            ProcessDrawCall((*drawCallsCopy)[i], *db, vpData, *rast, totalVisible);
-        }
+            ProcessDrawCall((*drawCallsCopy)[i], stateCaptured, *db, *rast, totalVisible);
 
         for (size_t i = 0; i < drawCalls.size(); ++i)
             drawCalls[i].visibleSamples = (*drawCallsCopy)[i].visibleSamples;
@@ -142,23 +180,45 @@ void OcclusionQuery::Release()
         future.wait();
     rasterizer.reset();
     drawCalls.clear();
-    depthBuffer = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(*stateMutex);
+        state.depthBuffer.reset();
+    }
     begun = ended = false;
     ready = false;
 }
 
-void OcclusionQuery::ProcessDrawCall(DrawCall& dc,
+bool OcclusionQuery::GetData(uint* outVisibleSamples) const
+{
+    if (!ready)
+    {
+        if (outVisibleSamples) *outVisibleSamples = 0;
+        return false;
+    }
+    if (outVisibleSamples) *outVisibleSamples = totalVisibleSamples;
+    return totalVisibleSamples > 0;
+}
+
+bool OcclusionQuery::GetResult(queryID id, uint* outSamples) const
+{
+    if (!ready || id >= drawCalls.size()) return false;
+    const DrawCall& dc = drawCalls[id];
+    if (outSamples) *outSamples = dc.visibleSamples;
+    return dc.visibleSamples > 0;
+}
+
+void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
+                                     const OcclusionPipelineState& state,
                                      DepthBuffer& db,
-                                     const Viewport& vp,
                                      IQueryRasterizer& rasterzer,
                                      std::atomic<uint>& totalVisible)
 {
     PROFILE_SCOPE("OcclusionQuery::ProcessDrawCall");
 
-    RasterizerState state;
-    state.cullMode = cullMode;
-    state.depthFunc = depthFunc;
-    state.depthWriteEnable = depthWriteEnable;
+    RasterizerState rasterState;
+    rasterState.cullMode = state.cullMode;
+    rasterState.depthFunc = state.depthFunc;
+    rasterState.depthWriteEnable = state.depthWriteEnable;
 
     const auto& vbData = *dc.vb;
     const auto& ibData = dc.ib;
@@ -200,7 +260,7 @@ void OcclusionQuery::ProcessDrawCall(DrawCall& dc,
         for (int t = 0; t < numTris; ++t)
         {
             for (int j = 0; j < 3; ++j)
-                RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], vp);
+                RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], state.viewport);
 
             const VertexOutput& tv0 = clipped[t][0];
             const VertexOutput& tv1 = clipped[t][1];
@@ -220,7 +280,7 @@ void OcclusionQuery::ProcessDrawCall(DrawCall& dc,
                 continue;
 
             localVisible += rasterzer.RasterizeTriangle( tv0, tv1, tv2,
-                                                         state,
+                                                         rasterState,
                                                          db,
                                                          dc.constantBuffer,
                                                          uint2(tileMinX, tileMinY),
@@ -228,7 +288,7 @@ void OcclusionQuery::ProcessDrawCall(DrawCall& dc,
         }
     }
 
-    dc.visibleSamples = localVisible;
+    const_cast<DrawCall&>(dc).visibleSamples = localVisible;
     totalVisible += localVisible;
 }
 

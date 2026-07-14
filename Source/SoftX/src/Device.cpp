@@ -11,12 +11,15 @@ Device::Device(const PresentParameters& params): presentParams(params),
                                                  backBuffer(std::make_shared<FrameBuffer>(params.BackBufferSize)),
                                                  depthBuffer(std::make_shared<DepthBuffer>(params.BackBufferSize))
 {
+    presentParams.Validate();
+
     if (presentParams.Output == PresentationMode::Console)
         SetupOutputConsole();
 }
 
 Device::~Device()
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     DestroyOutputConsole();
 }
 
@@ -71,6 +74,39 @@ void Device::DestroyOutputConsole()
     }
 }
 
+void Device::Reset(const PresentParameters& newParams)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    newParams.Validate();
+
+    const bool consoleWasActive = (presentParams.Output == PresentationMode::Console && !presentParams.Headless);
+    const bool consoleWillBeActive = (newParams.Output == PresentationMode::Console && !newParams.Headless);
+
+    if (consoleWasActive)
+        DestroyOutputConsole();
+
+    presentParams = newParams;
+
+    if (!presentParams.Headless)
+    {
+        backBuffer = std::make_shared<FrameBuffer>(presentParams.BackBufferSize);
+        depthBuffer = std::make_shared<DepthBuffer>(presentParams.BackBufferSize);
+
+        immediateContext.SetRenderTarget(backBuffer, false);
+        immediateContext.SetDepthBuffer(depthBuffer);
+    }
+    else
+    {
+        backBuffer = std::make_shared<FrameBuffer>(uint2(1, 1));
+        depthBuffer = std::make_shared<DepthBuffer>(uint2(1, 1));
+        immediateContext.SetRenderTarget(backBuffer, false);
+        immediateContext.SetDepthBuffer(depthBuffer);
+    }
+
+    if (consoleWillBeActive)
+        SetupOutputConsole();
+}
+
 void Device::PresentToWindow()
 {
     PROFILE_SCOPE("Device::PresentToWindow");
@@ -101,6 +137,8 @@ void Device::PresentToConsole()
 
 void Device::Present()
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
     PROFILE_SCOPE("Device::Present");
 
     if (presentParams.Headless)

@@ -23,7 +23,7 @@ SOFTX_BEGIN
 class SOFTX_API FrameBuffer : public IRenderTarget
 {
 public:
-    explicit FrameBuffer(uint2 size) : resolution(size), pixelsStorage(size.x* size.y, 0)
+    explicit FrameBuffer(uint2 size) : resolution(size), pixelsStorage(size.x * size.y, 0)
     {
     }
 

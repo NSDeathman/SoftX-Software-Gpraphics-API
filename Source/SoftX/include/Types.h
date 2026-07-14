@@ -15,6 +15,10 @@
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
 #include "TextureInterface.h"
+#include "RenderTargetInterface.h"
+#include "RenderTargetTexture.h"
+#include "FrameBuffer.h"
+#include "DepthBuffer.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -29,6 +33,40 @@ struct PresentParameters
     PresentationMode Output = PresentationMode::Window;
     bool Windowed = true;
     bool Headless = false;
+
+    void Validate() const
+    {
+        if (Headless) return;
+
+        std::vector<std::string> errors;
+        
+        if (BackBufferSize.x == 0 || BackBufferSize.y == 0)
+            errors.push_back("BackBufferSize must be > 0 in non-headless mode");
+
+        switch (Output)
+        {
+        case PresentationMode::Window:
+            if (hDeviceWindow == nullptr)
+                errors.push_back("hDeviceWindow must be a valid window handle for Window output mode");
+            break;
+
+        case PresentationMode::Console:
+            if (ConsoleSize.x == 0 || ConsoleSize.y == 0)
+                errors.push_back("ConsoleSize must be > 0 for Console output mode");
+            break;
+        }
+
+        if (!errors.empty())
+        {
+            std::string message = "PresentParameters validation failed: ";
+            for (size_t i = 0; i < errors.size(); ++i)
+            {
+                if (i > 0) message += "; ";
+                message += errors[i];
+            }
+            SOFTX_THROW(InvalidArgument(message));
+        }
+    }
 };
 
 // ── Geometry data ───────────────────────────────────────────
@@ -263,6 +301,117 @@ using GeometryShader = std::function<void(const VertexOutput[3], std::vector<Ver
 enum class CullMode { None, Front, Back };
 enum class FillMode { Point, Wireframe, Solid };
 enum class ComparisonFunc { Never, Less, Equal, LessEqual, Greater, NotEqual, GreaterEqual, Always };
+
+// ── Pipeline resources ───────────────────────────────────────
+enum class PipelineResource : uint32_t
+{
+    VertexShader = 1 << 0,
+    PixelShader = 1 << 1,
+    GeometryShader = 1 << 2,
+    VertexBuffer = 1 << 3,
+    IndexBuffer = 1 << 4,
+    ConstantBuffer = 1 << 5,
+    RenderTarget = 1 << 6,
+    DepthBuffer = 1 << 7,
+    Viewport = 1 << 8,
+    TileSize = 1 << 9
+};
+
+constexpr uint32_t operator|(PipelineResource a, PipelineResource b) { return static_cast<uint32_t>(a) | static_cast<uint32_t>(b); }
+constexpr uint32_t operator|(uint32_t a, PipelineResource b) { return a | static_cast<uint32_t>(b); }
+
+// ── Pipeline state object ────────────────────────────────────
+struct PipelineStateObject
+{
+    VertexShader vertexShader;
+    GeometryShader geometryShader;
+    PixelShader pixelShader;
+
+    VertexBuffer vertexBuffer;
+    IndexBuffer indexBuffer;
+    ConstantBuffer constantBuffer;
+
+    TextureTable textureTable;
+
+    std::shared_ptr<IRenderTarget> renderTarget;
+    std::shared_ptr<DepthBuffer> depthBuffer;
+
+    CullMode cullMode = CullMode::Back;
+    FillMode fillMode = FillMode::Solid;
+    ComparisonFunc depthFunc = ComparisonFunc::Less;
+    bool depthWriteEnable = true;
+
+    Viewport viewport;
+    uint tileSize = 64;
+
+    bool Validate(uint32_t requiredResourcesMask) const 
+    {
+        std::string errors;
+        auto check = [&](PipelineResource res, const char* name, bool present) 
+        {
+            if ((requiredResourcesMask & static_cast<uint32_t>(res)) && !present)
+            {
+                if (!errors.empty()) errors += "; ";
+                errors += name;
+            }
+        };
+        check(PipelineResource::VertexShader, "vertex shader", vertexShader != nullptr);
+        check(PipelineResource::PixelShader, "pixel shader", pixelShader != nullptr);
+        check(PipelineResource::GeometryShader, "geometry shader", geometryShader != nullptr);
+        check(PipelineResource::VertexBuffer, "vertex buffer", !vertexBuffer.IsEmpty());
+        check(PipelineResource::IndexBuffer, "index buffer", !indexBuffer.IsEmpty());
+        check(PipelineResource::ConstantBuffer, "constant buffer", constantBuffer.Size() > 0);
+        check(PipelineResource::RenderTarget, "render target", renderTarget != nullptr);
+        check(PipelineResource::DepthBuffer, "depth buffer", depthBuffer != nullptr);
+        check(PipelineResource::Viewport, "viewport", viewport.size.x > 0 && viewport.size.y > 0);
+        check(PipelineResource::TileSize, "tile size > 0", tileSize > 0);
+
+        if (!errors.empty())
+            throw InvalidState("Missing required pipeline state: " + errors);
+
+        return errors.empty();
+    }
+};
+
+struct OcclusionPipelineState
+{
+    using OcclusionVertexShader = std::function<VertexOutput(const VertexInput&, const ConstantBuffer&)>;
+
+    VertexBuffer vertexBuffer;
+    IndexBuffer  indexBuffer;
+    ConstantBuffer constantBuffer;
+    OcclusionVertexShader vertexShader;
+
+    std::shared_ptr<DepthBuffer> depthBuffer;
+    Viewport viewport;
+    CullMode cullMode = CullMode::Back;
+    ComparisonFunc depthFunc = ComparisonFunc::Less;
+    bool depthWriteEnable = false;
+
+    bool Validate(uint32_t requiredResourcesMask) const
+    {
+        std::string errors;
+        auto check = [&](PipelineResource res, const char* name, bool present)
+        {
+            if ((requiredResourcesMask & static_cast<uint32_t>(res)) && !present)
+            {
+                if (!errors.empty()) errors += "; ";
+                errors += name;
+            }
+        };
+        check(PipelineResource::VertexShader, "vertex shader", vertexShader != nullptr);
+        check(PipelineResource::VertexBuffer, "vertex buffer", !vertexBuffer.IsEmpty());
+        check(PipelineResource::IndexBuffer, "index buffer", !indexBuffer.IsEmpty());
+        check(PipelineResource::ConstantBuffer, "constant buffer", constantBuffer.Size() > 0);
+        check(PipelineResource::DepthBuffer, "depth buffer", depthBuffer != nullptr);
+        check(PipelineResource::Viewport, "viewport", viewport.size.x > 0 && viewport.size.y > 0);
+
+        if (!errors.empty())
+            throw InvalidState("Missing required pipeline state: " + errors);
+
+        return errors.empty();
+    }
+};
 
 SOFTX_END
 /////////////////////////////////////////////////////////////////

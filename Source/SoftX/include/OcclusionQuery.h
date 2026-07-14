@@ -28,22 +28,20 @@ public:
     OcclusionQuery(const OcclusionQuery&) = delete;
     OcclusionQuery& operator=(const OcclusionQuery&) = delete;
 
-    SOFTX_FORCE_INLINE void SetVertexBuffer(const VertexBuffer& vb) { currentVB = vb; }
-    SOFTX_FORCE_INLINE void SetIndexBuffer(const IndexBuffer& ib) { currentIB = ib; }
-    SOFTX_FORCE_INLINE void SetConstantBuffer(const ConstantBuffer& cb) { currentCB = cb; }
-    SOFTX_FORCE_INLINE void SetVertexShader(OcclusionVertexShader vs) { currentVS = std::move(vs); }
-    SOFTX_FORCE_INLINE void SetDepthBuffer(std::shared_ptr<DepthBuffer> db) { depthBuffer = std::move(db); }
-    SOFTX_FORCE_INLINE void SetViewport(const Viewport& vp) { viewport = vp; }
-    SOFTX_FORCE_INLINE void SetCullMode(CullMode mode) { cullMode = mode; }
-    SOFTX_FORCE_INLINE void SetDepthFunc(ComparisonFunc func) { depthFunc = func; }
-    SOFTX_FORCE_INLINE void SetDepthWriteEnable(bool enable) { depthWriteEnable = enable; }
+    void SetVertexBuffer(const VertexBuffer& vb);
+    void SetIndexBuffer(const IndexBuffer& ib);
+    void SetConstantBuffer(const ConstantBuffer& cb);
+    void SetVertexShader(OcclusionVertexShader vs);
+    void SetDepthBuffer(std::shared_ptr<DepthBuffer> db);
+    void SetViewport(const Viewport& vp);
+    void SetCullMode(CullMode mode);
+    void SetDepthFunc(ComparisonFunc func);
+    void SetDepthWriteEnable(bool enable);
 
     SOFTX_FORCE_INLINE bool IsReady() const { return ready; }
 
     bool GetData(uint* outVisibleSamples = nullptr) const;
     bool GetResult(queryID id, uint* outSamples) const;
-
-    bool Validate() const;
 
     void Begin();
     queryID DrawIndexed();
@@ -61,26 +59,21 @@ private:
         uint visibleSamples = 0;
     };
 
-    std::shared_ptr<DepthBuffer> depthBuffer;
-    VertexBuffer currentVB;
-    IndexBuffer currentIB;
-    ConstantBuffer currentCB;
-    OcclusionVertexShader currentVS;
+    OcclusionPipelineState state;
+    mutable std::unique_ptr<std::mutex> stateMutex;
+
     std::vector<DrawCall> drawCalls;
     std::future<void> future;
     std::unique_ptr<IQueryRasterizer> rasterizer;
-    Viewport viewport;
-    CullMode cullMode = CullMode::Back;
-    ComparisonFunc depthFunc = ComparisonFunc::Less;
-    uint totalVisibleSamples = 0;
-    bool depthWriteEnable = false;
+
+    std::atomic<bool> ready{ false };
     bool begun = false;
     bool ended = false;
-    std::atomic<bool> ready{ false };
+    uint totalVisibleSamples = 0;
 
-    void ProcessDrawCall(DrawCall& dc,
+    void ProcessDrawCall(const DrawCall& dc,
+                         const OcclusionPipelineState& state,
                          DepthBuffer& db,
-                         const Viewport& vp,
                          IQueryRasterizer& rasterizer,
                          std::atomic<uint>& totalVisible);
 };

@@ -321,11 +321,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     params.hDeviceWindow = g_hWnd;
     params.Windowed = true;
 
-    Device device(params);
-    g_device = &device;
+    std::unique_ptr<Device> device = std::make_unique<Device>(params);
+    g_device = device.get();
 
     DeviceContext& ctx = g_device->GetImmediateContext();
-    ctx.SetRenderTarget(device.GetBackBuffer(), true);
+    ctx.SetRenderTarget(device->GetBackBuffer(), true);
     ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
     ctx.SetTileSize(128);
     ctx.SetCullMode(CullMode::Back);

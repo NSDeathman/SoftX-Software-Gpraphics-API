@@ -5,6 +5,7 @@
 /////////////////////////////////////////////////////////////////
 #pragma once
 /////////////////////////////////////////////////////////////////
+#include <mutex>
 #include "LibInternal.h"
 #include "RasterizerInterface.h"
 #include "RenderTargetInterface.h"
@@ -19,95 +20,84 @@ public:
     DeviceContext();
     ~DeviceContext();
 
+    explicit DeviceContext(const PipelineStateObject& initialState);
+
     DeviceContext(const DeviceContext&) = delete;
     DeviceContext& operator=(const DeviceContext&) = delete;
 
     DeviceContext(DeviceContext&&) = default;
     DeviceContext& operator=(DeviceContext&&) = default;
 
-    SOFTX_FORCE_INLINE void SetVertexShader(VertexShader shader) { vertexShader = std::move(shader); }
-    SOFTX_FORCE_INLINE VertexShader GetVertexShader() const { return vertexShader; }
+    void SetVertexShader(VertexShader shader);
+    SOFTX_FORCE_INLINE VertexShader GetVertexShader() const { return frontState.vertexShader; }
 
-    SOFTX_FORCE_INLINE void SetGeometryShader(GeometryShader shader) { geometryShader = std::move(shader); }
-    SOFTX_FORCE_INLINE GeometryShader GetGeometryShader() const { return geometryShader; }
+    void SetGeometryShader(GeometryShader shader);
+    SOFTX_FORCE_INLINE GeometryShader GetGeometryShader() const { return frontState.geometryShader; }
 
-    SOFTX_FORCE_INLINE void SetPixelShader(PixelShader shader) { pixelShader = std::move(shader); }
-    SOFTX_FORCE_INLINE PixelShader GetPixelShader() const { return pixelShader; }
+    void SetPixelShader(PixelShader shader);
+    SOFTX_FORCE_INLINE PixelShader GetPixelShader() const { return frontState.pixelShader; }
 
-    SOFTX_FORCE_INLINE void SetVertexBuffer(const VertexBuffer& buffer) { vertexBuffer = buffer; }
-    SOFTX_FORCE_INLINE VertexBuffer GetVertexBuffer() const { return vertexBuffer; }
+    void SetVertexBuffer(const VertexBuffer& buffer);
+    SOFTX_FORCE_INLINE VertexBuffer GetVertexBuffer() const { return frontState.vertexBuffer; }
 
-    SOFTX_FORCE_INLINE void SetIndexBuffer(const IndexBuffer& buffer) { indexBuffer = buffer; }
-    SOFTX_FORCE_INLINE IndexBuffer GetIndexBuffer() const { return indexBuffer; }
+    void SetIndexBuffer(const IndexBuffer& buffer);
+    SOFTX_FORCE_INLINE IndexBuffer GetIndexBuffer() const { return frontState.indexBuffer; }
 
-    SOFTX_FORCE_INLINE void SetConstantBuffer(const ConstantBuffer& buffer) { constantBuffer = buffer; }
-    SOFTX_FORCE_INLINE ConstantBuffer GetConstantBuffer() const { return constantBuffer; }
+    void SetConstantBuffer(const ConstantBuffer& buffer);
+    SOFTX_FORCE_INLINE ConstantBuffer GetConstantBuffer() const { return frontState.constantBuffer; }
 
-    SOFTX_FORCE_INLINE void SetTexture(const std::string& name, const std::shared_ptr<ITexture> texture, SamplerState sampler = SamplerState{}) { textureTable.Set(name, texture, sampler); }
+    void SetTexture(const std::string& name, std::shared_ptr<const ITexture> texture, SamplerState sampler = SamplerState{});
 
-    SOFTX_FORCE_INLINE void SetRenderTarget(std::shared_ptr<IRenderTarget> target) { renderTarget = std::move(target); }
-    void SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer);
-    SOFTX_FORCE_INLINE std::shared_ptr<IRenderTarget> GetRenderTarget() const { return renderTarget; }
+    void SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer = false);
+    SOFTX_FORCE_INLINE std::shared_ptr<IRenderTarget> GetRenderTarget() const { return frontState.renderTarget; }
 
-    SOFTX_FORCE_INLINE void SetDepthBuffer(std::shared_ptr<DepthBuffer> depth) { this->depthBuffer = std::move(depth); }
-    SOFTX_FORCE_INLINE std::shared_ptr<DepthBuffer> GetDepthBuffer() const { return depthBuffer; }
+    void SetDepthBuffer(std::shared_ptr<DepthBuffer> depth);
+    SOFTX_FORCE_INLINE std::shared_ptr<DepthBuffer> GetDepthBuffer() const { return frontState.depthBuffer; }
 
-    SOFTX_FORCE_INLINE void SetDepthWriteEnable(bool enable) { depthWriteEnable = enable; }
-    SOFTX_FORCE_INLINE bool GetDepthWriteEnable() const { return depthWriteEnable; }
+    void SetDepthWriteEnable(bool enable);
+    SOFTX_FORCE_INLINE bool GetDepthWriteEnable() const { return frontState.depthWriteEnable; }
 
-    SOFTX_FORCE_INLINE void SetCullMode(CullMode mode) { cullMode = mode; }
-    SOFTX_FORCE_INLINE CullMode GetCullMode() const { return cullMode; }
+    void SetCullMode(CullMode mode);
+    SOFTX_FORCE_INLINE CullMode GetCullMode() const { return frontState.cullMode; }
 
-    SOFTX_FORCE_INLINE void SetFillMode(FillMode mode) { fillMode = mode; }
-    SOFTX_FORCE_INLINE FillMode GetFillMode() const { return fillMode; }
+    void SetFillMode(FillMode mode);
+    SOFTX_FORCE_INLINE FillMode GetFillMode() const { return frontState.fillMode; }
 
-    SOFTX_FORCE_INLINE void SetDepthFunc(ComparisonFunc func) { depthFunc = func; }
-    SOFTX_FORCE_INLINE ComparisonFunc GetDepthFunc() const { return depthFunc; }
+    void SetDepthFunc(ComparisonFunc func);
+    SOFTX_FORCE_INLINE ComparisonFunc GetDepthFunc() const { return frontState.depthFunc; }
 
-    SOFTX_FORCE_INLINE void SetViewport(const Viewport& vp) { viewport = vp; }
-    SOFTX_FORCE_INLINE Viewport GetViewport() const { return viewport; }
+    void SetViewport(const Viewport& vp);
+    SOFTX_FORCE_INLINE Viewport GetViewport() const { return frontState.viewport; }
 
-    SOFTX_FORCE_INLINE void SetTileSize(uint size) { tileSize = size; }
-    SOFTX_FORCE_INLINE uint GetTileSize() const { return tileSize; }
+    void SetTileSize(uint size);
+    SOFTX_FORCE_INLINE uint GetTileSize() const { return frontState.tileSize; }
 
     void Clear(const float4& color);
     void ClearDepth(const float& depth = 1.0f);
     void ClearColorAndDepth(const float4& color, const float& depth = 1.0f);
-    bool Validate(std::string* errorMsg = nullptr) const;
 
     void DrawIndexed(uint indexCount, uint startIndex);
     void DrawIndexed();
     void DrawFullScreenQuad();
 
 private:
-    void RenderTileQuad(const Tile& tile, float invW, float invH);
-    void DrawPoint(int x, int y, float z, const float4& color);
-    void DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
-    void DrawDebugLine(int x0, int y0, int x1, int y1, const float4& color);
-    void DrawTileBorders();
-    void DrawActiveTileBorders(const std::vector<Tile>& tiles);
+    void DrawPoint(const PipelineStateObject& state, int x, int y, float z, const float4& color);
+    void DrawLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
+    void DrawDebugLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, const float4& color);
+    void DrawTileBorders(const PipelineStateObject& state);
+    void DrawActiveTileBorders(const PipelineStateObject& state, const std::vector<Tile>& tiles);
+    void DrawIndexedImpl(const PipelineStateObject& state, uint indexCount, uint startIndex);
 
-    VertexShader vertexShader;
-    GeometryShader geometryShader;
-    PixelShader pixelShader;
+    void CommitState();
+    PipelineStateObject CaptureState() const;
 
-    VertexBuffer vertexBuffer;
-    IndexBuffer indexBuffer;
-    ConstantBuffer constantBuffer;
-    TextureTable textureTable;
-
-    std::shared_ptr<DepthBuffer> depthBuffer;
-    std::shared_ptr<IRenderTarget> renderTarget;
+private:
+    PipelineStateObject frontState;
+    PipelineStateObject backState;
+    mutable std::unique_ptr<std::mutex> stateMutex;
+    mutable std::unique_ptr<std::mutex> drawMutex;
 
     std::unique_ptr<IRasterizer> rasterizer;
-
-    CullMode cullMode = CullMode::Back;
-    FillMode fillMode = FillMode::Solid;
-    ComparisonFunc depthFunc = ComparisonFunc::Less;
-
-    Viewport viewport;
-    uint tileSize = 64;
-    bool depthWriteEnable = true;
 };
 
 SOFTX_END

@@ -14,13 +14,13 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
+void DeviceContext::DrawPoint(const PipelineStateObject& state, int x, int y, float z, const float4& color)
 {
-    IRenderTarget* rt = renderTarget.get();
+    IRenderTarget* rt = state.renderTarget.get();
     if (!rt)
         return;
 
-    if (!depthBuffer)
+    if (!state.depthBuffer)
         return;
 
     if (x >= (int)rt->Width() || y >= (int)rt->Height())
@@ -30,10 +30,10 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
         return;
 
     uint idx = y * rt->Width() + x;
-    float depthValue = depthBuffer->At(idx);
+    float depthValue = state.depthBuffer->At(idx);
 
     bool pass = false;
-    switch (depthFunc)
+    switch (state.depthFunc)
     {
     case ComparisonFunc::Never:        pass = false; break;
     case ComparisonFunc::Less:         pass = (z < depthValue); break;
@@ -48,18 +48,18 @@ void DeviceContext::DrawPoint(int x, int y, float z, const float4& color)
 
     if (pass)
     {
-        if (depthWriteEnable) depthBuffer->At(idx) = z;
-        if (renderTarget) rt->SetPixel(uint2(x, y), color);
+        if (state.depthWriteEnable) state.depthBuffer->At(idx) = z;
+        if (state.renderTarget) rt->SetPixel(uint2(x, y), color);
     }
 }
 
-void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
+void DeviceContext::DrawLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
-    IRenderTarget* rt = renderTarget.get();
+    IRenderTarget* rt = state.renderTarget.get();
     if (!rt)
         return;
 
-    if (!depthBuffer)
+    if (!state.depthBuffer)
         return;
 
     int dx = std::abs((int)x1 - (int)x0);
@@ -74,7 +74,7 @@ void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1,
 
     for (int i = 0; i <= steps; ++i)
     {
-        DrawPoint(x, y, z, color);
+        DrawPoint(state, x, y, z, color);
 
         int e2 = 2 * err;
         if (e2 >= dy)
@@ -93,21 +93,55 @@ void DeviceContext::DrawLine(int x0, int y0, int x1, int y1, float z0, float z1,
 
 void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
+    std::lock_guard<std::mutex> lock(*drawMutex);
     PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
-    if (!vertexShader || vertexBuffer.IsEmpty() || indexBuffer.IsEmpty() || !depthBuffer)
-        return;
+    CommitState();
+    PipelineStateObject state = frontState;
 
+    bool stateValid = state.Validate(PipelineResource::VertexShader |
+                                     PipelineResource::VertexBuffer |
+                                     PipelineResource::IndexBuffer |
+                                     PipelineResource::DepthBuffer |
+                                     PipelineResource::Viewport |
+                                     PipelineResource::TileSize);
+    if (!stateValid) return;
+
+    DrawIndexedImpl(state, indexCount, startIndex);
+}
+
+void DeviceContext::DrawIndexed()
+{
+    std::lock_guard<std::mutex> lock(*drawMutex);
+    PROFILE_SCOPE("DeviceContext::DrawIndexed (full buffer)");
+
+    CommitState();
+    PipelineStateObject state = frontState;
+
+    bool stateValid = state.Validate(PipelineResource::VertexShader |
+                                     PipelineResource::VertexBuffer |
+                                     PipelineResource::IndexBuffer |
+                                     PipelineResource::DepthBuffer |
+                                     PipelineResource::Viewport |
+                                     PipelineResource::TileSize);
+    if (!stateValid) return;
+
+    uint count = static_cast<uint>(state.indexBuffer.Size());
+    DrawIndexedImpl(state, count, 0);
+}
+
+void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint indexCount, uint startIndex)
+{
     // Step 1: VS → clip space (without perspective divide)
-    std::vector<VertexOutput> clipVerts(vertexBuffer.Size());
+    std::vector<VertexOutput> clipVerts(state.vertexBuffer.Size());
     {
         PROFILE_SCOPE("Vertex Shader (VS -> clip space)");
         std::vector<uint> uniqueIndices;
         {
-            std::vector<bool> visited(vertexBuffer.Size(), false);
+            std::vector<bool> visited(state.vertexBuffer.Size(), false);
             for (uint i = startIndex; i < startIndex + indexCount; ++i)
             {
-                uint idx = indexBuffer.GetByIndex(i);
+                uint idx = state.indexBuffer.GetByIndex(i);
                 if (!visited[idx])
                 {
                     visited[idx] = true;
@@ -129,7 +163,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
                         size_t i = atomicIdx.fetch_add(1);
                         if (i >= totalUnique) break;
                         uint idx = uniqueIndices[i];
-                        clipVerts[idx] = vertexShader(vertexBuffer.GetByIndex(idx), constantBuffer, textureTable);
+                        clipVerts[idx] = state.vertexShader(state.vertexBuffer.GetByIndex(idx), state.constantBuffer, state.textureTable);
                     }
                 });
         }
@@ -142,7 +176,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
         PROFILE_SCOPE("Gather source triangles");
         for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
         {
-            sourceTriangles.push_back({ (int)indexBuffer.GetByIndex(i), (int)indexBuffer.GetByIndex(i + 1), (int)indexBuffer.GetByIndex(i + 2) });
+            sourceTriangles.push_back({ (int)state.indexBuffer.GetByIndex(i), (int)state.indexBuffer.GetByIndex(i + 1), (int)state.indexBuffer.GetByIndex(i + 2) });
         }
     }
 
@@ -177,11 +211,11 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     {
         PROFILE_SCOPE("Perspective divide on surviving vertices");
         for (auto& v : finalVerts)
-            RasterizerCommon::ClipSpaceToScreenSpace(v, viewport);
+            RasterizerCommon::ClipSpaceToScreenSpace(v, state.viewport);
     }
 
     // Step 5: Geometry shader (on screen-space vertices)
-    if (geometryShader)
+    if (state.geometryShader)
     {
         PROFILE_SCOPE("Geometry shader");
         std::vector<VertexOutput> gsVerts;
@@ -192,7 +226,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
             VertexOutput inVerts[3] = { finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z] };
             std::vector<VertexOutput> outVerts;
             std::vector<int> outIndices;
-            geometryShader(inVerts, outVerts, outIndices, textureTable);
+            state.geometryShader(inVerts, outVerts, outIndices, state.textureTable);
 
             int base = (int)gsVerts.size();
             gsVerts.insert(gsVerts.end(), outVerts.begin(), outVerts.end());
@@ -204,35 +238,22 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     }
 
     // Step 6: Render
-    if (fillMode == FillMode::Solid)
+    if (state.fillMode == FillMode::Solid)
     {
         PROFILE_SCOPE("Render Solid");
-        RasterizerState state;
-        state.cullMode = cullMode;
-        state.fillMode = fillMode;
-        state.depthFunc = depthFunc;
-        state.depthWriteEnable = depthWriteEnable;
 
-        Renderer renderer(*rasterizer,
-            renderTarget.get(),
-            *depthBuffer,
-            pixelShader,
-            constantBuffer,
-            &textureTable,
-            state,
-            tileSize);
-
-        renderer.Execute(finalVerts, finalTriangles);
+        Renderer renderer(*rasterizer);
+        renderer.Execute(state, finalVerts, finalTriangles);
 
 #ifdef DEBUG_TILING
-        DrawActiveTileBorders(renderer.GetTiles());
+        DrawActiveTileBorders(state, renderer.GetTiles());
 #endif
     }
-    else if (fillMode == FillMode::Wireframe)
+    else if (state.fillMode == FillMode::Wireframe)
     {
         PROFILE_SCOPE("Render Wireframe");
 
-        if (renderTarget == nullptr)
+        if (state.renderTarget == nullptr)
             return;
 
         float4 wireColor(1, 1, 1, 1);
@@ -241,86 +262,70 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
             const auto& v0 = finalVerts[tri.x];
             const auto& v1 = finalVerts[tri.y];
             const auto& v2 = finalVerts[tri.z];
-            DrawLine((int)round(v0.Position.x),
-                (int)round(v0.Position.y),
-                (int)round(v1.Position.x),
-                (int)round(v1.Position.y),
-                v0.Position.z,
-                v1.Position.z,
-                wireColor);
-            DrawLine((int)round(v1.Position.x),
-                (int)round(v1.Position.y),
-                (int)round(v2.Position.x),
-                (int)round(v2.Position.y),
-                v1.Position.z, v2.Position.z,
-                wireColor);
-            DrawLine((int)round(v2.Position.x),
-                (int)round(v2.Position.y),
-                (int)round(v0.Position.x),
-                (int)round(v0.Position.y),
-                v2.Position.z,
-                v0.Position.z,
-                wireColor);
+            DrawLine(state,
+                     (int)round(v0.Position.x),
+                     (int)round(v0.Position.y),
+                     (int)round(v1.Position.x),
+                     (int)round(v1.Position.y),
+                     v0.Position.z,
+                     v1.Position.z,
+                     wireColor);
+            DrawLine(state,
+                     (int)round(v1.Position.x),
+                     (int)round(v1.Position.y),
+                     (int)round(v2.Position.x),
+                     (int)round(v2.Position.y),
+                     v1.Position.z, v2.Position.z,
+                     wireColor);
+            DrawLine(state,
+                     (int)round(v2.Position.x),
+                     (int)round(v2.Position.y),
+                     (int)round(v0.Position.x),
+                     (int)round(v0.Position.y),
+                     v2.Position.z,
+                     v0.Position.z,
+                     wireColor);
         }
     }
-    else if (fillMode == FillMode::Point)
+    else if (state.fillMode == FillMode::Point)
     {
         PROFILE_SCOPE("Render Point");
 
-        if (renderTarget == nullptr)
+        if (state.renderTarget == nullptr)
             return;
 
         std::vector<bool> drawn(finalVerts.size(), false);
         for (const auto& tri : finalTriangles)
+        {
             for (int idx : {tri.x, tri.y, tri.z})
+            {
                 if (!drawn[idx])
                 {
                     drawn[idx] = true;
                     const auto& v = finalVerts[idx];
-                    DrawPoint((int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
+                    DrawPoint(state, (int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
                 }
-    }
-}
-
-void DeviceContext::DrawIndexed()
-{
-    uint count = (uint)indexBuffer.Size();
-    DrawIndexed(count, 0);
-}
-
-void DeviceContext::RenderTileQuad(const Tile& tile, float invW, float invH)
-{
-    PROFILE_SCOPE("DeviceContext::RenderTileQuad");
-    IRenderTarget* rt = renderTarget.get();
-    if (!rt)
-        return;
-
-    VertexOutput input = {};
-    auto ps = pixelShader;
-    auto cb = constantBuffer;
-    auto tt = textureTable;
-
-    for (uint y = tile.min.y; y <= (uint)tile.max.y; ++y)
-    {
-        float v = y * invH;
-        for (uint x = tile.min.x; x <= (uint)tile.max.x; ++x)
-        {
-            float u = x * invW;
-            input.UV = float2(u, v);
-            float4 color = ps(input, cb, tt);
-            if (renderTarget) rt->SetPixel(uint2(x, y), color);
+            }
         }
     }
 }
 
 void DeviceContext::DrawFullScreenQuad()
 {
+    std::lock_guard<std::mutex> lock(*drawMutex);
     PROFILE_SCOPE("DeviceContext::DrawFullScreenQuad");
 
-    if (!pixelShader || !renderTarget)
-        return;
+    CommitState();
+    PipelineStateObject state = frontState;
 
-    IRenderTarget* rt = renderTarget.get();
+    bool stateValid = state.Validate(PipelineResource::RenderTarget |
+                                     PipelineResource::PixelShader |
+                                     PipelineResource::Viewport |
+                                     PipelineResource::TileSize);
+
+    if (!stateValid) return;
+
+    IRenderTarget* rt = state.renderTarget.get();
     const uint w = rt->Width();
     const uint h = rt->Height();
     const float invW = 1.0f / (w - 1u);
@@ -331,11 +336,11 @@ void DeviceContext::DrawFullScreenQuad()
     uint32_t* fbPixels = fb ? fb->GetRawPixels() : nullptr;
     __m128* texPixels = rtt ? rtt->Texture().GetRawPixels() : nullptr;
 
-    auto ps = pixelShader;
-    auto cb = constantBuffer;
-    auto tt = textureTable;
+    auto ps = state.pixelShader;
+    auto cb = state.constantBuffer;
+    auto tt = state.textureTable;
 
-    const uint ts = tileSize;
+    const uint ts = state.tileSize;
     const uint tilesX = (w + ts - 1u) / ts;
     const uint tilesY = (h + ts - 1u) / ts;
     std::vector<Tile> tiles;
@@ -374,8 +379,7 @@ void DeviceContext::DrawFullScreenQuad()
                             input.UV = float2(u + i * invW, v);
                             packed[i] = FrameBuffer::PackColor(ps(input, cb, tt));
                         }
-                        _mm_store_si128((__m128i*)(row + x),
-                            _mm_loadu_si128((__m128i*)packed));
+                        _mm_store_si128((__m128i*)(row + x), _mm_loadu_si128((__m128i*)packed));
                     }
 
                     for (; x <= endX; ++x, u += invW) {
@@ -412,8 +416,7 @@ void DeviceContext::DrawFullScreenQuad()
                             VertexOutput input;
                             input.UV = float2(u + i * invW, v);
                             float4 c = ps(input, cb, tt);
-                            _mm_store_ps((float*)(row + x + i),
-                                _mm_set_ps(c.w, c.z, c.y, c.x));
+                            _mm_store_ps((float*)(row + x + i), _mm_set_ps(c.w, c.z, c.y, c.x));
                         }
                     }
 
@@ -421,8 +424,7 @@ void DeviceContext::DrawFullScreenQuad()
                         VertexOutput input;
                         input.UV = float2(u, v);
                         float4 c = ps(input, cb, tt);
-                        _mm_store_ps((float*)(row + x),
-                            _mm_set_ps(c.w, c.z, c.y, c.x));
+                        _mm_store_ps((float*)(row + x), _mm_set_ps(c.w, c.z, c.y, c.x));
                     }
                 }
             }
@@ -448,7 +450,7 @@ void DeviceContext::DrawFullScreenQuad()
                     for (uint x = startX; x <= endX; ++x, u += invW) {
                         VertexOutput input;
                         input.UV = float2(u, v);
-                        if (renderTarget) rt->SetPixel(uint2(x, y), ps(input, cb, tt));
+                        rt->SetPixel(uint2(x, y), ps(input, cb, tt));
                     }
                 }
             }
@@ -460,7 +462,7 @@ void DeviceContext::DrawFullScreenQuad()
     }
 
 #ifdef DEBUG_TILING
-    DrawActiveTileBorders(tiles);
+    DrawActiveTileBorders(state, tiles);
 #endif
 }
 
