@@ -37,36 +37,33 @@ void Renderer::Execute(const PipelineStateObject& pso,
 
     tileSize = pso.tileSize;
 
-    BuildTiles(width, height, tileSize);
-    BinTriangles(verts, triangles, width, height, tileSize);
+    BuildTiles();
+    BinTriangles(verts, triangles);
     RenderTiles(pso, verts, triangles);
 }
 
 
-void Renderer::BuildTiles(uint global_width, uint global_height, uint global_tileSize)
+void Renderer::BuildTiles()
 {
     PROFILE_SCOPE("Renderer::BuildTiles");
     tiles.clear();
     uint ts = tileSize;
-    uint tilesX = (global_width + ts - 1) / ts;
-    uint tilesY = (global_height + ts - 1) / ts;
+    uint tilesX = (width + ts - 1) / ts;
+    uint tilesY = (height + ts - 1) / ts;
     for (uint ty = 0; ty < tilesY; ++ty)
     {
         for (uint tx = 0; tx < tilesX; ++tx)
         {
             uint2 mn(tx * ts, ty * ts);
-            uint2 mx(std::min((tx + 1) * ts - 1, global_width - 1),
-                     std::min((ty + 1) * ts - 1, global_height - 1));
+            uint2 mx(std::min((tx + 1) * ts - 1, width - 1),
+                     std::min((ty + 1) * ts - 1, height - 1));
             tiles.emplace_back(mn, mx);
         }
     }
 }
 
 void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts,
-                            const std::vector<int3>& inputTriangles,
-                            uint width,
-                            uint height,
-                            uint tileSize)
+                            const std::vector<int3>& inputTriangles)
 {
     PROFILE_SCOPE("Renderer::BinTriangles");
     for (auto& t : tiles)

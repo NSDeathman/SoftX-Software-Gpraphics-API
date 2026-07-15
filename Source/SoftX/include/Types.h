@@ -344,7 +344,7 @@ struct PipelineStateObject
     Viewport viewport;
     uint tileSize = 64;
 
-    bool Validate(uint32_t requiredResourcesMask) const 
+    void Validate(uint32_t requiredResourcesMask) const 
     {
         std::string errors;
         auto check = [&](PipelineResource res, const char* name, bool present) 
@@ -368,8 +368,6 @@ struct PipelineStateObject
 
         if (!errors.empty())
             throw InvalidState("Missing required pipeline state: " + errors);
-
-        return errors.empty();
     }
 };
 
@@ -388,7 +386,7 @@ struct OcclusionPipelineState
     ComparisonFunc depthFunc = ComparisonFunc::Less;
     bool depthWriteEnable = false;
 
-    bool Validate(uint32_t requiredResourcesMask) const
+    void Validate(uint32_t requiredResourcesMask) const
     {
         std::string errors;
         auto check = [&](PipelineResource res, const char* name, bool present)
@@ -408,8 +406,6 @@ struct OcclusionPipelineState
 
         if (!errors.empty())
             throw InvalidState("Missing required pipeline state: " + errors);
-
-        return errors.empty();
     }
 };
 

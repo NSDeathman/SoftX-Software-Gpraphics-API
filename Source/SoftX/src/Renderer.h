@@ -20,12 +20,9 @@ public:
     const std::vector<Tile>& GetTiles() const { return tiles; }
 
 private:
-    void BuildTiles(uint global_width, uint global_height, uint global_tileSize);
+    void BuildTiles();
     void BinTriangles(const std::vector<VertexOutput>& verts, 
-                      const std::vector<int3>& triangles,
-                      uint width, 
-                      uint height, 
-                      uint tileSize);
+                      const std::vector<int3>& triangles);
     void RenderTiles(const PipelineStateObject& pso,
                      const std::vector<VertexOutput>& verts,
                      const std::vector<int3>& triangles);

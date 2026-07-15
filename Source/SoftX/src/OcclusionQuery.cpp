@@ -208,7 +208,7 @@ bool OcclusionQuery::GetResult(queryID id, uint* outSamples) const
 }
 
 void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
-                                     const OcclusionPipelineState& state,
+                                     const OcclusionPipelineState& pso,
                                      DepthBuffer& db,
                                      IQueryRasterizer& rasterzer,
                                      std::atomic<uint>& totalVisible)
@@ -216,9 +216,9 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
     PROFILE_SCOPE("OcclusionQuery::ProcessDrawCall");
 
     RasterizerState rasterState;
-    rasterState.cullMode = state.cullMode;
-    rasterState.depthFunc = state.depthFunc;
-    rasterState.depthWriteEnable = state.depthWriteEnable;
+    rasterState.cullMode = pso.cullMode;
+    rasterState.depthFunc = pso.depthFunc;
+    rasterState.depthWriteEnable = pso.depthWriteEnable;
 
     const auto& vbData = *dc.vb;
     const auto& ibData = dc.ib;
@@ -260,7 +260,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
         for (int t = 0; t < numTris; ++t)
         {
             for (int j = 0; j < 3; ++j)
-                RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], state.viewport);
+                RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], pso.viewport);
 
             const VertexOutput& tv0 = clipped[t][0];
             const VertexOutput& tv1 = clipped[t][1];

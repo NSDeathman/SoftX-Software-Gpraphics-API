@@ -99,13 +99,12 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
     CommitState();
     PipelineStateObject state = frontState;
 
-    bool stateValid = state.Validate(PipelineResource::VertexShader |
-                                     PipelineResource::VertexBuffer |
-                                     PipelineResource::IndexBuffer |
-                                     PipelineResource::DepthBuffer |
-                                     PipelineResource::Viewport |
-                                     PipelineResource::TileSize);
-    if (!stateValid) return;
+    state.Validate(PipelineResource::VertexShader |
+                   PipelineResource::VertexBuffer |
+                   PipelineResource::IndexBuffer |
+                   PipelineResource::DepthBuffer |
+                   PipelineResource::Viewport |
+                   PipelineResource::TileSize);
 
     DrawIndexedImpl(state, indexCount, startIndex);
 }
@@ -118,13 +117,12 @@ void DeviceContext::DrawIndexed()
     CommitState();
     PipelineStateObject state = frontState;
 
-    bool stateValid = state.Validate(PipelineResource::VertexShader |
-                                     PipelineResource::VertexBuffer |
-                                     PipelineResource::IndexBuffer |
-                                     PipelineResource::DepthBuffer |
-                                     PipelineResource::Viewport |
-                                     PipelineResource::TileSize);
-    if (!stateValid) return;
+    state.Validate(PipelineResource::VertexShader |
+                   PipelineResource::VertexBuffer |
+                   PipelineResource::IndexBuffer |
+                   PipelineResource::DepthBuffer |
+                   PipelineResource::Viewport |
+                   PipelineResource::TileSize);
 
     uint count = static_cast<uint>(state.indexBuffer.Size());
     DrawIndexedImpl(state, count, 0);
@@ -318,12 +316,10 @@ void DeviceContext::DrawFullScreenQuad()
     CommitState();
     PipelineStateObject state = frontState;
 
-    bool stateValid = state.Validate(PipelineResource::RenderTarget |
-                                     PipelineResource::PixelShader |
-                                     PipelineResource::Viewport |
-                                     PipelineResource::TileSize);
-
-    if (!stateValid) return;
+    state.Validate(PipelineResource::RenderTarget |
+                   PipelineResource::PixelShader |
+                   PipelineResource::Viewport |
+                   PipelineResource::TileSize);
 
     IRenderTarget* rt = state.renderTarget.get();
     const uint w = rt->Width();
