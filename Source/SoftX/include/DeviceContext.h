@@ -25,8 +25,8 @@ public:
     DeviceContext(const DeviceContext&) = delete;
     DeviceContext& operator=(const DeviceContext&) = delete;
 
-    DeviceContext(DeviceContext&&) = default;
-    DeviceContext& operator=(DeviceContext&&) = default;
+    DeviceContext(DeviceContext&&) = delete;
+    DeviceContext& operator=(DeviceContext&&) = delete;
 
     void SetVertexShader(VertexShader shader);
     SOFTX_FORCE_INLINE VertexShader GetVertexShader() const { return frontState.vertexShader; }
@@ -46,7 +46,7 @@ public:
     void SetConstantBuffer(const ConstantBuffer& buffer);
     SOFTX_FORCE_INLINE ConstantBuffer GetConstantBuffer() const { return frontState.constantBuffer; }
 
-    void SetTexture(const std::string& name, std::shared_ptr<const ITexture> texture, SamplerState sampler = SamplerState{});
+    void SetTexture(const std::string& name, std::shared_ptr<const ITexture> texture, const SamplerState& sampler = SamplerState{});
 
     void SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer = false);
     SOFTX_FORCE_INLINE std::shared_ptr<IRenderTarget> GetRenderTarget() const { return frontState.renderTarget; }
@@ -94,8 +94,8 @@ private:
 private:
     PipelineStateObject frontState;
     PipelineStateObject backState;
-    mutable std::unique_ptr<std::mutex> stateMutex;
-    mutable std::unique_ptr<std::mutex> drawMutex;
+    mutable std::mutex stateMutex;
+    mutable std::mutex drawMutex;
 
     std::unique_ptr<IRasterizer> rasterizer;
 };

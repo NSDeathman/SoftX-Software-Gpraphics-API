@@ -176,69 +176,108 @@ private:
     // ============================================================================
     static storage_type float_to_half(float f) noexcept
     {
-        if (std::isnan(f)) {
-            uint32_t bits;
-            std::memcpy(&bits, &f, 4);
-            uint16_t nan_mantissa = static_cast<uint16_t>((bits >> 13) & 0x03FFu);
-            if (nan_mantissa == 0) nan_mantissa = 1;
-            return static_cast<storage_type>(0x7C00u | nan_mantissa);
-        }
+        uint32_t bits;
+        std::memcpy(&bits, &f, sizeof(bits));
 
-        if (std::isinf(f)) {
-            return static_cast<storage_type>(f < 0 ? 0xFC00u : 0x7C00u);
-        }
+        const uint32_t sign = bits & 0x80000000u;
+        int32_t e = static_cast<int32_t>((bits >> 23) & 0xFFu);   // biased exponent
+        uint32_t m = bits & 0x007FFFFFu;                          // 23-bit mantissa
 
-        if (f == 0.0f) {
-            uint32_t bits;
-            std::memcpy(&bits, &f, 4);
-            return static_cast<storage_type>(bits & 0x80000000u ? 0x8000u : 0x0000u);
-        }
-
-        uint32_t u;
-        std::memcpy(&u, &f, 4);
-
-        uint32_t sign = u & 0x80000000;
-        int32_t exp = static_cast<int32_t>((u >> 23) & 0xFF) - 127;
-        uint32_t mant = u & 0x007FFFFF;
-
-        if (exp < -14) {
-            if (exp < -24) return static_cast<storage_type>(sign >> 16);
-            mant |= 0x00800000u;
-            int32_t shift = 14 - exp;
-            uint32_t round_bit = 1u << (shift - 1);
-            uint32_t sticky_mask = (1u << (shift - 1)) - 1;
-
-            if ((mant & sticky_mask) == round_bit) {
-                mant += (mant >> shift) & 1u;
+        // NaN / Inf
+        if (e == 255) {
+            if (m == 0) {
+                return static_cast<storage_type>(sign ? 0xFC00u : 0x7C00u);
             }
-            else if ((mant & round_bit)) {
-                mant += round_bit;
+            else {
+                uint16_t nan_mant = static_cast<uint16_t>((m >> 13) & 0x03FFu);
+                if (nan_mant == 0) nan_mant = 1;
+                return static_cast<storage_type>(0x7C00u | nan_mant);
             }
-
-            return static_cast<storage_type>((sign >> 16) | (mant >> shift));
         }
 
-        exp += 15;
-        uint32_t round_bit = 0x00001000u;
-        uint32_t sticky_mask = 0x00000FFFu;
+        // Determine effective mantissa and exponent
+        uint32_t mant24;   // 24-bit mantissa with explicit leading bit
+        int32_t exp;       // unbiased exponent
 
-        if ((mant & sticky_mask) > round_bit) {
-            mant += round_bit;
+        if (e == 0) {
+            // Subnormal float: exponent = -126, mantissa without leading 1
+            if (m == 0) {
+                // Signed zero
+                return static_cast<storage_type>(sign >> 16);
+            }
+            exp = -126;
+            mant24 = m;   // no hidden bit
         }
-        else if ((mant & sticky_mask) == round_bit) {
-            mant += (mant & (round_bit << 1)) ? round_bit : 0u;
+        else {
+            // Normal float: add hidden leading 1, exponent = e - 127
+            exp = e - 127;
+            mant24 = m | 0x800000u;
         }
 
-        if (mant & 0x00800000) {
-            mant = 0;
-            exp++;
-        }
+        // Target half exponent (biased by 15)
+        int32_t h_exp = exp + 15;
 
-        if (exp > 30) {
+        // Overflow to infinity?
+        if (h_exp >= 31) {
             return static_cast<storage_type>((sign >> 16) | 0x7C00u);
         }
 
-        return static_cast<storage_type>((sign >> 16) | (static_cast<uint32_t>(exp) << 10) | (mant >> 13));
+        // Subnormal (or zero) in half: h_exp <= 0
+        if (h_exp <= 0) {
+            // We need to shift mant24 right by (1 - h_exp) positions,
+            // because half subnormals have effective exponent -14.
+            // Actually half subnormal exponent is -14, and mantissa is shifted right by (14 - exp).
+            // Derivation: effective half exponent = -14 + (number of leading zeros in 10-bit mantissa).
+            // Equivalently, shift = 14 - exp.
+            int32_t shift = 14 - exp;   // shift >= 14 for exp <= 0
+            if (shift >= 25) {
+                // Too small, becomes signed zero
+                return static_cast<storage_type>(sign >> 16);
+            }
+            uint32_t mant10 = mant24 >> shift;
+            uint32_t remainder = mant24 & ((1u << shift) - 1u);
+            uint32_t half_bit = 1u << (shift - 1u);
+
+            // Round to nearest even
+            if ((remainder > half_bit) ||
+                (remainder == half_bit && (mant10 & 1u)))
+            {
+                ++mant10;
+            }
+
+            // If rounding overflows into normal range
+            if (mant10 >= 1024u) {
+                return static_cast<storage_type>((sign >> 16) | (1u << 10)); // exp=1, mant=0
+            }
+            return static_cast<storage_type>((sign >> 16) | mant10);
+        }
+
+        // Normal half: 1 <= h_exp <= 30
+        {
+            // mant24 >> 13 gives bits [23:13] -> 11 bits, including hidden 1 at bit 10.
+            // We need only the lower 10 bits for the mantissa field.
+            uint32_t mant10 = (mant24 >> 13) & 0x3FFu;
+            uint32_t remainder = mant24 & 0x1FFFu;          // bits 0..12
+            const uint32_t half_bit = 0x1000u;              // bit 12
+
+            // Round to nearest even
+            if ((remainder > half_bit) ||
+                (remainder == half_bit && (mant10 & 1u)))
+            {
+                ++mant10;
+            }
+
+            uint32_t final_exp = static_cast<uint32_t>(h_exp);
+            if (mant10 >= 1024u) {   // rounding carried into hidden bit
+                mant10 = 0;
+                ++final_exp;
+                if (final_exp > 30u) {
+                    return static_cast<storage_type>((sign >> 16) | 0x7C00u); // became inf
+                }
+            }
+            return static_cast<storage_type>(
+                (sign >> 16) | (final_exp << 10) | mant10);
+        }
     }
 
     static float half_to_float(storage_type h) noexcept {
@@ -257,7 +296,6 @@ private:
             else {                                   // NaN
                 uint32_t mantissa_half = exp_mant & 0x03FFu;
                 uint32_t mantissa_float = mantissa_half << 13;
-                if (mantissa_float == 0) mantissa_float = 1u << 13;   // guarantee non‑zero mantissa
                 uint32_t bits = sign | 0x7F800000u | mantissa_float;
                 float f;
                 std::memcpy(&f, &bits, 4);

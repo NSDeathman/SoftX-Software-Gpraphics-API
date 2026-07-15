@@ -71,12 +71,11 @@ public:
         size_t count = pixelsStorage.size();
         size_t i = 0;
 
-        __m128i bg4 = _mm_set1_epi32(static_cast<int>(bg));
+        const __m128i bg4 = _mm_set1_epi32(static_cast<int>(bg));
         for (; i + 4 <= count; i += 4)
         {
-            _mm_storeu_si128(reinterpret_cast<__m128i*>(pixelsStorage.data() + i), bg4);
+            std::memcpy(&pixelsStorage[i], &bg4, sizeof(bg4));
         }
-        _mm_sfence();
 
         for (; i < count; ++i)
         {

@@ -145,7 +145,6 @@ void OcclusionQuery::End()
         PROFILE_SCOPE("OcclusionQuery::AsyncExecution");
         std::atomic<uint32_t> totalVisible(0);
 
-        std::atomic<size_t> idx(0);
         size_t count = drawCallsCopy->size();
         for (size_t i = 0; i < count; ++i)
             ProcessDrawCall((*drawCallsCopy)[i], stateCaptured, *db, *rast, totalVisible);

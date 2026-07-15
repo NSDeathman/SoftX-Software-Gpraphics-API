@@ -9,7 +9,8 @@ SOFTX_BEGIN
 
 Device::Device(const PresentParameters& params): presentParams(params), 
                                                  backBuffer(std::make_shared<FrameBuffer>(params.BackBufferSize)),
-                                                 depthBuffer(std::make_shared<DepthBuffer>(params.BackBufferSize))
+                                                 depthBuffer(std::make_shared<DepthBuffer>(params.BackBufferSize)),
+                                                 immediateContext(std::make_unique<DeviceContext>())
 {
     presentParams.Validate();
 
@@ -92,19 +93,23 @@ void Device::Reset(const PresentParameters& newParams)
         backBuffer = std::make_shared<FrameBuffer>(presentParams.BackBufferSize);
         depthBuffer = std::make_shared<DepthBuffer>(presentParams.BackBufferSize);
 
-        immediateContext.SetRenderTarget(backBuffer, false);
-        immediateContext.SetDepthBuffer(depthBuffer);
+        immediateContext->SetRenderTarget(backBuffer, false);
+        immediateContext->SetDepthBuffer(depthBuffer);
     }
     else
     {
         backBuffer = std::make_shared<FrameBuffer>(uint2(1, 1));
         depthBuffer = std::make_shared<DepthBuffer>(uint2(1, 1));
-        immediateContext.SetRenderTarget(backBuffer, false);
-        immediateContext.SetDepthBuffer(depthBuffer);
+        immediateContext->SetRenderTarget(backBuffer, false);
+        immediateContext->SetDepthBuffer(depthBuffer);
     }
 
     if (consoleWillBeActive)
         SetupOutputConsole();
+}
+
+void Device::SetDeviceContext(std::unique_ptr<DeviceContext> ctx) {
+    immediateContext = std::move(ctx);
 }
 
 void Device::PresentToWindow()

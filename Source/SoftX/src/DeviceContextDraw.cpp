@@ -93,7 +93,7 @@ void DeviceContext::DrawLine(const PipelineStateObject& state, int x0, int y0, i
 
 void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
-    std::lock_guard<std::mutex> lock(*drawMutex);
+    std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::DrawIndexed");
 
     CommitState();
@@ -111,7 +111,7 @@ void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 
 void DeviceContext::DrawIndexed()
 {
-    std::lock_guard<std::mutex> lock(*drawMutex);
+    std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::DrawIndexed (full buffer)");
 
     CommitState();
@@ -172,9 +172,15 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
     std::vector<int3> sourceTriangles;
     {
         PROFILE_SCOPE("Gather source triangles");
+        const uint triangleCount = indexCount / 3;
+        sourceTriangles.reserve(triangleCount);
         for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
         {
-            sourceTriangles.push_back({ (int)state.indexBuffer.GetByIndex(i), (int)state.indexBuffer.GetByIndex(i + 1), (int)state.indexBuffer.GetByIndex(i + 2) });
+            sourceTriangles.emplace_back(
+                static_cast<int>(state.indexBuffer.GetByIndex(i)),
+                static_cast<int>(state.indexBuffer.GetByIndex(i + 1)),
+                static_cast<int>(state.indexBuffer.GetByIndex(i + 2))
+            );
         }
     }
 
@@ -197,7 +203,7 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
                 finalVerts.push_back(clipped[t][0]);
                 finalVerts.push_back(clipped[t][1]);
                 finalVerts.push_back(clipped[t][2]);
-                finalTriangles.push_back({ base, base + 1, base + 2 });
+                finalTriangles.emplace_back(base, base + 1, base + 2);
             }
         }
     }
@@ -218,6 +224,8 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
         PROFILE_SCOPE("Geometry shader");
         std::vector<VertexOutput> gsVerts;
         std::vector<int3> gsTriangles;
+        gsVerts.reserve(finalTriangles.size() * 6);
+        gsTriangles.reserve(finalTriangles.size() * 2);
 
         for (const auto& tri : finalTriangles)
         {
@@ -226,10 +234,10 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
             std::vector<int> outIndices;
             state.geometryShader(inVerts, outVerts, outIndices, state.textureTable);
 
-            int base = (int)gsVerts.size();
+            int base = static_cast<int>(gsVerts.size());
             gsVerts.insert(gsVerts.end(), outVerts.begin(), outVerts.end());
             for (size_t j = 0; j + 2 < outIndices.size(); j += 3)
-                gsTriangles.push_back({ base + outIndices[j], base + outIndices[j + 1], base + outIndices[j + 2] });
+                gsTriangles.emplace_back(base + outIndices[j], base + outIndices[j + 1], base + outIndices[j + 2]);
         }
         finalVerts = std::move(gsVerts);
         finalTriangles = std::move(gsTriangles);
@@ -310,7 +318,7 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
 
 void DeviceContext::DrawFullScreenQuad()
 {
-    std::lock_guard<std::mutex> lock(*drawMutex);
+    std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::DrawFullScreenQuad");
 
     CommitState();
@@ -375,7 +383,7 @@ void DeviceContext::DrawFullScreenQuad()
                             input.UV = float2(u + i * invW, v);
                             packed[i] = FrameBuffer::PackColor(ps(input, cb, tt));
                         }
-                        _mm_store_si128((__m128i*)(row + x), _mm_loadu_si128((__m128i*)packed));
+                        std::memcpy(row + x, packed, sizeof(packed));
                     }
 
                     for (; x <= endX; ++x, u += invW) {

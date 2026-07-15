@@ -237,7 +237,7 @@ struct TextureBinding
     SOFTX_FORCE_INLINE bool IsEmpty() const { return !IsValid(); }
 
     SOFTX_FORCE_INLINE void SetTexture(std::shared_ptr<const ITexture> tex) { texture = std::move(tex); }
-    SOFTX_FORCE_INLINE void SetSamplerState(SamplerState samp) { sampler = samp; }
+    SOFTX_FORCE_INLINE void SetSamplerState(const SamplerState& samp) { sampler = samp; }
 
     float4 Sample(const float2& uv) const
     {
@@ -267,7 +267,7 @@ struct TextureBinding
 class TextureTable
 {
 public:
-    SOFTX_FORCE_INLINE void Set(const std::string& name, std::shared_ptr<const ITexture> texture, SamplerState sampler = SamplerState{})
+    SOFTX_FORCE_INLINE void Set(const std::string& name, std::shared_ptr<const ITexture> texture, const SamplerState& sampler = SamplerState{})
     {
         bindings[name] = { std::move(texture), sampler };
     }

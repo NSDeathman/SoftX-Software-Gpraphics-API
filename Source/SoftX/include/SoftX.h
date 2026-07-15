@@ -7,7 +7,7 @@
 /////////////////////////////////////////////////////////////////
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
-#include "Exeptions.h"
+#include "Exceptions.h"
 #include "Types.h"
 #include "Device.h"
 #include "DeviceContext.h"

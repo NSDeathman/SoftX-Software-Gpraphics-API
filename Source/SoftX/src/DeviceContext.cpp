@@ -9,16 +9,13 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-DeviceContext::DeviceContext() : stateMutex(std::make_unique<std::mutex>()), 
-                                 drawMutex(std::make_unique<std::mutex>())
+DeviceContext::DeviceContext()
 {
     rasterizer = CreateBestRasterizer();
 }
 
 DeviceContext::DeviceContext(const PipelineStateObject& initialState) : backState(initialState), 
-                                                                        frontState(initialState),
-                                                                        stateMutex(std::make_unique<std::mutex>()),
-                                                                        drawMutex(std::make_unique<std::mutex>())
+                                                                        frontState(initialState)
 {
     rasterizer = CreateBestRasterizer();
 }
@@ -27,45 +24,45 @@ DeviceContext::~DeviceContext() = default;
 
 void DeviceContext::SetVertexShader(VertexShader shader) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.vertexShader = std::move(shader);
 }
 
 void DeviceContext::SetGeometryShader(GeometryShader shader)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.geometryShader = std::move(shader);
 }
 
 void DeviceContext::SetPixelShader(PixelShader shader) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.pixelShader = std::move(shader);
 }
 
 void DeviceContext::SetIndexBuffer(const IndexBuffer& buffer)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.indexBuffer = buffer;
 }
 
 void DeviceContext::SetVertexBuffer(const VertexBuffer& buffer) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.vertexBuffer = buffer;
 }
 
 void DeviceContext::SetTexture(const std::string& name,
                                std::shared_ptr<const ITexture> texture,
-                               SamplerState sampler) 
+                               const SamplerState& sampler) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.textureTable.Set(name, std::move(texture), sampler);
 }
 
 void DeviceContext::SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.renderTarget = std::move(target);
     if (createDepthBuffer && backState.renderTarget) 
     {
@@ -77,55 +74,55 @@ void DeviceContext::SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool 
 
 void DeviceContext::SetDepthBuffer(std::shared_ptr<DepthBuffer> depth) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.depthBuffer = std::move(depth);
 }
 
 void DeviceContext::SetViewport(const Viewport& vp) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.viewport = vp;
 }
 
 void DeviceContext::SetTileSize(uint size) 
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.tileSize = size;
 }
 
 void DeviceContext::SetDepthWriteEnable(bool enable)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.depthWriteEnable = enable;
 }
 
 void DeviceContext::SetCullMode(CullMode mode)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.cullMode = mode;
 }
 
 void DeviceContext::SetFillMode(FillMode mode)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.fillMode = mode;
 }
 
 void DeviceContext::SetDepthFunc(ComparisonFunc func)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.depthFunc = func;
 }
 
 void DeviceContext::SetConstantBuffer(const ConstantBuffer& buffer)
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     backState.constantBuffer = buffer;
 }
 
 void DeviceContext::CommitState()
 {
-    std::lock_guard<std::mutex> lock(*stateMutex);
+    std::lock_guard<std::mutex> lock(stateMutex);
     frontState = backState;
 }
 
@@ -136,7 +133,7 @@ PipelineStateObject DeviceContext::CaptureState() const
 
 void DeviceContext::Clear(const float4& color) 
 {
-    std::lock_guard<std::mutex> lock(*drawMutex);
+    std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::Clear");
     CommitState();
     PipelineStateObject state = frontState;
@@ -146,7 +143,7 @@ void DeviceContext::Clear(const float4& color)
 
 void DeviceContext::ClearDepth(const float& depth) 
 {
-    std::lock_guard<std::mutex> lock(*drawMutex);
+    std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::ClearDepth");
     CommitState();
     PipelineStateObject state = frontState;
@@ -156,7 +153,7 @@ void DeviceContext::ClearDepth(const float& depth)
 
 void DeviceContext::ClearColorAndDepth(const float4& color, const float& depth) 
 {
-    std::lock_guard<std::mutex> lock(*drawMutex);
+    std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::ClearColorAndDepth");
     CommitState();
     PipelineStateObject state = frontState;

@@ -22,10 +22,10 @@ uint QueryRasterizerAVX::RasterizeTriangle(
     uint2 tileMin,
     uint2 tileMax)
 {
-    float minX = std::min({ v0.Position.x, v1.Position.x, v2.Position.x });
-    float maxX = std::max({ v0.Position.x, v1.Position.x, v2.Position.x });
-    float minY = std::min({ v0.Position.y, v1.Position.y, v2.Position.y });
-    float maxY = std::max({ v0.Position.y, v1.Position.y, v2.Position.y });
+    float minX = std::min(std::min(v0.Position.x, v1.Position.x), v2.Position.x);
+    float maxX = std::max(std::max(v0.Position.x, v1.Position.x), v2.Position.x);
+    float minY = std::min(std::min(v0.Position.y, v1.Position.y), v2.Position.y);
+    float maxY = std::max(std::max(v0.Position.y, v1.Position.y), v2.Position.y);
 
     int iMinX = std::max((int)tileMin.x, (int)std::floor(minX));
     int iMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));

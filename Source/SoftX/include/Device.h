@@ -28,12 +28,12 @@ public:
 
     Device CreateHeadless(uint2 backBufferSize);
 
-    void SetDeviceContext(DeviceContext ctx) { immediateContext = std::move(ctx); }
-    SOFTX_FORCE_INLINE DeviceContext& GetDeviceContext() { return immediateContext; }
-    SOFTX_FORCE_INLINE const DeviceContext& GetDeviceContext() const { return immediateContext; }
+    void SetDeviceContext(std::unique_ptr<DeviceContext> ctx);
+    DeviceContext& GetDeviceContext() { return *immediateContext; }
+    const DeviceContext& GetDeviceContext() const { return *immediateContext; }
 
-    SOFTX_FORCE_INLINE DeviceContext& GetImmediateContext() { return immediateContext; }
-    SOFTX_FORCE_INLINE const DeviceContext& GetImmediateContext() const { return immediateContext; }
+    DeviceContext& GetImmediateContext() { return *immediateContext; }
+    const DeviceContext& GetImmediateContext() const { return *immediateContext; }
 
     std::unique_ptr<DeviceContext> CreateDeferredContext() { return std::make_unique<DeviceContext>(); }
 
@@ -55,7 +55,7 @@ private:
     void PresentToConsole();
 
 private:
-    DeviceContext immediateContext;
+    std::unique_ptr<DeviceContext> immediateContext;
     std::shared_ptr<FrameBuffer> backBuffer;
     std::shared_ptr<DepthBuffer> depthBuffer;
     HANDLE hConsoleBuffer = nullptr;
