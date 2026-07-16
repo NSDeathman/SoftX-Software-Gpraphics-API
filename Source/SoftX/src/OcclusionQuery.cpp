@@ -139,7 +139,7 @@ void OcclusionQuery::End()
     ready = false;
     totalVisibleSamples = 0;
 
-    future = std::async(std::launch::async, [this, drawCallsCopy, stateCaptured, db, rast]()
+    future = ThreadPoolManager::Get().enqueueBackground([this, drawCallsCopy, stateCaptured, db, rast]()
     {
         PROFILE_THREAD("OcclusionQuery::AsyncExecution");
         PROFILE_SCOPE("OcclusionQuery::AsyncExecution");
