@@ -6,6 +6,7 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #include <functional>
+#include <future>
 #include <windows.h>
 
 #include "DeviceContext.h"
@@ -55,12 +56,16 @@ private:
     void PresentToConsole();
 
 private:
+    void SwapBuffers();
+
     std::unique_ptr<DeviceContext> immediateContext;
     std::shared_ptr<FrameBuffer> backBuffer;
+    std::shared_ptr<FrameBuffer> frontBuffer;
     std::shared_ptr<DepthBuffer> depthBuffer;
     HANDLE hConsoleBuffer = nullptr;
     PresentParameters presentParams;
     mutable std::mutex m_mutex;
+    std::future<void> pendingPresent;
 };
 
 SOFTX_END
