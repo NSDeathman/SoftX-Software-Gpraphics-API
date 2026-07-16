@@ -17,6 +17,18 @@ if %ERRORLEVEL% EQU 0 (
     echo.
     echo Solution generated successfully!
     echo Open "%BUILD_DIR%\SoftXSolution.sln"
+
+    set "CLANG_FORMAT_FILE=%~dp0..\.clang-format"
+    if exist "%CLANG_FORMAT_FILE%" (
+        copy /Y "%CLANG_FORMAT_FILE%" "%BUILD_DIR%\" >nul
+        if !ERRORLEVEL! EQU 0 (
+            echo Copied .clang-format to build directory.
+        ) else (
+            echo Failed to copy .clang-format.
+        )
+    ) else (
+        echo Warning: .clang-format not found at "%CLANG_FORMAT_FILE%". Skipping copy.
+    )
 ) else (
     echo.
     echo ERROR: CMake generation failed.
