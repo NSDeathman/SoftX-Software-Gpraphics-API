@@ -132,7 +132,7 @@ void OcclusionQuery::End()
     }
 
     auto drawCallsCopy = std::make_shared<std::vector<DrawCall>>(drawCalls);
-    DepthBuffer* db = stateCaptured.depthBuffer.get();
+    auto db = std::make_shared<DepthBuffer>(*stateCaptured.depthBuffer);
     Viewport vpData = stateCaptured.viewport;
     IQueryRasterizer* rast = rasterizer.get();
 

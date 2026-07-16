@@ -51,6 +51,21 @@ public:
         Clear(1.0f);
     }
 
+    DepthBuffer(const DepthBuffer& other) : levels(other.levels)
+    {
+        const size_t blockCount = other.blocks.size();
+        blocks.resize(blockCount);
+
+        const __m128* src = other.blocks.data();
+        __m128* dst = blocks.data();
+
+        for (size_t i = 0; i < blockCount; ++i) {
+            _mm_stream_ps(reinterpret_cast<float*>(&dst[i]), src[i]);
+        }
+        _mm_sfence();
+    }
+    DepthBuffer& operator=(const DepthBuffer& other) = delete;
+
     SOFTX_FORCE_INLINE uint Width()  const { return levels[0].resolution.x; }
     SOFTX_FORCE_INLINE uint Height() const { return levels[0].resolution.y; }
     SOFTX_FORCE_INLINE uint WidthPadded() const { return levels[0].widthPadded; }
@@ -83,45 +98,9 @@ public:
 
     SOFTX_FORCE_INLINE float Read(int2 coords) const
     {
+        SOFTX_VERIFY(coords.x >= 0 && coords.x < static_cast<int>(Width()));
+        SOFTX_VERIFY(coords.y >= 0 && coords.y < static_cast<int>(Height()));
         return FloatPtr()[coords.y * WidthPadded() + coords.x];
-    }
-
-    SOFTX_FORCE_INLINE void Write(int2 coords, float depth)
-    {
-        FloatPtr()[coords.y * WidthPadded() + coords.x] = depth;
-    }
-
-    SOFTX_FORCE_INLINE float& At(int2 coords)
-    {
-        return FloatPtr()[coords.y * WidthPadded() + coords.x];
-    }
-
-    SOFTX_FORCE_INLINE const float& At(int2 coords) const
-    {
-        return FloatPtr()[coords.y * WidthPadded() + coords.x];
-    }
-
-    SOFTX_FORCE_INLINE float& At(uint index)
-    {
-        uint x = index % Size().x;
-        uint y = index / Size().x;
-        return At(int2(static_cast<int>(x), static_cast<int>(y)));
-    }
-
-    SOFTX_FORCE_INLINE const float& At(uint index) const
-    {
-        uint x = index % Size().x;
-        uint y = index / Size().x;
-        return At(int2(static_cast<int>(x), static_cast<int>(y)));
-    }
-
-    SOFTX_FORCE_INLINE __m128 Read4(uint2 coords) const
-    {
-        SOFTX_VERIFY(coords.x % 4 == 0);
-        const Level& lvl = levels[0];
-        SOFTX_VERIFY(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
-        uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
-        return LevelData(0)[blockIdx];
     }
 
     SOFTX_FORCE_INLINE float Read(int2 coords, uint level) const
@@ -136,12 +115,66 @@ public:
         return data[(sampleCoords.y * lvl.widthPadded + sampleCoords.x) / 4].m128_f32[sampleCoords.x % 4];
     }
 
+    SOFTX_FORCE_INLINE void Write(int2 coords, float depth)
+    {
+        SOFTX_VERIFY(coords.x >= 0 && coords.x < static_cast<int>(Width()));
+        SOFTX_VERIFY(coords.y >= 0 && coords.y < static_cast<int>(Height()));
+        FloatPtr()[coords.y * WidthPadded() + coords.x] = depth;
+    }
+
+    SOFTX_FORCE_INLINE float& At(int2 coords)
+    {
+        SOFTX_VERIFY(coords.x >= 0 && coords.x < static_cast<int>(Width()));
+        SOFTX_VERIFY(coords.y >= 0 && coords.y < static_cast<int>(Height()));
+        return FloatPtr()[coords.y * WidthPadded() + coords.x];
+    }
+
+    SOFTX_FORCE_INLINE const float& At(int2 coords) const
+    {
+        SOFTX_VERIFY(coords.x >= 0 && coords.x < static_cast<int>(Width()));
+        SOFTX_VERIFY(coords.y >= 0 && coords.y < static_cast<int>(Height()));
+        return FloatPtr()[coords.y * WidthPadded() + coords.x];
+    }
+
+    SOFTX_FORCE_INLINE float& At(uint index)
+    {
+        SOFTX_VERIFY(index < Width()* Height());
+        uint x = index % Size().x;
+        uint y = index / Size().x;
+        return At(int2(static_cast<int>(x), static_cast<int>(y)));
+    }
+
+    SOFTX_FORCE_INLINE const float& At(uint index) const
+    {
+        SOFTX_VERIFY(index < Width()* Height());
+        uint x = index % Size().x;
+        uint y = index / Size().x;
+        return At(int2(static_cast<int>(x), static_cast<int>(y)));
+    }
+
+    SOFTX_FORCE_INLINE __m128 Read4(uint2 coords) const
+    {
+        SOFTX_VERIFY(coords.x % 4 == 0);
+        const Level& lvl = levels[0];
+
+        SOFTX_VERIFY(coords.x < lvl.resolution.x);
+        SOFTX_VERIFY(coords.x + 3u < lvl.resolution.x);
+        SOFTX_VERIFY(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
+
+        uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
+        return LevelData(0)[blockIdx];
+    }
+
     SOFTX_FORCE_INLINE __m128 Read4(uint2 coords, uint level) const
     {
         uint mipLevel = std::min(level, static_cast<uint>(levels.size()) - 1);
         const Level& lvl = levels[mipLevel];
         SOFTX_VERIFY(coords.x % 4 == 0);
+
+        SOFTX_VERIFY(coords.x < lvl.resolution.x);
+        SOFTX_VERIFY(coords.x + 3u < lvl.resolution.x);
         SOFTX_VERIFY(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
+
         uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
         return LevelData(mipLevel)[blockIdx];
     }
@@ -150,7 +183,11 @@ public:
     {
         SOFTX_VERIFY(coords.x % 4 == 0);
         const Level& lvl = levels[0];
+
+        SOFTX_VERIFY(coords.x < lvl.resolution.x);
+        SOFTX_VERIFY(coords.x + 3u < lvl.resolution.x);
         SOFTX_VERIFY(coords.x + 3u < lvl.widthPadded && coords.y < lvl.resolution.y);
+
         uint blockIdx = (coords.y * lvl.widthPadded + coords.x) / 4u;
         __m128& block = LevelData(0)[blockIdx];
         block = _mm_or_ps(_mm_and_ps(depths, mask), _mm_andnot_ps(mask, block));
