@@ -8,38 +8,73 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-void TextureRGBA32F::GenerateMips() {
-    mipChain.resize(1);
-    uint w = resolution.x;
-    uint h = resolution.y;
+void TextureRGBA32F::GenerateMips()
+{
+    const Level& baseLevel = levels[0];
+    uint w = baseLevel.resolution.x;
+    uint h = baseLevel.resolution.y;
 
-    while (w > 1 || h > 1) {
+    std::vector<Level> newLevels;
+    std::vector<__m128> newPixels;
+
+    uint basePixelCount = w * h;
+    newPixels.resize(basePixelCount);
+    const __m128* srcBase = pixels.data() + baseLevel.offset;
+    std::copy(srcBase, srcBase + basePixelCount, newPixels.begin());
+
+    Level lvl0;
+    lvl0.resolution = uint2(w, h);
+    lvl0.offset = 0;
+    newLevels.push_back(lvl0);
+
+    uint totalPixels = basePixelCount;
+
+    while (w > 1 || h > 1)
+    {
         uint nw = std::max(1u, w / 2);
         uint nh = std::max(1u, h / 2);
-        std::vector<__m128> level(nw * nh);
-        const auto& prev = mipChain.back();
+        uint levelSize = nw * nh;
 
-        for (uint y = 0; y < nh; ++y) {
-            for (uint x = 0; x < nw; ++x) {
+        newPixels.resize(totalPixels + levelSize);
+
+        const Level& prevLevel = newLevels.back();
+        const __m128* prevData = newPixels.data() + prevLevel.offset;
+
+        __m128* currData = newPixels.data() + totalPixels;
+
+        for (uint y = 0; y < nh; ++y)
+        {
+            for (uint x = 0; x < nw; ++x)
+            {
                 uint base = 2 * y * w + 2 * x;
-                __m128 a = prev[base];
-                __m128 b = prev[base + 1];
-                __m128 c = prev[base + w];
-                __m128 d = prev[base + w + 1];
+                __m128 a = prevData[base];
+                __m128 b = prevData[base + 1];
+                __m128 c = prevData[base + w];
+                __m128 d = prevData[base + w + 1];
 
                 __m128 sum = _mm_add_ps(
                     _mm_add_ps(a, b),
                     _mm_add_ps(c, d));
-                level[y * nw + x] = _mm_mul_ps(sum, _mm_set1_ps(0.25f));
+                currData[y * nw + x] = _mm_mul_ps(sum, _mm_set1_ps(0.25f));
             }
         }
-        mipChain.push_back(std::move(level));
+
+        Level lvl;
+        lvl.resolution = uint2(nw, nh);
+        lvl.offset = totalPixels;
+        newLevels.push_back(lvl);
+
+        totalPixels += levelSize;
         w = nw;
         h = nh;
     }
+
+    levels = std::move(newLevels);
+    pixels = std::move(newPixels);
 }
 
-void TextureRGBA32F::SaveToTGA(const char* filename) const {
+void TextureRGBA32F::SaveToTGA(const char* filename) const
+{
     uint w = Width();
     uint h = Height();
 
