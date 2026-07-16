@@ -73,8 +73,8 @@ public:
     SOFTX_FORCE_INLINE uint GetTileSize() const { return frontState.tileSize; }
 
     void Clear(const float4& color);
-    void ClearDepth(const float& depth = 1.0f);
-    void ClearColorAndDepth(const float4& color, const float& depth = 1.0f);
+    void ClearDepth(const float depth = 1.0f);
+    void ClearColorAndDepth(const float4& color, const float depth = 1.0f);
 
     void DrawIndexed(uint indexCount, uint startIndex);
     void DrawIndexed();

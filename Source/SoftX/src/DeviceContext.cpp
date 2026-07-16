@@ -141,7 +141,7 @@ void DeviceContext::Clear(const float4& color)
         state.renderTarget->Clear(color);
 }
 
-void DeviceContext::ClearDepth(const float& depth) 
+void DeviceContext::ClearDepth(const float depth) 
 {
     std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::ClearDepth");
@@ -151,7 +151,7 @@ void DeviceContext::ClearDepth(const float& depth)
         state.depthBuffer->Clear(depth);
 }
 
-void DeviceContext::ClearColorAndDepth(const float4& color, const float& depth) 
+void DeviceContext::ClearColorAndDepth(const float4& color, const float depth) 
 {
     std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::ClearColorAndDepth");
