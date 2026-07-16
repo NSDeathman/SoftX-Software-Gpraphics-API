@@ -105,7 +105,7 @@ Determine which objects are visible without expensive pixel shading.
 ```cpp
 // Create and begin a query
 OcclusionQuery query;
-query.SetDepthBuffer(*ctx.GetDepthBuffer());
+query.SetDepthBuffer(ctx.GetDepthBuffer());
 query.SetViewport(ctx.GetViewport());
 query.SetCullMode(CullMode::Back);
 query.SetDepthFunc(ComparisonFunc::Less);
