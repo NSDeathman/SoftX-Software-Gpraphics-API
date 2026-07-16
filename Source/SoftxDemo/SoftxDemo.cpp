@@ -17,16 +17,13 @@ static constexpr int CUBE_COUNT = 100;
 
 static HWND g_hWnd = nullptr;
 static Device* g_device = nullptr;
-static const int QUERY_POOL_SIZE = 2;
-static OcclusionQuery g_queryPool[QUERY_POOL_SIZE];
-static int g_currentQueryIndex = 0;
-static OcclusionQuery* g_pendingQuery = nullptr;
 
 struct Mesh
 {
     VertexBuffer           vb;
     IndexBuffer            ib;
     float4x4               worldMatrix;
+    float4                 baseColor;
     OcclusionQuery::queryID queryId = 0;
     bool                   visible = true;
 };
@@ -170,51 +167,41 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
         ctx.DrawIndexed();
     }
 
-    if (g_pendingQuery && g_pendingQuery->IsReady())
+    std::vector<OcclusionQuery::queryID> queryIds(cubes.size());
     {
-        PROFILE_SCOPE("Retrieve last frame query results");
-        for (auto& cube : cubes)
+        PROFILE_SCOPE("Synchronous occlusion query");
+
+        OcclusionQuery query;
+        query.SetDepthBuffer(ctx.GetDepthBuffer());
+        query.SetViewport(ctx.GetViewport());
+        query.Begin();
+
+        for (size_t i = 0; i < cubes.size(); ++i)
         {
-            uint visibleSamples = 0;
-            if (g_pendingQuery->GetResult(cube.queryId, &visibleSamples))
-                cube.visible = (visibleSamples > 0);
-            else
-                cube.visible = false;
-        }
-        g_pendingQuery = nullptr;
-    }
-
-    {
-        PROFILE_SCOPE("Begin new occlusion query");
-
-        OcclusionQuery& currentQuery = g_queryPool[g_currentQueryIndex];
-
-        if (!currentQuery.IsReady())
-            currentQuery.Flush();
-
-        g_currentQueryIndex = (g_currentQueryIndex + 1) % QUERY_POOL_SIZE;
-
-        currentQuery.SetDepthBuffer(ctx.GetDepthBuffer());
-        currentQuery.SetViewport(ctx.GetViewport());
-        currentQuery.Begin();
-
-        for (auto& cube : cubes)
-        {
-            float4x4 mvp = cube.worldMatrix * view * proj;
+            float4x4 mvp = cubes[i].worldMatrix * view * proj;
             CbDataQuery cbData;
             cbData.modelViewProjection = mvp;
             ConstantBuffer cb(&cbData, sizeof(cbData));
 
-            currentQuery.SetVertexBuffer(cube.vb);
-            currentQuery.SetIndexBuffer(cube.ib);
-            currentQuery.SetConstantBuffer(cb);
-            currentQuery.SetVertexShader(OcclusionVS);
+            query.SetVertexBuffer(cubes[i].vb);
+            query.SetIndexBuffer(cubes[i].ib);
+            query.SetConstantBuffer(cb);
+            query.SetVertexShader(OcclusionVS);
 
-            cube.queryId = currentQuery.DrawIndexed();
+            cubes[i].queryId = query.DrawIndexed();
         }
 
-        currentQuery.End();
-        g_pendingQuery = &currentQuery;
+        query.End();
+        query.Flush();
+
+        for (auto& cube : cubes)
+        {
+            uint visibleSamples = 0;
+            if (query.GetResult(cube.queryId, &visibleSamples))
+                cube.visible = (visibleSamples > 0);
+            else
+                cube.visible = false;
+        }
     }
 
     int visibleCount = 0;
@@ -276,7 +263,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
     }
 
     static char title[256];
-    sprintf_s(title, "SoftX Occlusion Query Demo | Visible cubes: %d / %d", visibleCount, CUBE_COUNT);
+    sprintf_s(title, "SoftX Occlusion Query Demo (Sync) | Visible cubes: %d / %d", visibleCount, CUBE_COUNT);
     SetWindowTextA(g_hWnd, title);
 
     g_device->Present();
@@ -296,6 +283,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
+    // Инициализация окна
     WNDCLASSEX wc = {};
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -321,11 +309,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     params.hDeviceWindow = g_hWnd;
     params.Windowed = true;
 
-    std::unique_ptr<Device> device = std::make_unique<Device>(params);
-    g_device = device.get();
+    Device device(params);
+    g_device = &device;
 
     DeviceContext& ctx = g_device->GetImmediateContext();
-    ctx.SetRenderTarget(device->GetBackBuffer(), true);
+    ctx.SetRenderTarget(device.GetBackBuffer(), true);
     ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
     ctx.SetTileSize(128);
     ctx.SetCullMode(CullMode::Back);
@@ -343,6 +331,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
         CreateCube(cubes[i].vb, cubes[i].ib, color);
         cubes[i].worldMatrix = translation(pos) * scaling(float3(1.0f));
+        cubes[i].baseColor = color;
     }
 
     Mesh occluder;
