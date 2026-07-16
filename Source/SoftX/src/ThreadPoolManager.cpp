@@ -8,10 +8,23 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
+void ThreadPoolManager::Initialize(size_t threadCount)
+{
+    if (instance)
+        SOFTX_THROW(InvalidState("ThreadPoolManager already initialized"));
+    instance = std::make_unique<ThreadPool>(threadCount);
+}
+
 ThreadPool& ThreadPoolManager::Get()
 {
-	static ThreadPool instance(std::thread::hardware_concurrency());
-	return instance;
+    if (!instance)
+        SOFTX_THROW(InvalidState("ThreadPoolManager not initialized. Call Device constructor first."));
+    return *instance;
+}
+
+void ThreadPoolManager::Shutdown() 
+{
+    instance.reset();
 }
 
 SOFTX_END

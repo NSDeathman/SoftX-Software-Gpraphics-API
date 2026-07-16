@@ -17,7 +17,7 @@ SOFTX_BEGIN
 class SOFTX_API Device
 {
 public:
-    explicit Device(const PresentParameters& params);
+    explicit Device(const PresentParameters& params, size_t numThreads = 0);
     ~Device();
 
     Device(const Device&) = delete;
@@ -26,7 +26,7 @@ public:
     Device(Device&&) = default;
     Device& operator=(Device&&) = default;
 
-    Device CreateHeadless(uint2 backBufferSize);
+    static Device CreateHeadless(uint2 backBufferSize);
 
     void SetDeviceContext(std::unique_ptr<DeviceContext> ctx);
     DeviceContext& GetDeviceContext() { return *immediateContext; }

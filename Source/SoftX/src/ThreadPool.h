@@ -6,8 +6,6 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #include <atomic>
-#include <condition_variable>
-#include <functional>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -22,9 +20,13 @@ class SOFTX_API ThreadPool
   public:
 	ThreadPool(size_t numThreads) : stop(false), activeTasks(0)
 	{
+		if(numThreads == 0)
+			numThreads = std::thread::hardware_concurrency();
+
 		for (size_t i = 0; i < numThreads; ++i)
 		{
-			workers.emplace_back([this, i] {
+			workers.emplace_back([this, i] 
+			{
 				PROFILE_THREAD(("SoftX Worker " + std::to_string(i)).c_str());
 				while (true)
 				{

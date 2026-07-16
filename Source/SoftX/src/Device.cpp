@@ -4,15 +4,18 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
+#include "ThreadPoolManager.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-Device::Device(const PresentParameters& params): presentParams(params), 
-                                                 backBuffer(std::make_shared<FrameBuffer>(params.BackBufferSize)),
-                                                 depthBuffer(std::make_shared<DepthBuffer>(params.BackBufferSize)),
-                                                 immediateContext(std::make_unique<DeviceContext>())
+Device::Device(const PresentParameters& params, size_t numThreads): presentParams(params),
+                                                                    backBuffer(std::make_shared<FrameBuffer>(params.BackBufferSize)),
+                                                                    depthBuffer(std::make_shared<DepthBuffer>(params.BackBufferSize)),
+                                                                    immediateContext(std::make_unique<DeviceContext>())
 {
     presentParams.Validate();
+
+    ThreadPoolManager::Initialize(numThreads);
 
     if (presentParams.Output == PresentationMode::Console)
         SetupOutputConsole();

@@ -24,7 +24,6 @@ set(SOFTX_SOURCES
     src/RasterizerScalar.cpp
     src/RasterizerSSE.cpp
     src/Renderer.cpp
-    src/ThreadPoolManager.cpp
 )
 
 set(SOFTX_PRIVATE_HEADERS
@@ -103,7 +102,7 @@ set_target_properties(SoftX PROPERTIES
 source_group("Source Files\\Core"          FILES src/Device.cpp src/DeviceContext.cpp src/DeviceContextDebug.cpp src/DeviceContextDraw.cpp src/Renderer.cpp src/OcclusionQuery.cpp)
 source_group("Source Files\\Rasterizer"    FILES src/RasterizerAVX.cpp src/RasterizerFactory.cpp src/RasterizerScalar.cpp src/RasterizerSSE.cpp
                                                  src/QueryRasterizerAVX.cpp src/QueryRasterizerFactory.cpp src/QueryRasterizerScalar.cpp src/QueryRasterizerSSE.cpp)
-source_group("Source Files\\Tools"         FILES src/CPUDetector.cpp src/ThreadPoolManager.cpp)
+source_group("Source Files\\Tools"         FILES src/CPUDetector.cpp)
 source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp src/TextureRGBA32F.cpp)
 
 source_group("Header Files\\Core"          FILES src/Renderer.h)
