@@ -72,9 +72,10 @@ public:
     void SetTileSize(uint size);
     SOFTX_FORCE_INLINE uint GetTileSize() const { return frontState.tileSize; }
 
-    void Clear(const float4& color);
-    void ClearDepth(const float depth = 1.0f);
-    void ClearColorAndDepth(const float4& color, const float depth = 1.0f);
+    void Clear(ClearFlags clearTargetBitMask, const float4& color = {0.0f, 0.0f, 0.0f, 0.0f}, float depth = 1.0f);
+    void ClearColor(const float4& color) { Clear(ClearFlags::RenderTarget, color); }
+    void ClearDepth(float depth = 1.0f) { Clear(ClearFlags::DepthBuffer, {}, depth); }
+    void ClearColorAndDepth(const float4& color, float depth = 1.0f) { Clear(ClearFlags::RenderTarget | ClearFlags::DepthBuffer, color, depth); }
 
     void DrawIndexed(uint indexCount, uint startIndex);
     void DrawIndexed();

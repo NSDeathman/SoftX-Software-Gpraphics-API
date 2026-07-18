@@ -131,43 +131,36 @@ PipelineStateObject DeviceContext::CaptureState() const
     return frontState;
 }
 
-void DeviceContext::Clear(const float4& color) 
+void DeviceContext::Clear(ClearFlags flags,
+                          const float4& color,
+                          float depth)
 {
+    if (flags == ClearFlags::None) return;
+
     std::lock_guard<std::mutex> lock(drawMutex);
     PROFILE_SCOPE("DeviceContext::Clear");
     CommitState();
-    PipelineStateObject state = frontState;
-    if (state.renderTarget)
-        state.renderTarget->Clear(color);
-}
 
-void DeviceContext::ClearDepth(const float depth) 
-{
-    std::lock_guard<std::mutex> lock(drawMutex);
-    PROFILE_SCOPE("DeviceContext::ClearDepth");
-    CommitState();
-    PipelineStateObject state = frontState;
-    if (state.depthBuffer)
-        state.depthBuffer->Clear(depth);
-}
-
-void DeviceContext::ClearColorAndDepth(const float4& color, const float depth) 
-{
-    std::lock_guard<std::mutex> lock(drawMutex);
-    PROFILE_SCOPE("DeviceContext::ClearColorAndDepth");
-    CommitState();
     PipelineStateObject state = frontState;
     auto& pool = ThreadPoolManager::Get();
-    if (state.renderTarget && state.depthBuffer && pool.threadCount() > 0) 
+
+    const bool clearColor = !!(flags & ClearFlags::RenderTarget) && state.renderTarget;
+    const bool clearDepth = !!(flags & ClearFlags::DepthBuffer) && state.depthBuffer;
+
+    if (!clearColor && !clearDepth) return;
+
+    const bool useParallel = clearColor && clearDepth && pool.threadCount() > 0;
+
+    if (useParallel) 
     {
-        pool.enqueue([rt = state.renderTarget, color]{ rt->Clear(color); });
+        state.renderTarget->Clear(color);
         pool.enqueue([db = state.depthBuffer, depth]{ db->Clear(depth); });
         pool.wait();
     }
     else 
     {
-        if (state.renderTarget) state.renderTarget->Clear(color);
-        if (state.depthBuffer)  state.depthBuffer->Clear(depth);
+        if (clearColor) state.renderTarget->Clear(color);
+        if (clearDepth) state.depthBuffer->Clear(depth);
     }
 }
 

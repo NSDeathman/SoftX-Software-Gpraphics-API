@@ -146,7 +146,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
     float3 target(0.0f, 0.0f, 0.0f);
     float4x4 view = look_at(eye, target);
 
-    ctx.ClearColorAndDepth(float4(0.05f, 0.10f, 0.18f, 1.0f), 1.0f);
+    ctx.Clear(ClearFlags::All, float4(0.05f, 0.10f, 0.18f, 1.0f), 1.0f);
 
     {
         PROFILE_SCOPE("Draw occluder");

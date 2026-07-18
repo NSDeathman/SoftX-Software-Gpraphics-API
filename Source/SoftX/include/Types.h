@@ -367,7 +367,7 @@ struct PipelineStateObject
         check(PipelineResource::TileSize, "tile size > 0", tileSize > 0);
 
         if (!errors.empty())
-            throw InvalidState("Missing required pipeline state: " + errors);
+            SOFTX_THROW(InvalidState("Missing required pipeline state: " + errors));
     }
 };
 
@@ -405,9 +405,22 @@ struct OcclusionPipelineState
         check(PipelineResource::Viewport, "viewport", viewport.size.x > 0 && viewport.size.y > 0);
 
         if (!errors.empty())
-            throw InvalidState("Missing required pipeline state: " + errors);
+            SOFTX_THROW(InvalidState("Missing required pipeline state: " + errors));
     }
 };
+
+// ── Clear target ───────────────────────────────────────
+enum class ClearFlags : uint32_t 
+{
+    None = 0,
+    RenderTarget = 1 << 0,
+    DepthBuffer = 1 << 1,
+    All = RenderTarget | DepthBuffer
+};
+
+constexpr ClearFlags operator|(ClearFlags a, ClearFlags b) { return static_cast<ClearFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b)); }
+constexpr ClearFlags operator&(ClearFlags a, ClearFlags b) { return static_cast<ClearFlags>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b)); }
+constexpr bool operator!(ClearFlags f) { return f == ClearFlags::None; }
 
 SOFTX_END
 /////////////////////////////////////////////////////////////////
