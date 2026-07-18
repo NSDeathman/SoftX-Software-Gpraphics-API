@@ -1,6 +1,16 @@
-﻿// Description: Unified include file for Math Library - comprehensive mathematics
-//              library for games and scientific computing with SSE optimization
-// Author: DeepSeek, NS_Deathman
+﻿/*
+ * AfterMath — high‑performance C++ math library (HLSL‑style, SSE‑accelerated)
+ *
+ * Project:   Presence AfterMath
+ * Copyright: 2026 Presence Collaboratory
+ * Authors:   NSDeathman (Architecture & Core)
+ *            DeepSeek (Mathematics & HLSL Integration)
+ *            Gemini 3 (Optimization & Fast Math)
+ *	      Nikolay Partas (Half precision data type prototype)
+ * License:   MIT License with Attribution — see LICENSE.md for details.
+ *
+ * https://github.com/Presence-Collaboratory/AfterMath-CPP-Open-Math-Library
+ */
 #pragma once
 
 #define AFTERMATH_VERSION 0.8f
@@ -30,8 +40,7 @@
 // ============================================================================
 // Advanced Types
 // ============================================================================
-//#include "math_quaternion.h"
-//#include "math_aabb.h"
+#include "math_quaternion.h"
 
 // ============================================================================
 // Vector Types

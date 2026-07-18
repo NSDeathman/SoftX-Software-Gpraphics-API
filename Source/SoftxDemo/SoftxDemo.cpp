@@ -77,7 +77,10 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
     };
 
     std::vector<VertexInput> vertices;
-    std::vector<uint>        indices;
+    std::vector<uint> indices;
+
+    vertices.reserve(6);
+    indices.reserve(36);
 
     for (const auto& face : faces)
     {
@@ -85,7 +88,7 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
         for (int idx : face.i)
             vertices.push_back({ positions[idx], face.normal, color });
 
-        // Two triangles: 0-1-2 и 2-3-0 (CCW)
+        // Two triangles: 0-1-2 and 2-3-0 (CCW)
         indices.push_back(base + 0);
         indices.push_back(base + 1);
         indices.push_back(base + 2);
@@ -283,7 +286,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    // Инициализация окна
     WNDCLASSEX wc = {};
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;

@@ -1,13 +1,26 @@
-// math_float4x4.h
-// Description: 4x4 matrix class with HLSL-like syntax and SSE optimization
-// Convention:  Row-major storage, Left-Handed coordinate system
-//              Vectors are ROW vectors: result = vec * mat
-//              Multiplication order: vec * T * R * S
-//              +Z points forward (into screen), +Y up, +X right
-//              Depth range: [0, 1] (zero-to-one, Vulkan/DirectX style)
-// Author: NSDeathman, DeepSeek
-
+/*
+ * AfterMath — high‑performance C++ math library (HLSL‑style, SSE‑accelerated)
+ *
+ * Project:   Presence AfterMath
+ * Copyright: 2026 Presence Collaboratory
+ * Authors:   NSDeathman (Architecture & Core)
+ *            DeepSeek (Mathematics & HLSL Integration)
+ *            Gemini 3 (Optimization & Fast Math)
+ *	      Nikolay Partas (Half precision data type prototype)
+ * License:   MIT License with Attribution — see LICENSE.md for details.
+ *
+ * https://github.com/Presence-Collaboratory/AfterMath-CPP-Open-Math-Library
+ */
 #pragma once
+
+/**
+ * @file math_float4x4.h
+ * @brief 4x4 floating point precision matrix class with HLSL-like syntax and SSE optimization
+ * @note Row-major storage, Left-Handed coordinate system
+ * @note Vectors are ROW vectors: result = vec * mat
+ * @note +Z points forward (into screen), +Y up, +X right
+ * @note Depth range: [0, 1] (zero-to-one, Vulkan/DirectX style)
+ */
 
 #include <cmath>
 #include <string>
@@ -314,7 +327,7 @@ inline float4x4 operator/(const float4x4& mat, float scalar) noexcept {
 
 inline float4x4 operator*(const float4x4& a, const float4x4& b) noexcept
 {
-    // Cache b's rows as __m128 � no conversion needed since float4 is a union
+    // Cache b's rows as __m128 — no conversion needed since float4 is a union
     const __m128 b0 = b.row0.simd_;
     const __m128 b1 = b.row1.simd_;
     const __m128 b2 = b.row2.simd_;
