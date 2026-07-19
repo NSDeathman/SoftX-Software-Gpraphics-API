@@ -41,8 +41,8 @@ SoftX is designed from the ground up for performance and flexibility:
 #include <SoftX/SoftX.h>
 
 // Vertex and pixel shaders (lambdas)
-auto vs = [](const VertexInput& v, ConstantBuffer, const TextureTable&) -> VertexOutput { ... };
-auto ps = [](const VertexOutput& v, ConstantBuffer, const TextureTable&) -> float4 { ... };
+auto vs = [](const Vertex& v, ConstantBuffer, const TextureTable&) -> Interpolant { ... };
+auto ps = [](const Interpolant& v, ConstantBuffer, const TextureTable&) -> float4 { ... };
 
 // Create device
 PresentParameters params = { {800,600}, hwnd, true };
