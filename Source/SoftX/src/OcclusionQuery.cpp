@@ -237,7 +237,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
         }
     }
 
-    std::vector<VertexOutput> transformedVerts(vertexCount);
+    std::vector<Interpolant> transformedVerts(vertexCount);
     for (uint32_t idx : uniqueIndices)
     {
         transformedVerts[idx] = dc.vertexShader(vbData[idx], dc.constantBuffer);
@@ -250,20 +250,20 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
         uint32_t i1 = ibData.GetByIndex(static_cast<uint>(i + 1));
         uint32_t i2 = ibData.GetByIndex(static_cast<uint>(i + 2));
 
-        VertexOutput v0 = transformedVerts[i0];
-        VertexOutput v1 = transformedVerts[i1];
-        VertexOutput v2 = transformedVerts[i2];
+        Interpolant v0 = transformedVerts[i0];
+        Interpolant v1 = transformedVerts[i1];
+        Interpolant v2 = transformedVerts[i2];
 
-        VertexOutput clipped[2][3];
+        Interpolant clipped[2][3];
         int numTris = RasterizerCommon::ClipTriangleNearPlane(v0, v1, v2, clipped);
         for (int t = 0; t < numTris; ++t)
         {
             for (int j = 0; j < 3; ++j)
                 RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], pso.viewport);
 
-            const VertexOutput& tv0 = clipped[t][0];
-            const VertexOutput& tv1 = clipped[t][1];
-            const VertexOutput& tv2 = clipped[t][2];
+            const Interpolant& tv0 = clipped[t][0];
+            const Interpolant& tv1 = clipped[t][1];
+            const Interpolant& tv2 = clipped[t][2];
 
             float minX = std::min({ tv0.Position.x, tv1.Position.x, tv2.Position.x });
             float maxX = std::max({ tv0.Position.x, tv1.Position.x, tv2.Position.x });

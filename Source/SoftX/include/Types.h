@@ -70,43 +70,43 @@ struct PresentParameters
 };
 
 // ── Geometry data ───────────────────────────────────────────
-struct VertexInput
+struct Vertex
 {
     float4 Color;
     float3 Position;
     float3 Normal;
     float2 UV;
 
-    VertexInput() : Color(0, 0, 0, 0), Position(0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
-    VertexInput(float3 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Color(col), Position(pos), Normal(norm), UV(uv) {}
+    Vertex() : Color(0, 0, 0, 0), Position(0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
+    Vertex(float3 pos, float4 col = float4(0, 0, 0, 0), float3 norm = float3(0, 0, 0), float2 uv = float2(0, 0)) : Color(col), Position(pos), Normal(norm), UV(uv) {}
 };
 
-struct VertexOutput
+struct Interpolant
 {
     float4 Position;
     float4 Color;
     float3 Normal;
     float2 UV;
 
-    VertexOutput() : Position(0, 0, 0, 0), Color(0, 0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
-    VertexOutput(float4 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Position(pos), Color(col), Normal(norm), UV(uv) {}
+    Interpolant() : Position(0, 0, 0, 0), Color(0, 0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
+    Interpolant(float4 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Position(pos), Color(col), Normal(norm), UV(uv) {}
 };
 
 // ── Buffers ──────────────────────────────────────────────────
 class VertexBuffer
 {
 public:
-    using VertexData = std::vector<VertexInput>;
+    using VertexData = std::vector<Vertex>;
 
     VertexBuffer() = default;
     explicit VertexBuffer(std::shared_ptr<const VertexData> data) : data(std::move(data)) {}
     explicit VertexBuffer(const VertexData& data) : data(std::make_shared<const VertexData>(data)) {}
-    VertexBuffer(std::initializer_list<VertexInput> list) : data(std::make_shared<const VertexData>(list)) {}
+    VertexBuffer(std::initializer_list<Vertex> list) : data(std::make_shared<const VertexData>(list)) {}
 
     SOFTX_FORCE_INLINE size_t Size() const { return data ? data->size() : 0; }
     SOFTX_FORCE_INLINE bool IsEmpty() const { return !data || data->empty(); }
 
-    SOFTX_FORCE_INLINE const VertexInput& GetByIndex(uint index) const
+    SOFTX_FORCE_INLINE const Vertex& GetByIndex(uint index) const
     {
         assert(data && index < data->size());
         return (*data)[index];
@@ -293,9 +293,9 @@ private:
 };
 
 // ── Shader types ─────────────────────────────────────────────
-using PixelShader = std::function<float4(const VertexOutput&, const ConstantBuffer&, const TextureTable&)>;
-using VertexShader = std::function<VertexOutput(const VertexInput&, const ConstantBuffer&, const TextureTable&)>;
-using GeometryShader = std::function<void(const VertexOutput[3], std::vector<VertexOutput>&, std::vector<int>&, const TextureTable&)>;
+using PixelShader = std::function<float4(const Interpolant&, const ConstantBuffer&, const TextureTable&)>;
+using VertexShader = std::function<Interpolant(const Vertex&, const ConstantBuffer&, const TextureTable&)>;
+using GeometryShader = std::function<void(const Interpolant[3], std::vector<Interpolant>&, std::vector<int>&, const TextureTable&)>;
 
 // ── Rasterizer states ────────────────────────────────────────
 enum class CullMode { None, Front, Back };
@@ -373,7 +373,7 @@ struct PipelineStateObject
 
 struct OcclusionPipelineState
 {
-    using OcclusionVertexShader = std::function<VertexOutput(const VertexInput&, const ConstantBuffer&)>;
+    using OcclusionVertexShader = std::function<Interpolant(const Vertex&, const ConstantBuffer&)>;
 
     VertexBuffer vertexBuffer;
     IndexBuffer  indexBuffer;

@@ -129,9 +129,9 @@ namespace RasterizerCommon
     //
     // where invW0/1/2 = Position.w of each vertex (set in ClipSpaceToScreenSpace),
     // and α, β, γ are barycentric coordinates in screen space.
-    inline VertexOutput Trilerp(const VertexOutput& v0, 
-                                const VertexOutput& v1, 
-                                const VertexOutput& v2, 
+    inline Interpolant Trilerp(const Interpolant& v0, 
+                                const Interpolant& v1, 
+                                const Interpolant& v2, 
                                 float alpha,
                                 float beta, 
                                 float gamma)
@@ -144,7 +144,7 @@ namespace RasterizerCommon
         float invWsum = w0 + w1 + w2;
         float wsum = (std::abs(invWsum) > 1e-10f) ? (1.0f / invWsum) : 0.0f;
 
-        VertexOutput result;
+        Interpolant result;
 
 #define PLERP(field) result.field = (w0 * v0.field + w1 * v1.field + w2 * v2.field) * wsum
         PLERP(Color);
@@ -165,7 +165,7 @@ namespace RasterizerCommon
     // Transforms vertex from clip space to screen space.
     // Stores 1/w in Position.w for perspective-correct interpolation
     // in the rasterizer (DX11 style: after rasterization Position.w == 1/w).
-    inline void ClipSpaceToScreenSpace(VertexOutput& vert, const Viewport& vp)
+    inline void ClipSpaceToScreenSpace(Interpolant& vert, const Viewport& vp)
     {
         float w = vert.Position.w;
         float invW = (std::abs(w) > 1e-10f) ? (1.0f / w) : 0.0f;
@@ -181,9 +181,9 @@ namespace RasterizerCommon
     }
 
     // Linear interpolation of two vertices in clip space
-    inline VertexOutput LerpVertexClipSpace(const VertexOutput& a, const VertexOutput& b, float t)
+    inline Interpolant LerpVertexClipSpace(const Interpolant& a, const Interpolant& b, float t)
     {
-        VertexOutput r;
+        Interpolant r;
 
 #define CSLERP(field) r.field = a.field + t * (b.field - a.field)
         CSLERP(Position);
@@ -199,12 +199,12 @@ namespace RasterizerCommon
     // Returns 0, 1 or 2 triangles in outTris[2][3].
     // Sutherland-Hodgman algorithm for a single plane.
     inline int ClipTriangleNearPlane(
-        const VertexOutput& v0,
-        const VertexOutput& v1,
-        const VertexOutput& v2,
-        VertexOutput outTris[2][3])
+        const Interpolant& v0,
+        const Interpolant& v1,
+        const Interpolant& v2,
+        Interpolant outTris[2][3])
     {
-        const VertexOutput* verts[3] = { &v0, &v1, &v2 };
+        const Interpolant* verts[3] = { &v0, &v1, &v2 };
         bool inside[3];
         int insideCount = 0;
 
@@ -219,13 +219,13 @@ namespace RasterizerCommon
             return 1;
         }
 
-        VertexOutput poly[4];
+        Interpolant poly[4];
         int polySize = 0;
 
         for (int i = 0; i < 3; ++i) {
             int j = (i + 1) % 3;
-            const VertexOutput& A = *verts[i];
-            const VertexOutput& B = *verts[j];
+            const Interpolant& A = *verts[i];
+            const Interpolant& B = *verts[j];
             bool aIn = inside[i];
             bool bIn = inside[j];
 

@@ -12,7 +12,7 @@ SOFTX_BEGIN
 static inline bool ProcessPixel(uint x, uint y,
                                 int64_t sf12, int64_t sf20, int64_t sf01,
                                 int64_t area2Int,
-                                const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2,
+                                const Interpolant& v0, const Interpolant& v1, const Interpolant& v2,
                                 DepthBuffer& depthBuffer,
                                 const RasterizerState& state,
                                 uint width)
@@ -45,9 +45,9 @@ static inline bool ProcessPixel(uint x, uint y,
     return false;
 }
 
-uint QueryRasterizerScalar::RasterizeTriangle(const VertexOutput& v0,
-                                              const VertexOutput& v1,
-                                              const VertexOutput& v2,
+uint QueryRasterizerScalar::RasterizeTriangle(const Interpolant& v0,
+                                              const Interpolant& v1,
+                                              const Interpolant& v2,
                                               const RasterizerState& state,
                                               DepthBuffer& depthBuffer,
                                               const ConstantBuffer& /*cb*/,

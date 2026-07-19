@@ -13,9 +13,9 @@ SOFTX_BEGIN
 class SOFTX_API RasterizerScalar : public IRasterizer
 {
   public:
-    void RasterizeTriangle(const VertexOutput& v0,
-                           const VertexOutput& v1,
-                           const VertexOutput& v2,
+    void RasterizeTriangle(const Interpolant& v0,
+                           const Interpolant& v1,
+                           const Interpolant& v2,
                            const RasterizerState& state,
                            DepthBuffer& depthBuffer,
                            IRenderTarget* renderTarget,

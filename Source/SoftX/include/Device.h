@@ -48,7 +48,7 @@ public:
 
     void Present();
 
-private:
+public:
     void SetupOutputConsole();
     void DestroyOutputConsole();
 
@@ -56,8 +56,6 @@ private:
     void PresentToConsole();
 
 private:
-    void SwapBuffers();
-
     std::unique_ptr<DeviceContext> immediateContext;
     std::shared_ptr<FrameBuffer> backBuffer;
     std::shared_ptr<FrameBuffer> frontBuffer;

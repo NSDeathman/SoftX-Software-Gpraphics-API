@@ -15,7 +15,7 @@ Renderer::Renderer(IRasterizer& rasterizer) : rasterizer(rasterizer)
 }
 
 void Renderer::Execute(const PipelineStateObject& pso,
-                      const std::vector<VertexOutput>& verts,
+                      const std::vector<Interpolant>& verts,
                       const std::vector<int3>& triangles)
 {
     PROFILE_SCOPE("Renderer::Execute");
@@ -62,7 +62,7 @@ void Renderer::BuildTiles()
     }
 }
 
-void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts,
+void Renderer::BinTriangles(const std::vector<Interpolant>& inputVerts,
                             const std::vector<int3>& inputTriangles)
 {
     PROFILE_SCOPE("Renderer::BinTriangles");
@@ -113,7 +113,7 @@ void Renderer::BinTriangles(const std::vector<VertexOutput>& inputVerts,
 }
 
 void Renderer::RenderTiles(const PipelineStateObject& pso,
-                           const std::vector<VertexOutput>& verts,
+                           const std::vector<Interpolant>& verts,
                            const std::vector<int3>& triangles)
 {
     PROFILE_SCOPE("Renderer::RenderTiles");

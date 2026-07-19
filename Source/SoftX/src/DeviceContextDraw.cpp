@@ -129,7 +129,7 @@ void DeviceContext::DrawIndexed()
 void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint indexCount, uint startIndex)
 {
     // Step 1: VS → clip space (without perspective divide)
-    std::vector<VertexOutput> clipVerts(state.vertexBuffer.Size());
+    std::vector<Interpolant> clipVerts(state.vertexBuffer.Size());
     {
         PROFILE_SCOPE("Vertex Shader (VS -> clip space)");
         std::vector<uint> uniqueIndices;
@@ -183,7 +183,7 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
     }
 
     // Step 3: Near plane clipping in clip space
-    std::vector<VertexOutput> finalVerts;
+    std::vector<Interpolant> finalVerts;
     std::vector<int3> finalTriangles;
     finalVerts.reserve(sourceTriangles.size() * 3);
     finalTriangles.reserve(sourceTriangles.size() * 2);
@@ -192,7 +192,7 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
         PROFILE_SCOPE("Near plane clipping in clip space");
         for (const auto& tri : sourceTriangles)
         {
-            VertexOutput clipped[2][3];
+            Interpolant clipped[2][3];
             int numTris = RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
 
             for (int t = 0; t < numTris; ++t)
@@ -220,15 +220,15 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
     if (state.geometryShader)
     {
         PROFILE_SCOPE("Geometry shader");
-        std::vector<VertexOutput> gsVerts;
+        std::vector<Interpolant> gsVerts;
         std::vector<int3> gsTriangles;
         gsVerts.reserve(finalTriangles.size() * 6);
         gsTriangles.reserve(finalTriangles.size() * 2);
 
         for (const auto& tri : finalTriangles)
         {
-            VertexOutput inVerts[3] = { finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z] };
-            std::vector<VertexOutput> outVerts;
+            Interpolant inVerts[3] = { finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z] };
+            std::vector<Interpolant> outVerts;
             std::vector<int> outIndices;
             state.geometryShader(inVerts, outVerts, outIndices, state.textureTable);
 
@@ -377,7 +377,7 @@ void DeviceContext::DrawFullScreenQuad()
                     for (; x + 3 <= endX; x += 4, u += 4.0f * invW) {
                         uint32_t packed[4];
                         for (int i = 0; i < 4; ++i) {
-                            VertexOutput input;
+                            Interpolant input;
                             input.UV = float2(u + i * invW, v);
                             packed[i] = FrameBuffer::PackColor(ps(input, cb, tt));
                         }
@@ -385,7 +385,7 @@ void DeviceContext::DrawFullScreenQuad()
                     }
 
                     for (; x <= endX; ++x, u += invW) {
-                        VertexOutput input;
+                        Interpolant input;
                         input.UV = float2(u, v);
                         row[x] = FrameBuffer::PackColor(ps(input, cb, tt));
                     }
@@ -415,7 +415,7 @@ void DeviceContext::DrawFullScreenQuad()
 
                     for (; x + 3 <= endX; x += 4, u += 4.0f * invW) {
                         for (int i = 0; i < 4; ++i) {
-                            VertexOutput input;
+                            Interpolant input;
                             input.UV = float2(u + i * invW, v);
                             float4 c = ps(input, cb, tt);
                             _mm_store_ps((float*)(row + x + i), _mm_set_ps(c.w, c.z, c.y, c.x));
@@ -423,7 +423,7 @@ void DeviceContext::DrawFullScreenQuad()
                     }
 
                     for (; x <= endX; ++x, u += invW) {
-                        VertexOutput input;
+                        Interpolant input;
                         input.UV = float2(u, v);
                         float4 c = ps(input, cb, tt);
                         _mm_store_ps((float*)(row + x), _mm_set_ps(c.w, c.z, c.y, c.x));
@@ -450,7 +450,7 @@ void DeviceContext::DrawFullScreenQuad()
                 for (uint y = startY; y <= endY; ++y, v += invH) {
                     float u = startX * invW;
                     for (uint x = startX; x <= endX; ++x, u += invW) {
-                        VertexOutput input;
+                        Interpolant input;
                         input.UV = float2(u, v);
                         rt->SetPixel(uint2(x, y), ps(input, cb, tt));
                     }

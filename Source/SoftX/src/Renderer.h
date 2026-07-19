@@ -15,16 +15,16 @@ class Renderer
 public:
     Renderer(IRasterizer& rasterizer);
 
-    void Execute(const PipelineStateObject& pso, const std::vector<VertexOutput>& verts, const std::vector<int3>& triangles);
+    void Execute(const PipelineStateObject& pso, const std::vector<Interpolant>& verts, const std::vector<int3>& triangles);
 
     const std::vector<Tile>& GetTiles() const { return tiles; }
 
 private:
     void BuildTiles();
-    void BinTriangles(const std::vector<VertexOutput>& verts, 
+    void BinTriangles(const std::vector<Interpolant>& verts, 
                       const std::vector<int3>& triangles);
     void RenderTiles(const PipelineStateObject& pso,
-                     const std::vector<VertexOutput>& verts,
+                     const std::vector<Interpolant>& verts,
                      const std::vector<int3>& triangles);
 
     IRasterizer& rasterizer;

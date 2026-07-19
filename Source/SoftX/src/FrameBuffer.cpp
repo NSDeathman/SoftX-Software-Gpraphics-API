@@ -13,6 +13,7 @@ SOFTX_BEGIN
 // https://github.com/ArtemOnigiri/Console3D/blob/main/ConsoleRayTracing.cpp
 void FrameBuffer::PresentASCII(HANDLE hConsole, uint2 consoleSize)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     PROFILE_SCOPE("FrameBuffer::PresentASCII");
 
     if (!hConsole || consoleSize.x == 0 || consoleSize.y == 0)
@@ -103,6 +104,7 @@ void FrameBuffer::PresentASCII(HANDLE hConsole, uint2 consoleSize)
 
 void FrameBuffer::PresentBitmap(HDC hdc, int2 dstPos, int2 dstSize)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     PROFILE_SCOPE("FrameBuffer::PresentBitmap");
 
     int dstW = (dstSize.x == -1) ? (int)resolution.x : dstSize.x;
@@ -127,8 +129,9 @@ void FrameBuffer::PresentBitmap(HDC hdc, int2 dstPos, int2 dstSize)
         DIB_RGB_COLORS);
 }
 
-bool FrameBuffer::SaveTGA(const char* filename) const
+bool FrameBuffer::SaveTGA(const char* filename)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     std::ofstream file(filename, std::ios::binary);
     if (!file)
         return false;
