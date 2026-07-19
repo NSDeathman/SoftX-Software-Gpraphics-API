@@ -52,11 +52,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     DeviceContext& ctx = device.GetImmediateContext();
 
     VertexBuffer vb;
+    vb.Reserve(3);
     vb.Add(Vertex(float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f)));
     vb.Add(Vertex(float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f)));
     vb.Add(Vertex(float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f)));
 
     IndexBuffer ib;
+    ib.Reserve(3);
     ib.Add(0);
     ib.Add(1);
     ib.Add(2);
