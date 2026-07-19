@@ -90,6 +90,7 @@ struct Interpolant
     Interpolant() : Position(0, 0, 0, 0), Color(0, 0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
     Interpolant(float4 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Position(pos), Color(col), Normal(norm), UV(uv) {}
 };
+using VertexOutput = Interpolant;
 
 // ── Buffers ──────────────────────────────────────────────────
 class VertexBuffer
@@ -98,9 +99,9 @@ public:
     using VertexData = std::vector<Vertex>;
 
     VertexBuffer() = default;
-    explicit VertexBuffer(std::shared_ptr<const VertexData> data) : data(std::move(data)) {}
-    explicit VertexBuffer(const VertexData& data) : data(std::make_shared<const VertexData>(data)) {}
-    VertexBuffer(std::initializer_list<Vertex> list) : data(std::make_shared<const VertexData>(list)) {}
+    explicit VertexBuffer(std::shared_ptr<VertexData> data) : data(std::move(data)) {}
+    explicit VertexBuffer(const VertexData& data) : data(std::make_shared<VertexData>(data)) {}
+    VertexBuffer(std::initializer_list<Vertex> list) : data(std::make_shared<VertexData>(list)) {}
 
     SOFTX_FORCE_INLINE size_t Size() const { return data ? data->size() : 0; }
     SOFTX_FORCE_INLINE bool IsEmpty() const { return !data || data->empty(); }
@@ -111,11 +112,44 @@ public:
         return (*data)[index];
     }
 
+    void Add(const Vertex& vertex)
+    {
+        PrepareWrite();
+        data->push_back(vertex);
+    }
+
+    void Add(Vertex&& vertex)
+    {
+        PrepareWrite();
+        data->emplace_back(std::move(vertex));
+    }
+
+    template <typename... Args>
+    void EmplaceBack(Args&&... args)
+    {
+        PrepareWrite();
+        data->emplace_back(std::forward<Args>(args)...);
+    }
+
+    void Reserve(size_t capacity)
+    {
+        PrepareWrite();
+        data->reserve(capacity);
+    }
+
     SOFTX_FORCE_INLINE const VertexData* operator->() const { return data.get(); }
     SOFTX_FORCE_INLINE const VertexData& operator*() const { return *data; }
 
 private:
-    std::shared_ptr<const VertexData> data;
+    void PrepareWrite()
+    {
+        if (!data) 
+            data = std::make_shared<VertexData>();
+        else if (data.use_count() > 1) 
+            data = std::make_shared<VertexData>(*data);
+    }
+
+    std::shared_ptr<VertexData> data;
 };
 
 class IndexBuffer
@@ -124,9 +158,9 @@ public:
     using IndexData = std::vector<uint>;
 
     IndexBuffer() = default;
-    explicit IndexBuffer(std::shared_ptr<const IndexData> data) : data(std::move(data)) {}
-    explicit IndexBuffer(const IndexData& data) : data(std::make_shared<const IndexData>(data)) {}
-    IndexBuffer(std::initializer_list<uint> list) : data(std::make_shared<const IndexData>(list)) {}
+    explicit IndexBuffer(std::shared_ptr<IndexData> data) : data(std::move(data)) {}
+    explicit IndexBuffer(const IndexData& data) : data(std::make_shared<IndexData>(data)) {}
+    IndexBuffer(std::initializer_list<uint> list) : data(std::make_shared<IndexData>(list)) {}
 
     SOFTX_FORCE_INLINE size_t Size() const { return data ? data->size() : 0; }
     SOFTX_FORCE_INLINE bool IsEmpty() const { return !data || data->empty(); }
@@ -137,8 +171,34 @@ public:
         return (*data)[index];
     }
 
+    void Add(uint index)
+    {
+        PrepareWrite();
+        data->push_back(index);
+    }
+
+    void Add(std::initializer_list<uint> indices)
+    {
+        PrepareWrite();
+        data->insert(data->end(), indices);
+    }
+
+    void Reserve(size_t capacity)
+    {
+        PrepareWrite();
+        data->reserve(capacity);
+    }
+
 private:
-    std::shared_ptr<const IndexData> data;
+    void PrepareWrite()
+    {
+        if (!data)
+            data = std::make_shared<IndexData>();
+        else if (data.use_count() > 1)
+            data = std::make_shared<IndexData>(*data);
+    }
+
+    std::shared_ptr<IndexData> data;
 };
 
 class ConstantBuffer
@@ -148,10 +208,9 @@ public:
 
     ConstantBuffer() = default;
     explicit ConstantBuffer(std::shared_ptr<const CBufferData> data) : data(std::move(data)) {}
-    ConstantBuffer(const void* srcData, size_t size)
-        : data(std::make_shared<const CBufferData>(
-            static_cast<const char*>(srcData),
-            static_cast<const char*>(srcData) + size))
+    ConstantBuffer(const void* srcData, size_t size) : data(std::make_shared<const CBufferData>(
+                                                            static_cast<const char*>(srcData),
+                                                            static_cast<const char*>(srcData) + size))
     {}
 
     SOFTX_FORCE_INLINE size_t Size() const { return data ? data->size() : 0; }

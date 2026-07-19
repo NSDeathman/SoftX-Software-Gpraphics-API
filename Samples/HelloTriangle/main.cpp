@@ -51,17 +51,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     Device device(params);
     DeviceContext& ctx = device.GetImmediateContext();
 
-    std::vector<Vertex> vertices;
-    vertices.push_back({ float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f) });
-    vertices.push_back({ float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f) });
-    vertices.push_back({ float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f) });
-    VertexBuffer vb = VertexBuffer(std::move(vertices));
+    VertexBuffer vb;
+    vb.Add(Vertex(float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f)));
+    vb.Add(Vertex(float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f)));
+    vb.Add(Vertex(float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f)));
 
-    std::vector<uint> indices;
-    indices.push_back(0);
-    indices.push_back(1);
-    indices.push_back(2);
-    IndexBuffer ib = IndexBuffer(std::move(indices));
+    IndexBuffer ib;
+    ib.Add(0);
+    ib.Add(1);
+    ib.Add(2);
 
     auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
     {
