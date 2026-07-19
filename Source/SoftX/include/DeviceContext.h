@@ -77,8 +77,12 @@ public:
     void ClearDepth(float depth = 1.0f) { Clear(ClearFlags::DepthBuffer, {}, depth); }
     void ClearColorAndDepth(const float4& color, float depth = 1.0f) { Clear(ClearFlags::RenderTarget | ClearFlags::DepthBuffer, color, depth); }
 
+    void Draw(uint vertexCount, uint startVertex);
+    void Draw();
+
     void DrawIndexed(uint indexCount, uint startIndex);
     void DrawIndexed();
+
     void DrawFullScreenQuad();
 
 private:
@@ -87,6 +91,12 @@ private:
     void DrawDebugLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, const float4& color);
     void DrawTileBorders(const PipelineStateObject& state);
     void DrawActiveTileBorders(const PipelineStateObject& state, const std::vector<Tile>& tiles);
+    std::vector<Interpolant> ProcessIndexedVertices(const PipelineStateObject& state, uint indexCount, uint startIndex, uint totalVertices);
+    std::vector<int3> GatherIndexedTriangles(const PipelineStateObject& state, uint indexCount, uint startIndex);
+    std::vector<Interpolant> ProcessNonIndexedVertices(const PipelineStateObject& state, uint vertexCount, uint startVertex);
+    std::vector<int3> GatherNonIndexedTriangles(uint vertexCount);
+    void ClipAndRasterize(const PipelineStateObject& state, std::vector<Interpolant>& clipVerts, const std::vector<int3>& sourceTriangles);
+    void DrawImpl(const PipelineStateObject& state, uint vertexCount, uint startVertex);
     void DrawIndexedImpl(const PipelineStateObject& state, uint indexCount, uint startIndex);
 
     void CommitState();

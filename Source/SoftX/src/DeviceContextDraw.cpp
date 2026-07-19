@@ -90,6 +90,271 @@ void DeviceContext::DrawLine(const PipelineStateObject& state, int x0, int y0, i
     }
 }
 
+std::vector<Interpolant> DeviceContext::ProcessIndexedVertices(const PipelineStateObject& state,
+                                                               uint indexCount, 
+                                                               uint startIndex,
+                                                               uint totalVertices)
+{
+    PROFILE_SCOPE("Vertex Shader (indexed)");
+    std::vector<Interpolant> clipVerts(totalVertices);
+
+    std::vector<uint> uniqueIndices;
+    {
+        std::vector<bool> visited(totalVertices, false);
+        for (uint i = startIndex; i < startIndex + indexCount; ++i)
+        {
+            uint idx = state.indexBuffer.GetByIndex(i);
+            if (!visited[idx])
+            {
+                visited[idx] = true;
+                uniqueIndices.push_back(idx);
+            }
+        }
+    }
+
+    const size_t totalUnique = uniqueIndices.size();
+    ParallelFor(size_t(0), totalUnique, size_t(1),
+        [&](size_t i)
+        {
+            uint idx = uniqueIndices[i];
+            clipVerts[idx] = state.vertexShader(
+                state.vertexBuffer.GetByIndex(idx),
+                state.constantBuffer,
+                state.textureTable);
+        });
+
+    return clipVerts;
+}
+
+std::vector<int3> DeviceContext::GatherIndexedTriangles(const PipelineStateObject& state,
+                                                        uint indexCount, 
+                                                        uint startIndex)
+{
+    PROFILE_SCOPE("Gather indexed triangles");
+    const uint triangleCount = indexCount / 3;
+    std::vector<int3> triangles;
+    triangles.reserve(triangleCount);
+
+    for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
+    {
+        triangles.emplace_back(
+            static_cast<int>(state.indexBuffer.GetByIndex(i)),
+            static_cast<int>(state.indexBuffer.GetByIndex(i + 1)),
+            static_cast<int>(state.indexBuffer.GetByIndex(i + 2))
+        );
+    }
+    return triangles;
+}
+
+std::vector<Interpolant> DeviceContext::ProcessNonIndexedVertices(const PipelineStateObject& state,
+                                                                  uint vertexCount, 
+                                                                  uint startVertex)
+{
+    PROFILE_SCOPE("Vertex Shader (non-indexed)");
+    std::vector<Interpolant> clipVerts(vertexCount);
+
+    ParallelFor(uint(0), vertexCount, uint(1),
+        [&](uint i)
+        {
+            uint idx = startVertex + i;
+            clipVerts[i] = state.vertexShader(
+                state.vertexBuffer.GetByIndex(idx),
+                state.constantBuffer,
+                state.textureTable);
+        });
+
+    return clipVerts;
+}
+
+std::vector<int3> DeviceContext::GatherNonIndexedTriangles(uint vertexCount)
+{
+    const uint triangleCount = vertexCount / 3;
+    std::vector<int3> triangles;
+    triangles.reserve(triangleCount);
+    for (uint i = 0; i + 2 < vertexCount; i += 3)
+        triangles.emplace_back(i, i + 1, i + 2);
+    return triangles;
+}
+
+void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
+                                     std::vector<Interpolant>& clipVerts,
+                                     const std::vector<int3>& sourceTriangles)
+{
+    // Step 3: Near plane clipping
+    std::vector<Interpolant> finalVerts;
+    std::vector<int3> finalTriangles;
+    finalVerts.reserve(sourceTriangles.size() * 3);
+    finalTriangles.reserve(sourceTriangles.size() * 2);
+
+    {
+        PROFILE_SCOPE("Near plane clipping");
+        for (const auto& tri : sourceTriangles)
+        {
+            Interpolant clipped[2][3];
+            int numTris = RasterizerCommon::ClipTriangleNearPlane(
+                clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
+
+            for (int t = 0; t < numTris; ++t)
+            {
+                int base = static_cast<int>(finalVerts.size());
+                finalVerts.push_back(clipped[t][0]);
+                finalVerts.push_back(clipped[t][1]);
+                finalVerts.push_back(clipped[t][2]);
+                finalTriangles.emplace_back(base, base + 1, base + 2);
+            }
+        }
+    }
+
+    if (finalTriangles.empty())
+        return;
+
+    // Step 4: Perspective divide
+    {
+        PROFILE_SCOPE("Perspective divide");
+        for (auto& v : finalVerts)
+            RasterizerCommon::ClipSpaceToScreenSpace(v, state.viewport);
+    }
+
+    // Step 5: Geometry shader (опционально)
+    if (state.geometryShader)
+    {
+        PROFILE_SCOPE("Geometry shader");
+        std::vector<Interpolant> gsVerts;
+        std::vector<int3> gsTriangles;
+        gsVerts.reserve(finalTriangles.size() * 6);
+        gsTriangles.reserve(finalTriangles.size() * 2);
+
+        for (const auto& tri : finalTriangles)
+        {
+            Interpolant inVerts[3] = { finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z] };
+            std::vector<Interpolant> outVerts;
+            std::vector<int> outIndices;
+            state.geometryShader(inVerts, outVerts, outIndices, state.textureTable);
+
+            int base = static_cast<int>(gsVerts.size());
+            gsVerts.insert(gsVerts.end(), outVerts.begin(), outVerts.end());
+            for (size_t j = 0; j + 2 < outIndices.size(); j += 3)
+                gsTriangles.emplace_back(base + outIndices[j], base + outIndices[j + 1], base + outIndices[j + 2]);
+        }
+        finalVerts = std::move(gsVerts);
+        finalTriangles = std::move(gsTriangles);
+    }
+
+    // Step 6: Rasterization
+    if (state.fillMode == FillMode::Solid)
+    {
+        PROFILE_SCOPE("Render Solid");
+        Renderer renderer(*rasterizer);
+        renderer.Execute(state, finalVerts, finalTriangles);
+#ifdef DEBUG_TILING
+        DrawActiveTileBorders(state, renderer.GetTiles());
+#endif
+    }
+    else if (state.fillMode == FillMode::Wireframe)
+    {
+        PROFILE_SCOPE("Render Wireframe");
+        if (!state.renderTarget) return;
+        float4 wireColor(1, 1, 1, 1);
+        for (const auto& tri : finalTriangles)
+        {
+            const auto& v0 = finalVerts[tri.x];
+            const auto& v1 = finalVerts[tri.y];
+            const auto& v2 = finalVerts[tri.z];
+            DrawLine(state, 
+                     (int)round(v0.Position.x), 
+                     (int)round(v0.Position.y),
+                     (int)round(v1.Position.x), 
+                     (int)round(v1.Position.y),
+                     v0.Position.z, 
+                     v1.Position.z, 
+                     wireColor);
+            DrawLine(state, 
+                     (int)round(v1.Position.x), 
+                     (int)round(v1.Position.y),
+                     (int)round(v2.Position.x), 
+                     (int)round(v2.Position.y),
+                     v1.Position.z, 
+                     v2.Position.z, 
+                     wireColor);
+            DrawLine(state, 
+                     (int)round(v2.Position.x), 
+                     (int)round(v2.Position.y),
+                     (int)round(v0.Position.x), 
+                     (int)round(v0.Position.y),
+                     v2.Position.z, 
+                     v0.Position.z, 
+                     wireColor);
+        }
+    }
+    else if (state.fillMode == FillMode::Point)
+    {
+        PROFILE_SCOPE("Render Point");
+        if (!state.renderTarget) return;
+        std::vector<bool> drawn(finalVerts.size(), false);
+        for (const auto& tri : finalTriangles)
+        {
+            for (int idx : {tri.x, tri.y, tri.z})
+            {
+                if (!drawn[idx])
+                {
+                    drawn[idx] = true;
+                    const auto& v = finalVerts[idx];
+                    DrawPoint(state, (int)round(v.Position.x), (int)round(v.Position.y),
+                        v.Position.z, v.Color);
+                }
+            }
+        }
+    }
+}
+
+void DeviceContext::Draw(uint vertexCount, uint startVertex)
+{
+    std::lock_guard<std::mutex> lock(drawMutex);
+    PROFILE_SCOPE("DeviceContext::Draw (non-indexed)");
+
+    CommitState();
+    PipelineStateObject state = frontState;
+
+    state.Validate(PipelineResource::VertexShader |
+                   PipelineResource::VertexBuffer |
+                   PipelineResource::DepthBuffer |
+                   PipelineResource::Viewport |
+                   PipelineResource::TileSize);
+
+    if (vertexCount == 0 || startVertex + vertexCount > state.vertexBuffer.Size())
+        SOFTX_THROW(InvalidArgument("Draw: vertexCount out of range"));
+
+    DrawImpl(state, vertexCount, startVertex);
+}
+
+void DeviceContext::Draw()
+{
+    std::lock_guard<std::mutex> lock(drawMutex);
+    PROFILE_SCOPE("DeviceContext::Draw (all vertices)");
+
+    CommitState();
+    PipelineStateObject state = frontState;
+
+    state.Validate(PipelineResource::VertexShader |
+                   PipelineResource::VertexBuffer |
+                   PipelineResource::DepthBuffer |
+                   PipelineResource::Viewport |
+                   PipelineResource::TileSize);
+
+    uint count = static_cast<uint>(state.vertexBuffer.Size());
+    if (count == 0)
+        SOFTX_THROW(InvalidState("Draw: vertex buffer is empty"));
+
+    DrawImpl(state, count, 0);
+}
+
+void DeviceContext::DrawImpl(const PipelineStateObject& state, uint vertexCount, uint startVertex)
+{
+    auto clipVerts = ProcessNonIndexedVertices(state, vertexCount, startVertex);
+    auto triangles = GatherNonIndexedTriangles(vertexCount);
+    ClipAndRasterize(state, clipVerts, triangles);
+}
+
 void DeviceContext::DrawIndexed(uint indexCount, uint startIndex)
 {
     std::lock_guard<std::mutex> lock(drawMutex);
@@ -129,182 +394,10 @@ void DeviceContext::DrawIndexed()
 
 void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint indexCount, uint startIndex)
 {
-    // Step 1: VS → clip space (without perspective divide)
-    std::vector<Interpolant> clipVerts(state.vertexBuffer.Size());
-    {
-        PROFILE_SCOPE("Vertex Shader (VS -> clip space)");
-        std::vector<uint> uniqueIndices;
-        {
-            std::vector<bool> visited(state.vertexBuffer.Size(), false);
-            for (uint i = startIndex; i < startIndex + indexCount; ++i)
-            {
-                uint idx = state.indexBuffer.GetByIndex(i);
-                if (!visited[idx])
-                {
-                    visited[idx] = true;
-                    uniqueIndices.push_back(idx);
-                }
-            }
-        }
-
-        const size_t totalUnique = uniqueIndices.size();
-        ParallelFor(size_t(0), totalUnique, size_t(1),
-            [&](size_t i)
-            {
-                uint idx = uniqueIndices[i];
-                clipVerts[idx] = state.vertexShader(
-                    state.vertexBuffer.GetByIndex(idx),
-                    state.constantBuffer,
-                    state.textureTable);
-            });
-    }
-
-    // Step 2: Gather source triangles
-    std::vector<int3> sourceTriangles;
-    {
-        PROFILE_SCOPE("Gather source triangles");
-        const uint triangleCount = indexCount / 3;
-        sourceTriangles.reserve(triangleCount);
-        for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
-        {
-            sourceTriangles.emplace_back(
-                static_cast<int>(state.indexBuffer.GetByIndex(i)),
-                static_cast<int>(state.indexBuffer.GetByIndex(i + 1)),
-                static_cast<int>(state.indexBuffer.GetByIndex(i + 2))
-            );
-        }
-    }
-
-    // Step 3: Near plane clipping in clip space
-    std::vector<Interpolant> finalVerts;
-    std::vector<int3> finalTriangles;
-    finalVerts.reserve(sourceTriangles.size() * 3);
-    finalTriangles.reserve(sourceTriangles.size() * 2);
-
-    {
-        PROFILE_SCOPE("Near plane clipping in clip space");
-        for (const auto& tri : sourceTriangles)
-        {
-            Interpolant clipped[2][3];
-            int numTris = RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
-
-            for (int t = 0; t < numTris; ++t)
-            {
-                int base = (int)finalVerts.size();
-                finalVerts.push_back(clipped[t][0]);
-                finalVerts.push_back(clipped[t][1]);
-                finalVerts.push_back(clipped[t][2]);
-                finalTriangles.emplace_back(base, base + 1, base + 2);
-            }
-        }
-    }
-
-    if (finalTriangles.empty())
-        return;
-
-    // Step 4: Perspective divide on surviving vertices
-    {
-        PROFILE_SCOPE("Perspective divide on surviving vertices");
-        for (auto& v : finalVerts)
-            RasterizerCommon::ClipSpaceToScreenSpace(v, state.viewport);
-    }
-
-    // Step 5: Geometry shader (on screen-space vertices)
-    if (state.geometryShader)
-    {
-        PROFILE_SCOPE("Geometry shader");
-        std::vector<Interpolant> gsVerts;
-        std::vector<int3> gsTriangles;
-        gsVerts.reserve(finalTriangles.size() * 6);
-        gsTriangles.reserve(finalTriangles.size() * 2);
-
-        for (const auto& tri : finalTriangles)
-        {
-            Interpolant inVerts[3] = { finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z] };
-            std::vector<Interpolant> outVerts;
-            std::vector<int> outIndices;
-            state.geometryShader(inVerts, outVerts, outIndices, state.textureTable);
-
-            int base = static_cast<int>(gsVerts.size());
-            gsVerts.insert(gsVerts.end(), outVerts.begin(), outVerts.end());
-            for (size_t j = 0; j + 2 < outIndices.size(); j += 3)
-                gsTriangles.emplace_back(base + outIndices[j], base + outIndices[j + 1], base + outIndices[j + 2]);
-        }
-        finalVerts = std::move(gsVerts);
-        finalTriangles = std::move(gsTriangles);
-    }
-
-    // Step 6: Render
-    if (state.fillMode == FillMode::Solid)
-    {
-        PROFILE_SCOPE("Render Solid");
-
-        Renderer renderer(*rasterizer);
-        renderer.Execute(state, finalVerts, finalTriangles);
-
-#ifdef DEBUG_TILING
-        DrawActiveTileBorders(state, renderer.GetTiles());
-#endif
-    }
-    else if (state.fillMode == FillMode::Wireframe)
-    {
-        PROFILE_SCOPE("Render Wireframe");
-
-        if (state.renderTarget == nullptr)
-            return;
-
-        float4 wireColor(1, 1, 1, 1);
-        for (const auto& tri : finalTriangles)
-        {
-            const auto& v0 = finalVerts[tri.x];
-            const auto& v1 = finalVerts[tri.y];
-            const auto& v2 = finalVerts[tri.z];
-            DrawLine(state,
-                     (int)round(v0.Position.x),
-                     (int)round(v0.Position.y),
-                     (int)round(v1.Position.x),
-                     (int)round(v1.Position.y),
-                     v0.Position.z,
-                     v1.Position.z,
-                     wireColor);
-            DrawLine(state,
-                     (int)round(v1.Position.x),
-                     (int)round(v1.Position.y),
-                     (int)round(v2.Position.x),
-                     (int)round(v2.Position.y),
-                     v1.Position.z, v2.Position.z,
-                     wireColor);
-            DrawLine(state,
-                     (int)round(v2.Position.x),
-                     (int)round(v2.Position.y),
-                     (int)round(v0.Position.x),
-                     (int)round(v0.Position.y),
-                     v2.Position.z,
-                     v0.Position.z,
-                     wireColor);
-        }
-    }
-    else if (state.fillMode == FillMode::Point)
-    {
-        PROFILE_SCOPE("Render Point");
-
-        if (state.renderTarget == nullptr)
-            return;
-
-        std::vector<bool> drawn(finalVerts.size(), false);
-        for (const auto& tri : finalTriangles)
-        {
-            for (int idx : {tri.x, tri.y, tri.z})
-            {
-                if (!drawn[idx])
-                {
-                    drawn[idx] = true;
-                    const auto& v = finalVerts[idx];
-                    DrawPoint(state, (int)round(v.Position.x), (int)round(v.Position.y), v.Position.z, v.Color);
-                }
-            }
-        }
-    }
+    uint totalVertices = static_cast<uint>(state.vertexBuffer.Size());
+    auto clipVerts = ProcessIndexedVertices(state, indexCount, startIndex, totalVertices);
+    auto triangles = GatherIndexedTriangles(state, indexCount, startIndex);
+    ClipAndRasterize(state, clipVerts, triangles);
 }
 
 void DeviceContext::DrawFullScreenQuad()

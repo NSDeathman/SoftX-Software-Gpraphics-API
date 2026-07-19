@@ -91,10 +91,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     vb.Add(Vertex(float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f)));
     vb.Add(Vertex(float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f)));
 
-    IndexBuffer ib;
-    ib.Reserve(3);
-    ib.AddTri(0, 1, 2);
-
     auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
     {
         Interpolant Output;
@@ -113,7 +109,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetDepthFunc(ComparisonFunc::Less);
     ctx.SetFillMode(FillMode::Solid);
     ctx.SetVertexBuffer(vb);
-    ctx.SetIndexBuffer(ib);
     ctx.SetVertexShader(vs);
     ctx.SetPixelShader(ps);
     ctx.SetTileSize(64);
@@ -127,7 +122,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
             DispatchMessage(&msg);
         }
         ctx.Clear(ClearFlags::All, float4(0.10f, 0.05f, 0.12f, 1.0f), 1.0f);
-        ctx.DrawIndexed();
+        ctx.Draw();
         g_device->Present();
     }
 
