@@ -87,9 +87,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
     VertexBuffer vb;
     vb.Reserve(3);
-    vb.Add(Vertex(float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f)));
-    vb.Add(Vertex(float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f)));
-    vb.Add(Vertex(float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f)));
+    vb.Add(float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f));
+    vb.Add(float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f));
+    vb.Add(float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f));
 
     auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
     {

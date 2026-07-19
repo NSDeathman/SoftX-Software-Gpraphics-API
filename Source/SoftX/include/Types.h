@@ -125,7 +125,7 @@ public:
     }
 
     template <typename... Args>
-    void EmplaceBack(Args&&... args)
+    void Add(Args&&... args)
     {
         PrepareWrite();
         data->emplace_back(std::forward<Args>(args)...);
