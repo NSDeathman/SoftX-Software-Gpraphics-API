@@ -93,9 +93,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
     IndexBuffer ib;
     ib.Reserve(3);
-    ib.Add(0);
-    ib.Add(1);
-    ib.Add(2);
+    ib.AddTri(0, 1, 2);
 
     auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
     {

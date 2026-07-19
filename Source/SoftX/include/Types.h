@@ -183,6 +183,14 @@ public:
         data->insert(data->end(), indices);
     }
 
+    void AddTri(uint index0, uint index1, uint index2)
+    {
+        PrepareWrite();
+        data->push_back(index0);
+        data->push_back(index1);
+        data->push_back(index2);
+    }
+
     void Reserve(size_t capacity)
     {
         PrepareWrite();
