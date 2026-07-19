@@ -18,6 +18,7 @@ ipch/
 XRay.code-workspace
 
 # Build results
+bin/
 obj/
 intermediate/
 libraries/
