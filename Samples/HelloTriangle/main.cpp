@@ -1,19 +1,52 @@
+/////////////////////////////////////////////////////////////////
+// SoftX - Software Graphics API
+// Copyright (c) 2026 NSDeathman
+// Licensed under the MIT License.
+/////////////////////////////////////////////////////////////////
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 #include <SoftX.h>
 #include <AfterMath.h>
-
+/////////////////////////////////////////////////////////////////
 using namespace SoftX;
 using namespace AfterMath;
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
+/////////////////////////////////////////////////////////////////
+Device* g_device = nullptr;
+/////////////////////////////////////////////////////////////////
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    switch (msg) 
+    switch (msg)
     {
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
+
     case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) DestroyWindow(hWnd);
+        if (wParam == VK_ESCAPE)
+            DestroyWindow(hWnd);
         return 0;
+
+    case WM_SIZE:
+    {
+        if (g_device && wParam != SIZE_MINIMIZED)
+        {
+            int newWidth = LOWORD(lParam);
+            int newHeight = HIWORD(lParam);
+
+            if (newWidth > 0 && newHeight > 0)
+            {
+                PresentParameters newParams = g_device->GetPresentParams();
+                newParams.BackBufferSize = uint2(newWidth, newHeight);
+                g_device->Reset(newParams);
+
+                DeviceContext& ctx = g_device->GetImmediateContext();
+                ctx.SetViewport(Viewport(0.0f, 0.0f, newWidth, newHeight, 0.0f, 1.0f));
+            }
+        }
+        return 0;
+    }
     }
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
@@ -49,7 +82,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     params.Windowed = true;
 
     Device device(params);
-    DeviceContext& ctx = device.GetImmediateContext();
+    g_device = &device;
+    DeviceContext& ctx = g_device->GetImmediateContext();
 
     VertexBuffer vb;
     vb.Reserve(3);
@@ -96,8 +130,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         }
         ctx.Clear(ClearFlags::All, float4(0.10f, 0.05f, 0.12f, 1.0f), 1.0f);
         ctx.DrawIndexed();
-        device.Present();
+        g_device->Present();
     }
 
 	return 0;
 }
+/////////////////////////////////////////////////////////////////

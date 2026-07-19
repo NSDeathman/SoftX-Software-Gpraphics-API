@@ -1,4 +1,9 @@
-﻿#define WIN32_LEAN_AND_MEAN
+﻿/////////////////////////////////////////////////////////////////
+// SoftX - Software Graphics API
+// Copyright (c) 2026 NSDeathman
+// Licensed under the MIT License.
+/////////////////////////////////////////////////////////////////
+#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 #include <memory>
@@ -7,17 +12,17 @@
 #include <ctime>
 
 #include <SoftX.h>
-
+/////////////////////////////////////////////////////////////////
 using namespace SoftX;
 using namespace AfterMath;
-
+/////////////////////////////////////////////////////////////////
 static constexpr int WINDOW_WIDTH = 1280;
 static constexpr int WINDOW_HEIGHT = 768;
 static constexpr int CUBE_COUNT = 100;
-
+/////////////////////////////////////////////////////////////////
 static HWND g_hWnd = nullptr;
 static Device* g_device = nullptr;
-
+/////////////////////////////////////////////////////////////////
 struct Mesh
 {
     VertexBuffer           vb;
@@ -272,14 +277,38 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
     g_device->Present();
 }
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
+
     case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) DestroyWindow(hWnd);
+        if (wParam == VK_ESCAPE)
+            DestroyWindow(hWnd);
         return 0;
+
+    case WM_SIZE:
+    {
+        if (g_device && wParam != SIZE_MINIMIZED)
+        {
+            int newWidth = LOWORD(lParam);
+            int newHeight = HIWORD(lParam);
+
+            if (newWidth > 0 && newHeight > 0)
+            {
+                PresentParameters newParams = g_device->GetPresentParams();
+                newParams.BackBufferSize = uint2(newWidth, newHeight);
+                g_device->Reset(newParams);
+
+                DeviceContext& ctx = g_device->GetImmediateContext();
+                ctx.SetViewport(Viewport(0.0f, 0.0f, newWidth, newHeight, 0.0f, 1.0f));
+            }
+        }
+        return 0;
+    }
     }
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
@@ -359,3 +388,4 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
     return int(msg.wParam);
 }
+/////////////////////////////////////////////////////////////////
