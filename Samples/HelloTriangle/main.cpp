@@ -32,7 +32,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     wc.lpszClassName = "Hello Triangle";
     RegisterClassEx(&wc);
 
-    RECT rc = { 0, 0, windowSize.x, windowSize.y };
+    RECT rc = { 0, 0, (LONG)windowSize.x, (LONG)windowSize.y };
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
     HWND Wnd = CreateWindowEx(0, "Hello Triangle", "SoftX Triangle Demo",
                               WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
