@@ -20,7 +20,7 @@ class OcclusionQuery
 {
 public:
     using queryID = uint;
-    using OcclusionVertexShader = std::function<VertexOutput(const VertexInput&, const ConstantBuffer&)>;
+    using OcclusionVertexShader = std::function<Interpolant(const Vertex&, const ConstantBuffer&)>;
 
     OcclusionQuery();
     ~OcclusionQuery();

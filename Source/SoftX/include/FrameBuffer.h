@@ -7,6 +7,7 @@
 /////////////////////////////////////////////////////////////////
 #include <algorithm>
 #include <atomic>
+#include <mutex>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -67,6 +68,7 @@ public:
 
     void Clear(const float4& color) override
     {
+        std::lock_guard<std::mutex> lock(mutex);
         uint32_t bg = PackColor(color);
         size_t count = pixelsStorage.size();
         size_t i = 0;
@@ -90,11 +92,12 @@ public:
     void PresentBitmap(HDC hdc, int2 dstPos, int2 dstSize);
     void PresentASCII(HANDLE hConsole, uint2 consoleSize);
 
-    bool SaveTGA(const char* filename) const;
+    bool SaveTGA(const char* filename);
 
 private:
     uint2 resolution;
     std::vector<uint32_t> pixelsStorage;   // BGRA
+    std::mutex mutex;
 };
 
 SOFTX_END

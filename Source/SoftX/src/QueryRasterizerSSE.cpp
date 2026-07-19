@@ -14,9 +14,9 @@
 SOFTX_BEGIN
 
 uint32_t QueryRasterizerSSE::RasterizeTriangle(
-    const VertexOutput& v0,
-    const VertexOutput& v1,
-    const VertexOutput& v2,
+    const Interpolant& v0,
+    const Interpolant& v1,
+    const Interpolant& v2,
     const RasterizerState& state,
     DepthBuffer& depthBuffer,
     const ConstantBuffer& /*cb*/,

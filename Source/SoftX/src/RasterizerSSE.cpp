@@ -12,9 +12,9 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
-                                      const VertexOutput& v1,
-                                      const VertexOutput& v2,
+void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
+                                      const Interpolant& v1,
+                                      const Interpolant& v2,
                                       const RasterizerState& state,
                                       DepthBuffer& depthBuffer,
                                       IRenderTarget* renderTarget,
@@ -278,7 +278,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
                 if (px < tileMin.x || px > tileMax.x) continue;
                 if (renderTarget == nullptr) continue;
 
-                VertexOutput frag;
+                Interpolant frag;
                 frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
@@ -320,7 +320,7 @@ void RasterizerSSE::RasterizeTriangle(const VertexOutput& v0,
             const float fb = float(sf20) / float(area2Int); // weight for v1
             const float fc = float(sf01) / float(area2Int); // weight for v2
 
-            VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
+            Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
             const uint idx    = y * width + x;
 
             bool depthPass = false;

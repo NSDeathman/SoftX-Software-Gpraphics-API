@@ -14,7 +14,7 @@ SOFTX_BEGIN
 static inline void ShadeSinglePixel(uint x, uint y,
                                     int64_t sf12, int64_t sf20, int64_t sf01,
                                     int64_t area2Int,
-                                    const VertexOutput& v0, const VertexOutput& v1, const VertexOutput& v2,
+                                    const Interpolant& v0, const Interpolant& v1, const Interpolant& v2,
                                     DepthBuffer& depthBuffer, IRenderTarget* renderTarget,
                                     const PixelShader& ps, const ConstantBuffer& cb, const TextureTable* tt,
                                     const RasterizerState& state,
@@ -24,7 +24,7 @@ static inline void ShadeSinglePixel(uint x, uint y,
     const float fb = float(sf20) / float(area2Int); // weight for v1
     const float fc = float(sf01) / float(area2Int); // weight for v2
 
-    VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
+    Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
     const uint idx    = y * width + x;
 
     bool depthPass = false;
@@ -50,9 +50,9 @@ static inline void ShadeSinglePixel(uint x, uint y,
 }
 
 void RasterizerScalar::RasterizeTriangle(
-    const VertexOutput& v0,
-    const VertexOutput& v1,
-    const VertexOutput& v2,
+    const Interpolant& v0,
+    const Interpolant& v1,
+    const Interpolant& v2,
     const RasterizerState& state,
     DepthBuffer& depthBuffer,
     IRenderTarget* renderTarget,

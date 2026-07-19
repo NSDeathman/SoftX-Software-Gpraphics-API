@@ -9,9 +9,9 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
-                                      const VertexOutput& v1,
-                                      const VertexOutput& v2,
+void RasterizerAVX::RasterizeTriangle(const Interpolant& v0,
+                                      const Interpolant& v1,
+                                      const Interpolant& v2,
                                       const RasterizerState& state,
                                       DepthBuffer& depthBuffer,
                                       IRenderTarget* renderTarget,
@@ -268,7 +268,7 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
                 if (px < tileMin.x || px > tileMax.x) continue;
                 if (renderTarget == nullptr) continue;
 
-                VertexOutput frag;
+                Interpolant frag;
                 frag.Position = float4((float)px, (float)y, zArr[i], 1.0f);
                 frag.Color    = float4(rArr[i], gArr[i], bArr[i], aArr[i]);
                 frag.Normal   = float3(nxArr[i], nyArr[i], nzArr[i]);
@@ -301,7 +301,7 @@ void RasterizerAVX::RasterizeTriangle(const VertexOutput& v0,
             float b = f1 / area2;
             float c = f2 / area2;
 
-            VertexOutput frag = RasterizerCommon::Trilerp(v0, v1, v2, a, b, c);
+            Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, a, b, c);
             uint idx = y * width + x;
 
             bool depthPass = false;

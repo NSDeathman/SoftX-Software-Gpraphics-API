@@ -76,7 +76,7 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
         {{0, 1, 2, 3}, float3(0,0,-1)}
     };
 
-    std::vector<VertexInput> vertices;
+    std::vector<Vertex> vertices;
     std::vector<uint> indices;
 
     vertices.reserve(6);
@@ -86,7 +86,7 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
     {
         uint base = (uint)vertices.size();
         for (int idx : face.i)
-            vertices.push_back({ positions[idx], face.normal, color });
+            vertices.push_back({ positions[idx], color, face.normal });
 
         // Two triangles: 0-1-2 and 2-3-0 (CCW)
         indices.push_back(base + 0);
@@ -101,11 +101,11 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
     ib = IndexBuffer(std::move(indices));
 }
 
-VertexOutput MainVS(const VertexInput& input, const ConstantBuffer& cb, const TextureTable& tex)
+Interpolant MainVS(const Vertex& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
     (void)tex;
     const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
-    VertexOutput output;
+    Interpolant output;
     output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f) * data->modelViewProjection;
     output.Color = input.Color;
     output.Normal = input.Normal;
@@ -113,7 +113,7 @@ VertexOutput MainVS(const VertexInput& input, const ConstantBuffer& cb, const Te
     return output;
 }
 
-float4 MainPS(const VertexOutput& input, const ConstantBuffer& cb, const TextureTable& tex)
+float4 MainPS(const Interpolant& input, const ConstantBuffer& cb, const TextureTable& tex)
 {
     (void)tex;
     const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
@@ -121,10 +121,10 @@ float4 MainPS(const VertexOutput& input, const ConstantBuffer& cb, const Texture
     return data->objectTypeColor;
 }
 
-VertexOutput OcclusionVS(const VertexInput& input, const ConstantBuffer& cb)
+Interpolant OcclusionVS(const Vertex& input, const ConstantBuffer& cb)
 {
     const CbDataQuery* data = reinterpret_cast<const CbDataQuery*>(cb.Data());
-    VertexOutput output;
+    Interpolant output;
     output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f) * data->modelViewProjection;
     output.Color = float4(0, 0, 0, 0);
     output.Normal = float3(0, 0, 0);
