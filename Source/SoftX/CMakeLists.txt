@@ -40,6 +40,7 @@ set(SOFTX_PRIVATE_HEADERS
     src/Renderer.h
     src/ThreadPool.h
     src/ThreadPoolManager.h
+    src/ThreadUtils.h
 )
 
 set(SOFTX_PUBLIC_HEADERS
@@ -108,7 +109,7 @@ source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp src/Texture
 source_group("Header Files\\Core"          FILES src/Renderer.h)
 source_group("Header Files\\Rasterizer"    FILES src/RasterizerAVX.h src/RasterizerCommon.h src/RasterizerFactory.h src/RasterizerScalar.h src/RasterizerSSE.h
                                                  src/QueryRasterizerAVX.h src/QueryRasterizerFactory.h src/QueryRasterizerScalar.h src/QueryRasterizerSSE.h)
-source_group("Header Files\\Tools"         FILES src/CPUDetector.h src/ThreadPool.h src/ThreadPoolManager.h)
+source_group("Header Files\\Tools"         FILES src/CPUDetector.h src/ThreadPool.h src/ThreadPoolManager.h src/ThreadUtils.h)
 source_group("Header Files\\API"           FILES include/SoftX.h include/Device.h include/DeviceContext.h include/OcclusionQuery.h include/Types.h
                                                  include/DepthBuffer.h include/DepthTextureView.h include/FrameBuffer.h include/Exceptions.h
                                                  include/RenderTargetInterface.h include/RenderTargetTexture.h include/TextureRGBA32F.h include/TextureInterface.h

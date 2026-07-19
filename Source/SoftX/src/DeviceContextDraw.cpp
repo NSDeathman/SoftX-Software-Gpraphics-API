@@ -7,6 +7,7 @@
 #include "RasterizerCommon.h"
 #include "Renderer.h"
 #include "ThreadPoolManager.h"
+#include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
 //#define DEBUG_TILING
 /////////////////////////////////////////////////////////////////
@@ -146,24 +147,16 @@ void DeviceContext::DrawIndexedImpl(const PipelineStateObject& state, uint index
             }
         }
 
-        auto& pool = ThreadPoolManager::Get();
-        std::atomic<size_t> atomicIdx(0);
         const size_t totalUnique = uniqueIndices.size();
-
-        for (size_t t = 0; t < pool.threadCount(); ++t)
-        {
-            pool.enqueue([&]()
-                {
-                    while (true)
-                    {
-                        size_t i = atomicIdx.fetch_add(1);
-                        if (i >= totalUnique) break;
-                        uint idx = uniqueIndices[i];
-                        clipVerts[idx] = state.vertexShader(state.vertexBuffer.GetByIndex(idx), state.constantBuffer, state.textureTable);
-                    }
-                });
-        }
-        pool.wait();
+        ParallelFor(size_t(0), totalUnique, size_t(1),
+            [&](size_t i)
+            {
+                uint idx = uniqueIndices[i];
+                clipVerts[idx] = state.vertexShader(
+                    state.vertexBuffer.GetByIndex(idx),
+                    state.constantBuffer,
+                    state.textureTable);
+            });
     }
 
     // Step 2: Gather source triangles
