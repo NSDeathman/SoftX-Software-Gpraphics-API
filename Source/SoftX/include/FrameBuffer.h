@@ -6,11 +6,8 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #include <algorithm>
-#include <atomic>
 #include <mutex>
 #include <cstdint>
-#include <fstream>
-#include <iostream>
 #include <vector>
 #include <windows.h>
 #include <xmmintrin.h>

@@ -6,20 +6,23 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #include "LibInternal.h"
-#include "RenderTargetInterface.h"
-#include "DepthBuffer.h"
 #include "Types.h"
+/////////////////////////////////////////////////////////////////
+class SOFTX_API SoftX::IRenderTarget;
+class SOFTX_API SoftX::DepthBuffer;
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-struct RasterizerState {
+struct RasterizerState 
+{
     CullMode cullMode = CullMode::Back;
     FillMode fillMode = FillMode::Solid;
 	ComparisonFunc depthFunc = ComparisonFunc::Less;
     bool depthWriteEnable = true;
 };
 
-class IRasterizer {
+class IRasterizer 
+{
 public:
     virtual ~IRasterizer() = default;
 

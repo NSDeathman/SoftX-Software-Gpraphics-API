@@ -7,8 +7,6 @@
 /////////////////////////////////////////////////////////////////
 #include <algorithm>
 #include <cassert>
-#include <fstream>
-#include <iostream>
 #include <vector>
 #include <xmmintrin.h>
 

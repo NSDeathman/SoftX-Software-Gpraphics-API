@@ -5,7 +5,6 @@
 /////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <windows.h>
 #include <vector>
 #include <functional>
 #include <memory>
@@ -15,10 +14,10 @@
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
 #include "TextureInterface.h"
-#include "RenderTargetInterface.h"
-#include "RenderTargetTexture.h"
-#include "FrameBuffer.h"
-#include "DepthBuffer.h"
+/////////////////////////////////////////////////////////////////
+class SOFTX_API SoftX::IRenderTarget;
+class SOFTX_API SoftX::DepthBuffer;
+struct HWND__; typedef HWND__* HWND;
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 

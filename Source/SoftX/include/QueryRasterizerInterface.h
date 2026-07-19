@@ -9,7 +9,8 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-class IQueryRasterizer {
+class IQueryRasterizer 
+{
 public:
     virtual ~IQueryRasterizer() = default;
 
