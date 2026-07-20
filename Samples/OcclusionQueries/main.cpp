@@ -16,12 +16,13 @@
 using namespace SoftX;
 using namespace AfterMath;
 /////////////////////////////////////////////////////////////////
-static constexpr int WINDOW_WIDTH = 1280;
-static constexpr int WINDOW_HEIGHT = 768;
 static constexpr int CUBE_COUNT = 100;
 /////////////////////////////////////////////////////////////////
 static HWND g_hWnd = nullptr;
 static Device* g_device = nullptr;
+/////////////////////////////////////////////////////////////////
+float g_timeDelta = 0.0f;
+uint2 g_windowSize = uint2(1280, 768);
 /////////////////////////////////////////////////////////////////
 struct Mesh
 {
@@ -44,7 +45,7 @@ struct CbDataQuery
     float4x4 modelViewProjection;
 };
 
-void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
+void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color = float4(0.0f, 0.0f, 0.0f, 0.0f))
 {
     //     7-------6
     //    /|      /|
@@ -66,44 +67,31 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color)
     };
 
     struct Face { int i[4]; float3 normal; };
-    const Face faces[6] = {
-        // +X
-        {{1, 5, 6, 2}, float3(1,0,0)},
-        // -X
-        {{4, 0, 3, 7}, float3(-1,0,0)},
-        // +Y
-        {{2, 6, 7, 3}, float3(0,1,0)},
-        // -Y
-        {{4, 5, 1, 0}, float3(0,-1,0)},
-        // +Z
-        {{5, 4, 7, 6}, float3(0,0,1)},
-        // -Z
-        {{0, 1, 2, 3}, float3(0,0,-1)}
+    const Face faces[6] =
+    {
+        {{1, 5, 6, 2}, float3(1,0,0)},  // +X
+        {{4, 0, 3, 7}, float3(-1,0,0)}, // -X
+        {{2, 6, 7, 3}, float3(0,1,0)},  // +Y
+        {{4, 5, 1, 0}, float3(0,-1,0)}, // -Y
+        {{5, 4, 7, 6}, float3(0,0,1)},  // +Z
+        {{0, 1, 2, 3}, float3(0,0,-1)}  // -Z
     };
 
-    std::vector<Vertex> vertices;
-    std::vector<uint> indices;
-
-    vertices.reserve(6);
-    indices.reserve(36);
+    vb.Reserve(24);
+    ib.Reserve(36);
 
     for (const auto& face : faces)
     {
-        uint base = (uint)vertices.size();
+        uint base = vb.Size();
         for (int idx : face.i)
-            vertices.push_back({ positions[idx], color, face.normal });
+        {
+            vb.Add(positions[idx], color, face.normal);
+        }
 
         // Two triangles: 0-1-2 and 2-3-0 (CCW)
-        indices.push_back(base + 0);
-        indices.push_back(base + 1);
-        indices.push_back(base + 2);
-        indices.push_back(base + 2);
-        indices.push_back(base + 3);
-        indices.push_back(base + 0);
+        ib.AddTri(base + 0, base + 1, base + 2);
+        ib.AddTri(base + 2, base + 3, base + 0);
     }
-
-    vb = VertexBuffer(std::move(vertices));
-    ib = IndexBuffer(std::move(indices));
 }
 
 Interpolant MainVS(const Vertex& input, const ConstantBuffer& cb, const TextureTable& tex)
@@ -111,7 +99,7 @@ Interpolant MainVS(const Vertex& input, const ConstantBuffer& cb, const TextureT
     (void)tex;
     const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
     Interpolant output;
-    output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f) * data->modelViewProjection;
+    output.Position = float4(input.Position, 1.0f) * data->modelViewProjection;
     output.Color = input.Color;
     output.Normal = input.Normal;
     output.UV = input.UV;
@@ -130,7 +118,7 @@ Interpolant OcclusionVS(const Vertex& input, const ConstantBuffer& cb)
 {
     const CbDataQuery* data = reinterpret_cast<const CbDataQuery*>(cb.Data());
     Interpolant output;
-    output.Position = float4(input.Position.x, input.Position.y, input.Position.z, 1.0f) * data->modelViewProjection;
+    output.Position = float4(input.Position, 1.0f) * data->modelViewProjection;
     output.Color = float4(0, 0, 0, 0);
     output.Normal = float3(0, 0, 0);
     output.UV = float2(0, 0);
@@ -148,7 +136,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
 
     DeviceContext& ctx = g_device->GetImmediateContext();
 
-    const float aspect = float(WINDOW_WIDTH) / float(WINDOW_HEIGHT);
+    const float aspect = float(g_windowSize.x) / float(g_windowSize.y);
     float4x4 proj = perspective(Constants::degrees_to_radians(60.0f), aspect);
     float3 eye(0.0f, 30.0f, -1.0f);
     float3 target(0.0f, 0.0f, 0.0f);
@@ -171,7 +159,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
         ctx.SetIndexBuffer(occluder.ib);
         ctx.SetVertexShader(MainVS);
         ctx.SetPixelShader(MainPS);
-        ctx.SetTileSize(WINDOW_WIDTH / 16);
+        ctx.SetTileSize(g_windowSize.x / 16);
         ctx.DrawIndexed();
     }
 
@@ -231,7 +219,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
             ctx.SetIndexBuffer(cube.ib);
             ctx.SetVertexShader(MainVS);
             ctx.SetPixelShader(MainPS);
-            ctx.SetTileSize(WINDOW_WIDTH / 32);
+            ctx.SetTileSize(g_windowSize.x / 32);
             ctx.DrawIndexed();
         }
     }
@@ -261,7 +249,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
             ctx.SetIndexBuffer(cube.ib);
             ctx.SetVertexShader(MainVS);
             ctx.SetPixelShader(MainPS);
-            ctx.SetTileSize(WINDOW_WIDTH / 32);
+            ctx.SetTileSize(g_windowSize.x / 32);
             ctx.DrawIndexed();
         }
 
@@ -300,7 +288,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (newWidth > 0 && newHeight > 0)
             {
                 PresentParameters newParams = g_device->GetPresentParams();
-                newParams.BackBufferSize = uint2(newWidth, newHeight);
+                g_windowSize = uint2(newWidth, newHeight);
+                newParams.BackBufferSize = g_windowSize;
                 g_device->Reset(newParams);
 
                 DeviceContext& ctx = g_device->GetImmediateContext();
@@ -325,7 +314,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     wc.lpszClassName = "SoftXOcclusionDemo";
     RegisterClassEx(&wc);
 
-    RECT rc = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
+    RECT rc = { 0, 0, (LONG)g_windowSize.x, (LONG)g_windowSize.y };
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
     g_hWnd = CreateWindowEx(0, "SoftXOcclusionDemo", "SoftX Occlusion Query Demo",
                             WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -336,7 +325,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     UpdateWindow(g_hWnd);
 
     PresentParameters params;
-    params.BackBufferSize = uint2(WINDOW_WIDTH, WINDOW_HEIGHT);
+    params.BackBufferSize = g_windowSize;
     params.hDeviceWindow = g_hWnd;
     params.Windowed = true;
 
@@ -345,7 +334,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
     DeviceContext& ctx = g_device->GetImmediateContext();
     ctx.SetRenderTarget(device.GetBackBuffer(), true);
-    ctx.SetViewport(Viewport(0.0f, 0.0f, WINDOW_WIDTH, WINDOW_HEIGHT, 0.0f, 1.0f));
+    ctx.SetViewport(Viewport(0.0f, 0.0f, g_windowSize.x, g_windowSize.y, 0.0f, 1.0f));
     ctx.SetTileSize(128);
     ctx.SetCullMode(CullMode::Back);
     ctx.SetDepthFunc(ComparisonFunc::Less);
@@ -371,19 +360,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     MSG msg = {};
     float occluderAngle = 0.0f;
 
+    auto lastTime = std::chrono::steady_clock::now();
+
     while (msg.message != WM_QUIT)
     {
+        PROFILE_FRAME("SoftX");
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-        else
-        {
-            PROFILE_FRAME("SoftX");
-            DrawFrame(cubes, occluder, occluderAngle);
-            occluderAngle += 0.015f;
-        }
+
+        auto currentTime = std::chrono::steady_clock::now();
+        g_timeDelta = std::chrono::duration<float>(currentTime - lastTime).count();
+        lastTime = currentTime;
+
+        DrawFrame(cubes, occluder, occluderAngle);
+        occluderAngle += 1.25f * g_timeDelta;
     }
 
     return int(msg.wParam);
