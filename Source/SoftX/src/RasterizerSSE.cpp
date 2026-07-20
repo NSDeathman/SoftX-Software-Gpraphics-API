@@ -70,18 +70,15 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
     const int simdStartX = (iMinX / 4) * 4;
 
     // Edge function values at (simdStartX, iMinY)
-    int64_t f01Row = RasterizerCommon::EdgeFunctionInt(
-        x0fp, y0fp, x1fp, y1fp,
-        RasterizerCommon::PixelCentre(simdStartX),
-        RasterizerCommon::PixelCentre(iMinY));
-    int64_t f12Row = RasterizerCommon::EdgeFunctionInt(
-        x1fp, y1fp, x2fp, y2fp,
-        RasterizerCommon::PixelCentre(simdStartX),
-        RasterizerCommon::PixelCentre(iMinY));
-    int64_t f20Row = RasterizerCommon::EdgeFunctionInt(
-        x2fp, y2fp, x0fp, y0fp,
-        RasterizerCommon::PixelCentre(simdStartX),
-        RasterizerCommon::PixelCentre(iMinY));
+    int64_t f01Row = RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
+                                                       RasterizerCommon::PixelCentre(simdStartX),
+                                                       RasterizerCommon::PixelCentre(iMinY));
+    int64_t f12Row = RasterizerCommon::EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
+                                                       RasterizerCommon::PixelCentre(simdStartX),
+                                                       RasterizerCommon::PixelCentre(iMinY));
+    int64_t f20Row = RasterizerCommon::EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
+                                                       RasterizerCommon::PixelCentre(simdStartX),
+                                                       RasterizerCommon::PixelCentre(iMinY));
 
     // ── Normalise to CCW — inside test is now always f >= 0 ─────────────────
     // Negating f and steps together leaves all ratios f/area2Int invariant,
@@ -154,15 +151,9 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
     {
         // Initialise 4 lanes: lane i = f??Row + i * step??X
         // _mm_set_epi32(e3, e2, e1, e0) — e0 goes to lane 0, e3 to lane 3
-        __m128i f01 = _mm_add_epi32(
-            _mm_set1_epi32(static_cast<int32_t>(f01Row)),
-            _mm_set_epi32(3 * stepX01, 2 * stepX01, stepX01, 0));
-        __m128i f12 = _mm_add_epi32(
-            _mm_set1_epi32(static_cast<int32_t>(f12Row)),
-            _mm_set_epi32(3 * stepX12, 2 * stepX12, stepX12, 0));
-        __m128i f20 = _mm_add_epi32(
-            _mm_set1_epi32(static_cast<int32_t>(f20Row)),
-            _mm_set_epi32(3 * stepX20, 2 * stepX20, stepX20, 0));
+        __m128i f01 = _mm_add_epi32(_mm_set1_epi32(static_cast<int32_t>(f01Row)), _mm_set_epi32(3 * stepX01, 2 * stepX01, stepX01, 0));
+        __m128i f12 = _mm_add_epi32(_mm_set1_epi32(static_cast<int32_t>(f12Row)), _mm_set_epi32(3 * stepX12, 2 * stepX12, stepX12, 0));
+        __m128i f20 = _mm_add_epi32(_mm_set1_epi32(static_cast<int32_t>(f20Row)), _mm_set_epi32(3 * stepX20, 2 * stepX20, stepX20, 0));
 
         int x;
         for (x = simdStartX;
@@ -177,10 +168,7 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
 
             // Inside test: all three f >= 0 (CCW-normalised)
             // _mm_cmpgt_epi32(f, -1) returns 0xFFFFFFFF for lanes where f >= 0
-            __m128i insideI = _mm_and_si128(
-                _mm_and_si128(_mm_cmpgt_epi32(f01, minusOne),
-                              _mm_cmpgt_epi32(f12, minusOne)),
-                _mm_cmpgt_epi32(f20, minusOne));
+            __m128i insideI = _mm_and_si128(_mm_and_si128(_mm_cmpgt_epi32(f01, minusOne), _mm_cmpgt_epi32(f12, minusOne)), _mm_cmpgt_epi32(f20, minusOne));
 
             // _mm_testz_si128: ZF=1 if (insideI & insideI) == 0 — no lane passed
             if (_mm_testz_si128(insideI, insideI))
@@ -192,8 +180,7 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
             // Tile boundary mask (guards against data races at tile edges)
             // _mm_set_ps(e3, e2, e1, e0) — e0 goes to lane 0
             __m128 pxf      = _mm_set_ps(float(x + 3), float(x + 2), float(x + 1), float(x));
-            __m128 tileMask = _mm_and_ps(_mm_cmpge_ps(pxf, tileMinXv),
-                                          _mm_cmple_ps(pxf, tileMaxXv));
+            __m128 tileMask = _mm_and_ps(_mm_cmpge_ps(pxf, tileMinXv), _mm_cmple_ps(pxf, tileMaxXv));
 
             // Barycentric coordinates: f_int / area2Int == f_float / area2_float
             // alpha — weight for v0 (opposite edge f12)
@@ -235,19 +222,7 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
 
             // Depth test
             __m128 depths = depthBuffer.Read4(uint2(x, y));
-            __m128 depthCmp;
-            switch (state.depthFunc)
-            {
-            case ComparisonFunc::Never:        depthCmp = _mm_setzero_ps(); break;
-            case ComparisonFunc::Less:         depthCmp = _mm_cmplt_ps(z, depths); break;
-            case ComparisonFunc::Equal:        depthCmp = _mm_cmpeq_ps(z, depths); break;
-            case ComparisonFunc::LessEqual:    depthCmp = _mm_cmple_ps(z, depths); break;
-            case ComparisonFunc::Greater:      depthCmp = _mm_cmpgt_ps(z, depths); break;
-            case ComparisonFunc::NotEqual:     depthCmp = _mm_cmpneq_ps(z, depths); break;
-            case ComparisonFunc::GreaterEqual: depthCmp = _mm_cmpge_ps(z, depths); break;
-            case ComparisonFunc::Always:       depthCmp = _mm_castsi128_ps(_mm_set1_epi32(-1)); break;
-            default:                           depthCmp = _mm_cmplt_ps(z, depths); break;
-            }
+            __m128 depthCmp = RasterizerCommon::DepthTest128(z, depths, state.depthFunc);
 
             __m128 finalMask = _mm_and_ps(_mm_and_ps(depthCmp, inside), tileMask);
             int depthMask    = _mm_movemask_ps(finalMask);
@@ -300,18 +275,15 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
             if (x < (int)tileMin.x || x > (int)tileMax.x)
                 continue;
 
-            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x0fp, y0fp, x1fp, y1fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
-            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x1fp, y1fp, x2fp, y2fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
-            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x2fp, y2fp, x0fp, y0fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
+            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
+            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
+            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
 
             if (sf01 < 0 || sf12 < 0 || sf20 < 0)
                 continue;
@@ -322,19 +294,8 @@ void RasterizerSSE::RasterizeTriangle(const Interpolant& v0,
 
             Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
             const uint idx    = y * width + x;
-
-            bool depthPass = false;
-            switch (state.depthFunc)
-            {
-            case ComparisonFunc::Never:        depthPass = false; break;
-            case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.At(idx); break;
-            case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.At(idx); break;
-            case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.At(idx); break;
-            case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.At(idx); break;
-            case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.At(idx); break;
-            case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.At(idx); break;
-            case ComparisonFunc::Always:       depthPass = true; break;
-            }
+            float depthValue = depthBuffer.At(idx);
+            bool depthPass = RasterizerCommon::DepthTest(frag.Position.z, depthValue, state.depthFunc);
             if (depthPass)
             {
                 if (state.depthWriteEnable)

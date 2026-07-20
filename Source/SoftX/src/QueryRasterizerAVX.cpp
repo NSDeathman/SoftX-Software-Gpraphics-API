@@ -85,12 +85,9 @@ uint QueryRasterizerAVX::RasterizeTriangle(
             simdStartX + 1.5f, simdStartX + 0.5f);
         __m256 initY = _mm256_set1_ps(iMinY + 0.5f);
 
-        f01Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v0x), dy01v),
-            _mm256_mul_ps(_mm256_sub_ps(initY, v0y), dx01v));
-        f12Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v1x), dy12v),
-            _mm256_mul_ps(_mm256_sub_ps(initY, v1y), dx12v));
-        f20Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v2x), dy20v),
-            _mm256_mul_ps(_mm256_sub_ps(initY, v2y), dx20v));
+        f01Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v0x), dy01v), _mm256_mul_ps(_mm256_sub_ps(initY, v0y), dx01v));
+        f12Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v1x), dy12v), _mm256_mul_ps(_mm256_sub_ps(initY, v1y), dx12v));
+        f20Row = _mm256_sub_ps(_mm256_mul_ps(_mm256_sub_ps(initX, v2x), dy20v), _mm256_mul_ps(_mm256_sub_ps(initY, v2y), dx20v));
     }
 
     uint width = depthBuffer.Width();
@@ -113,15 +110,9 @@ uint QueryRasterizerAVX::RasterizeTriangle(
             // Inside test
             __m256 inside;
             if (area2 > 0)
-                inside = _mm256_and_ps(
-                    _mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_GE_OQ),
-                        _mm256_cmp_ps(f12, zero, _CMP_GE_OQ)),
-                    _mm256_cmp_ps(f20, zero, _CMP_GE_OQ));
+                inside = _mm256_and_ps(_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_GE_OQ), _mm256_cmp_ps(f12, zero, _CMP_GE_OQ)), _mm256_cmp_ps(f20, zero, _CMP_GE_OQ));
             else
-                inside = _mm256_and_ps(
-                    _mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_LE_OQ),
-                        _mm256_cmp_ps(f12, zero, _CMP_LE_OQ)),
-                    _mm256_cmp_ps(f20, zero, _CMP_LE_OQ));
+                inside = _mm256_and_ps(_mm256_and_ps(_mm256_cmp_ps(f01, zero, _CMP_LE_OQ), _mm256_cmp_ps(f12, zero, _CMP_LE_OQ)), _mm256_cmp_ps(f20, zero, _CMP_LE_OQ));
 
             if (_mm256_movemask_ps(inside) == 0)
                 continue;
@@ -132,10 +123,7 @@ uint QueryRasterizerAVX::RasterizeTriangle(
             __m256 gamma = _mm256_mul_ps(f01, invArea);
 
             // Linear interpolation z
-            __m256 z = _mm256_add_ps(
-                _mm256_add_ps(_mm256_mul_ps(alpha, v0z),
-                    _mm256_mul_ps(beta, v1z)),
-                _mm256_mul_ps(gamma, v2z));
+            __m256 z = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(alpha, v0z), _mm256_mul_ps(beta, v1z)), _mm256_mul_ps(gamma, v2z));
 
             // Depth read
             __m128 d_lo = depthBuffer.Read4(uint2(x, y));
@@ -143,26 +131,11 @@ uint QueryRasterizerAVX::RasterizeTriangle(
             __m256 depths = _mm256_set_m128(d_hi, d_lo);
 
             // Depth test
-            __m256 depthCmp;
-            switch (state.depthFunc)
-            {
-            case ComparisonFunc::Never:        depthCmp = _mm256_setzero_ps(); break;
-            case ComparisonFunc::Less:         depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ); break;
-            case ComparisonFunc::Equal:        depthCmp = _mm256_cmp_ps(z, depths, _CMP_EQ_OQ); break;
-            case ComparisonFunc::LessEqual:    depthCmp = _mm256_cmp_ps(z, depths, _CMP_LE_OQ); break;
-            case ComparisonFunc::Greater:      depthCmp = _mm256_cmp_ps(z, depths, _CMP_GT_OQ); break;
-            case ComparisonFunc::NotEqual:     depthCmp = _mm256_cmp_ps(z, depths, _CMP_NEQ_OQ); break;
-            case ComparisonFunc::GreaterEqual: depthCmp = _mm256_cmp_ps(z, depths, _CMP_GE_OQ); break;
-            case ComparisonFunc::Always:       depthCmp = _mm256_castsi256_ps(_mm256_set1_epi32(-1)); break;
-            default:                           depthCmp = _mm256_cmp_ps(z, depths, _CMP_LT_OQ); break;
-            }
+            __m256 depthCmp = RasterizerCommon::DepthTest256(z, depths, state.depthFunc);
 
             // Tile mask
-            __m256 pxf = _mm256_set_ps(float(x + 7), float(x + 6), float(x + 5), float(x + 4),
-                float(x + 3), float(x + 2), float(x + 1), float(x + 0));
-            __m256 tileMask = _mm256_and_ps(
-                _mm256_cmp_ps(pxf, tileMinXv, _CMP_GE_OQ),
-                _mm256_cmp_ps(pxf, tileMaxXv, _CMP_LE_OQ));
+            __m256 pxf = _mm256_set_ps(float(x + 7), float(x + 6), float(x + 5), float(x + 4), float(x + 3), float(x + 2), float(x + 1), float(x + 0));
+            __m256 tileMask = _mm256_and_ps(_mm256_cmp_ps(pxf, tileMinXv, _CMP_GE_OQ), _mm256_cmp_ps(pxf, tileMaxXv, _CMP_LE_OQ));
 
             __m256 finalMask = _mm256_and_ps(_mm256_and_ps(depthCmp, inside), tileMask);
             int mask = _mm256_movemask_ps(finalMask);
@@ -203,18 +176,8 @@ uint QueryRasterizerAVX::RasterizeTriangle(
             float z = a * v0.Position.z + b * v1.Position.z + c * v2.Position.z;
 
             uint idx = y * width + x;
-            bool depthPass = false;
-            switch (state.depthFunc)
-            {
-            case ComparisonFunc::Never:        depthPass = false; break;
-            case ComparisonFunc::Less:         depthPass = z < depthBuffer.At(idx); break;
-            case ComparisonFunc::Equal:        depthPass = z == depthBuffer.At(idx); break;
-            case ComparisonFunc::LessEqual:    depthPass = z <= depthBuffer.At(idx); break;
-            case ComparisonFunc::Greater:      depthPass = z > depthBuffer.At(idx); break;
-            case ComparisonFunc::NotEqual:     depthPass = z != depthBuffer.At(idx); break;
-            case ComparisonFunc::GreaterEqual: depthPass = z >= depthBuffer.At(idx); break;
-            case ComparisonFunc::Always:       depthPass = true; break;
-            }
+            float depthValue = depthBuffer.At(idx);
+            bool depthPass = RasterizerCommon::DepthTest(z, depthValue, state.depthFunc);
             if (depthPass)
             {
                 if (state.depthWriteEnable)

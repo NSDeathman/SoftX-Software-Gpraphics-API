@@ -27,18 +27,8 @@ static inline void ShadeSinglePixel(uint x, uint y,
     Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
     const uint idx    = y * width + x;
 
-    bool depthPass = false;
-    switch (state.depthFunc)
-    {
-    case ComparisonFunc::Never:        depthPass = false; break;
-    case ComparisonFunc::Less:         depthPass = frag.Position.z <  depthBuffer.At(idx); break;
-    case ComparisonFunc::Equal:        depthPass = frag.Position.z == depthBuffer.At(idx); break;
-    case ComparisonFunc::LessEqual:    depthPass = frag.Position.z <= depthBuffer.At(idx); break;
-    case ComparisonFunc::Greater:      depthPass = frag.Position.z >  depthBuffer.At(idx); break;
-    case ComparisonFunc::NotEqual:     depthPass = frag.Position.z != depthBuffer.At(idx); break;
-    case ComparisonFunc::GreaterEqual: depthPass = frag.Position.z >= depthBuffer.At(idx); break;
-    case ComparisonFunc::Always:       depthPass = true; break;
-    }
+    float depthValue = depthBuffer.At(idx);
+    bool depthPass = RasterizerCommon::DepthTest(frag.Position.z, depthValue, state.depthFunc);
 
     if (depthPass)
     {
@@ -49,18 +39,17 @@ static inline void ShadeSinglePixel(uint x, uint y,
     }
 }
 
-void RasterizerScalar::RasterizeTriangle(
-    const Interpolant& v0,
-    const Interpolant& v1,
-    const Interpolant& v2,
-    const RasterizerState& state,
-    DepthBuffer& depthBuffer,
-    IRenderTarget* renderTarget,
-    const PixelShader& ps,
-    const ConstantBuffer& cb,
-    const TextureTable* tt,
-    uint2 tileMin,
-    uint2 tileMax)
+void RasterizerScalar::RasterizeTriangle(const Interpolant& v0,
+                                         const Interpolant& v1,
+                                         const Interpolant& v2,
+                                         const RasterizerState& state,
+                                         DepthBuffer& depthBuffer,
+                                         IRenderTarget* renderTarget,
+                                         const PixelShader& ps,
+                                         const ConstantBuffer& cb,
+                                         const TextureTable* tt,
+                                         uint2 tileMin,
+                                         uint2 tileMax)
 {
     float minX = std::min(std::min(v0.Position.x, v1.Position.x), v2.Position.x);
     float maxX = std::max(std::max(v0.Position.x, v1.Position.x), v2.Position.x);
@@ -156,24 +145,19 @@ void RasterizerScalar::RasterizeTriangle(
                 y < tileMin.y  || y > tileMax.y) continue;
 
             // Integer edge test (exact, no floating-point error)
-            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x0fp, y0fp, x1fp, y1fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
-            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x1fp, y1fp, x2fp, y2fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
-            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x2fp, y2fp, x0fp, y0fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
+            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
+            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
+            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
 
             if (sf01 < 0 || sf12 < 0 || sf20 < 0) continue;
 
-            ShadeSinglePixel(x, y, sf12, sf20, sf01, area2Int,
-                             v0, v1, v2, depthBuffer, renderTarget,
-                             ps, cb, tt, state, width);
+            ShadeSinglePixel(x, y, sf12, sf20, sf01, area2Int, v0, v1, v2, depthBuffer, renderTarget, ps, cb, tt, state, width);
         }
     }
     else
@@ -185,46 +169,39 @@ void RasterizerScalar::RasterizeTriangle(
 
         // Per-pixel x-step: ΔE = +S * Δy_fp
         // Per-row   y-step: ΔE = -S * Δx_fp
-        const int stepX01 =  RasterizerCommon::SUBPIXEL_STEP * (y1fp - y0fp);
-        const int stepX12 =  RasterizerCommon::SUBPIXEL_STEP * (y2fp - y1fp);
-        const int stepX20 =  RasterizerCommon::SUBPIXEL_STEP * (y0fp - y2fp);
-        const int stepY01 = -RasterizerCommon::SUBPIXEL_STEP * (x1fp - x0fp);
-        const int stepY12 = -RasterizerCommon::SUBPIXEL_STEP * (x2fp - x1fp);
-        const int stepY20 = -RasterizerCommon::SUBPIXEL_STEP * (x0fp - x2fp);
+        const int stepX01 = normSign * RasterizerCommon::SUBPIXEL_STEP * (y1fp - y0fp);
+        const int stepX12 = normSign * RasterizerCommon::SUBPIXEL_STEP * (y2fp - y1fp);
+        const int stepX20 = normSign * RasterizerCommon::SUBPIXEL_STEP * (y0fp - y2fp);
+        const int stepY01 = -normSign * RasterizerCommon::SUBPIXEL_STEP * (x1fp - x0fp);
+        const int stepY12 = -normSign * RasterizerCommon::SUBPIXEL_STEP * (x2fp - x1fp);
+        const int stepY20 = -normSign * RasterizerCommon::SUBPIXEL_STEP * (x0fp - x2fp);
 
         // Row-start values at pixel centre (iMinX, iMinY)
-        int64_t f01Row = normSign * RasterizerCommon::EdgeFunctionInt(
-            x0fp, y0fp, x1fp, y1fp,
-            RasterizerCommon::PixelCentre(iMinX),
-            RasterizerCommon::PixelCentre(iMinY));
-        int64_t f12Row = normSign * RasterizerCommon::EdgeFunctionInt(
-            x1fp, y1fp, x2fp, y2fp,
-            RasterizerCommon::PixelCentre(iMinX),
-            RasterizerCommon::PixelCentre(iMinY));
-        int64_t f20Row = normSign * RasterizerCommon::EdgeFunctionInt(
-            x2fp, y2fp, x0fp, y0fp,
-            RasterizerCommon::PixelCentre(iMinX),
-            RasterizerCommon::PixelCentre(iMinY));
+        int64_t f01Row = normSign * RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
+                                                                      RasterizerCommon::PixelCentre(iMinX),
+                                                                      RasterizerCommon::PixelCentre(iMinY));
+        int64_t f12Row = normSign * RasterizerCommon::EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
+                                                                      RasterizerCommon::PixelCentre(iMinX),
+                                                                      RasterizerCommon::PixelCentre(iMinY));
+        int64_t f20Row = normSign * RasterizerCommon::EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
+                                                                      RasterizerCommon::PixelCentre(iMinX),
+                                                                      RasterizerCommon::PixelCentre(iMinY));
 
         const float invArea2 = 1.0f / float(area2Int);
         (void)invArea2; // used inside ShadeSinglePixel via area2Int
 
-        for (int y = iMinY; y <= iMaxY;
-             ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
+        for (int y = iMinY; y <= iMaxY; ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
         {
             int64_t f01 = f01Row;
             int64_t f12 = f12Row;
             int64_t f20 = f20Row;
 
-            for (int x = iMinX; x <= iMaxX;
-                 ++x, f01 += stepX01, f12 += stepX12, f20 += stepX20)
+            for (int x = iMinX; x <= iMaxX; ++x, f01 += stepX01, f12 += stepX12, f20 += stepX20)
             {
                 // Single branch: OR of sign bits — negative if any f < 0
                 if ((f01 | f12 | f20) < 0) continue;
 
-                ShadeSinglePixel(x, y, f12, f20, f01, area2Int,
-                                 v0, v1, v2, depthBuffer, renderTarget,
-                                 ps, cb, tt, state, width);
+                ShadeSinglePixel(x, y, f12, f20, f01, area2Int, v0, v1, v2, depthBuffer, renderTarget, ps, cb, tt, state, width);
             }
         }
     }

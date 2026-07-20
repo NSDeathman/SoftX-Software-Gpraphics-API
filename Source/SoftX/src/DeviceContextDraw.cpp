@@ -31,19 +31,7 @@ void DeviceContext::DrawPoint(const PipelineStateObject& state, int x, int y, fl
     uint idx = y * rt->Width() + x;
     float depthValue = state.depthBuffer->At(idx);
 
-    bool pass = false;
-    switch (state.depthFunc)
-    {
-    case ComparisonFunc::Never:        pass = false; break;
-    case ComparisonFunc::Less:         pass = (z < depthValue); break;
-    case ComparisonFunc::Equal:        pass = (z == depthValue); break;
-    case ComparisonFunc::LessEqual:    pass = (z <= depthValue); break;
-    case ComparisonFunc::Greater:      pass = (z > depthValue); break;
-    case ComparisonFunc::NotEqual:     pass = (z != depthValue); break;
-    case ComparisonFunc::GreaterEqual: pass = (z >= depthValue); break;
-    case ComparisonFunc::Always:       pass = true; break;
-    default:                           pass = (z < depthValue); break;
-    }
+    bool pass = RasterizerCommon::DepthTest(z, depthValue, state.depthFunc);
 
     if (pass)
     {

@@ -23,18 +23,8 @@ static inline bool ProcessPixel(uint x, uint y,
     float z = fa * v0.Position.z + fb * v1.Position.z + fc * v2.Position.z;
 
     const uint idx = y * width + x;
-    bool depthPass = false;
-    switch (state.depthFunc)
-    {
-    case ComparisonFunc::Never:        depthPass = false; break;
-    case ComparisonFunc::Less:         depthPass = z < depthBuffer.At(idx); break;
-    case ComparisonFunc::Equal:        depthPass = z == depthBuffer.At(idx); break;
-    case ComparisonFunc::LessEqual:    depthPass = z <= depthBuffer.At(idx); break;
-    case ComparisonFunc::Greater:      depthPass = z > depthBuffer.At(idx); break;
-    case ComparisonFunc::NotEqual:     depthPass = z != depthBuffer.At(idx); break;
-    case ComparisonFunc::GreaterEqual: depthPass = z >= depthBuffer.At(idx); break;
-    case ComparisonFunc::Always:       depthPass = true; break;
-    }
+    float depthValue = depthBuffer.At(idx);
+    bool depthPass = RasterizerCommon::DepthTest(z, depthValue, state.depthFunc);
 
     if (depthPass)
     {
@@ -105,18 +95,15 @@ uint QueryRasterizerScalar::RasterizeTriangle(const Interpolant& v0,
             const uint y = iMinY + dy;
             if (x < tileMin.x || x > tileMax.x || y < tileMin.y || y > tileMax.y) continue;
 
-            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x0fp, y0fp, x1fp, y1fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
-            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x1fp, y1fp, x2fp, y2fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
-            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(
-                x2fp, y2fp, x0fp, y0fp,
-                RasterizerCommon::PixelCentre(x),
-                RasterizerCommon::PixelCentre(y));
+            const int64_t sf01 = normSign * RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
+            const int64_t sf12 = normSign * RasterizerCommon::EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
+            const int64_t sf20 = normSign * RasterizerCommon::EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
+                                                                              RasterizerCommon::PixelCentre(x),
+                                                                              RasterizerCommon::PixelCentre(y));
 
             if (sf01 < 0 || sf12 < 0 || sf20 < 0) continue;
 
@@ -127,25 +114,22 @@ uint QueryRasterizerScalar::RasterizeTriangle(const Interpolant& v0,
     else
     {
         // Scanline traversal
-        const int stepX01 = RasterizerCommon::SUBPIXEL_STEP * (y1fp - y0fp);
-        const int stepX12 = RasterizerCommon::SUBPIXEL_STEP * (y2fp - y1fp);
-        const int stepX20 = RasterizerCommon::SUBPIXEL_STEP * (y0fp - y2fp);
-        const int stepY01 = -RasterizerCommon::SUBPIXEL_STEP * (x1fp - x0fp);
-        const int stepY12 = -RasterizerCommon::SUBPIXEL_STEP * (x2fp - x1fp);
-        const int stepY20 = -RasterizerCommon::SUBPIXEL_STEP * (x0fp - x2fp);
+        const int stepX01 = normSign * RasterizerCommon::SUBPIXEL_STEP * (y1fp - y0fp);
+        const int stepX12 = normSign * RasterizerCommon::SUBPIXEL_STEP * (y2fp - y1fp);
+        const int stepX20 = normSign * RasterizerCommon::SUBPIXEL_STEP * (y0fp - y2fp);
+        const int stepY01 = -normSign * RasterizerCommon::SUBPIXEL_STEP * (x1fp - x0fp);
+        const int stepY12 = -normSign * RasterizerCommon::SUBPIXEL_STEP * (x2fp - x1fp);
+        const int stepY20 = -normSign * RasterizerCommon::SUBPIXEL_STEP * (x0fp - x2fp);
 
-        int64_t f01Row = normSign * RasterizerCommon::EdgeFunctionInt(
-            x0fp, y0fp, x1fp, y1fp,
-            RasterizerCommon::PixelCentre(iMinX),
-            RasterizerCommon::PixelCentre(iMinY));
-        int64_t f12Row = normSign * RasterizerCommon::EdgeFunctionInt(
-            x1fp, y1fp, x2fp, y2fp,
-            RasterizerCommon::PixelCentre(iMinX),
-            RasterizerCommon::PixelCentre(iMinY));
-        int64_t f20Row = normSign * RasterizerCommon::EdgeFunctionInt(
-            x2fp, y2fp, x0fp, y0fp,
-            RasterizerCommon::PixelCentre(iMinX),
-            RasterizerCommon::PixelCentre(iMinY));
+        int64_t f01Row = normSign * RasterizerCommon::EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
+                                                                      RasterizerCommon::PixelCentre(iMinX),
+                                                                      RasterizerCommon::PixelCentre(iMinY));
+        int64_t f12Row = normSign * RasterizerCommon::EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
+                                                                      RasterizerCommon::PixelCentre(iMinX),
+                                                                      RasterizerCommon::PixelCentre(iMinY));
+        int64_t f20Row = normSign * RasterizerCommon::EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
+                                                                      RasterizerCommon::PixelCentre(iMinX),
+                                                                      RasterizerCommon::PixelCentre(iMinY));
 
         for (int y = iMinY; y <= iMaxY;
             ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
