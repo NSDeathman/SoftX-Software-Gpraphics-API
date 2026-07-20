@@ -5,7 +5,7 @@
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
 #include "RasterizerFactory.h"
-#include "ThreadPoolManager.h"
+#include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -142,20 +142,18 @@ void DeviceContext::Clear(ClearFlags flags,
     CommitState();
 
     PipelineStateObject state = frontState;
-    auto& pool = ThreadPoolManager::Get();
 
     const bool clearColor = !!(flags & ClearFlags::RenderTarget) && state.renderTarget;
     const bool clearDepth = !!(flags & ClearFlags::DepthBuffer) && state.depthBuffer;
 
     if (!clearColor && !clearDepth) return;
 
-    const bool useParallel = clearColor && clearDepth && pool.threadCount() > 0;
+    const bool useParallel = clearColor && clearDepth;
 
     if (useParallel) 
     {
         state.renderTarget->Clear(color);
-        pool.enqueue([db = state.depthBuffer, depth]{ db->Clear(depth); });
-        pool.wait();
+        ThreadUtils::DispatchWorkers([db = state.depthBuffer, depth]{ db->Clear(depth); });
     }
     else 
     {

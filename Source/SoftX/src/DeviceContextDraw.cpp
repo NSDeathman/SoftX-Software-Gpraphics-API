@@ -101,15 +101,15 @@ std::vector<Interpolant> DeviceContext::ProcessIndexedVertices(const PipelineSta
     }
 
     const size_t totalUnique = uniqueIndices.size();
-    ParallelFor(size_t(0), totalUnique, size_t(1),
-        [&](size_t i)
-        {
-            uint idx = uniqueIndices[i];
-            clipVerts[idx] = state.vertexShader(
-                state.vertexBuffer.GetByIndex(idx),
-                state.constantBuffer,
-                state.textureTable);
-        });
+    ThreadUtils::ParallelFor(size_t(0), totalUnique, size_t(1),
+    [&](size_t i)
+    {
+        uint idx = uniqueIndices[i];
+        clipVerts[idx] = state.vertexShader(
+            state.vertexBuffer.GetByIndex(idx),
+            state.constantBuffer,
+            state.textureTable);
+    });
 
     return clipVerts;
 }
@@ -125,11 +125,9 @@ std::vector<int3> DeviceContext::GatherIndexedTriangles(const PipelineStateObjec
 
     for (uint i = startIndex; i + 2 < startIndex + indexCount; i += 3)
     {
-        triangles.emplace_back(
-            static_cast<int>(state.indexBuffer.GetByIndex(i)),
-            static_cast<int>(state.indexBuffer.GetByIndex(i + 1)),
-            static_cast<int>(state.indexBuffer.GetByIndex(i + 2))
-        );
+        triangles.emplace_back(static_cast<int>(state.indexBuffer.GetByIndex(i)),
+                               static_cast<int>(state.indexBuffer.GetByIndex(i + 1)),
+                               static_cast<int>(state.indexBuffer.GetByIndex(i + 2)));
     }
     return triangles;
 }
@@ -141,15 +139,15 @@ std::vector<Interpolant> DeviceContext::ProcessNonIndexedVertices(const Pipeline
     PROFILE_SCOPE("Vertex Shader (non-indexed)");
     std::vector<Interpolant> clipVerts(vertexCount);
 
-    ParallelFor(uint(0), vertexCount, uint(1),
-        [&](uint i)
-        {
-            uint idx = startVertex + i;
-            clipVerts[i] = state.vertexShader(
-                state.vertexBuffer.GetByIndex(idx),
-                state.constantBuffer,
-                state.textureTable);
-        });
+    ThreadUtils::ParallelFor(uint(0), vertexCount, uint(1),
+    [&](uint i)
+    {
+        uint idx = startVertex + i;
+        clipVerts[i] = state.vertexShader(
+            state.vertexBuffer.GetByIndex(idx),
+            state.constantBuffer,
+            state.textureTable);
+    });
 
     return clipVerts;
 }
@@ -432,8 +430,10 @@ void DeviceContext::DrawFullScreenQuad()
     const uint numTiles = (uint)tiles.size();
     std::atomic<uint> tileIndex(0);
 
-    if (fbPixels) {
-        auto workerFB = [&, ps, cb, tt, fbPixels, w, invW, invH]() {
+    if (fbPixels) 
+    {
+        auto workerFB = [&, ps, cb, tt, fbPixels, w, invW, invH]() 
+        {
             PROFILE_SCOPE("FullScreenQuad FB Worker");
             while (true) {
                 uint idx = tileIndex.fetch_add(1);
@@ -466,13 +466,12 @@ void DeviceContext::DrawFullScreenQuad()
                 }
             }
         };
-        auto& pool = ThreadPoolManager::Get();
-        for (uint i = 0; i < pool.threadCount(); ++i)
-            pool.enqueue(workerFB);
-        pool.wait();
+        ThreadUtils::DispatchWorkers(workerFB);
     }
-    else if (texPixels) {
-        auto workerTex = [&, ps, cb, tt, texPixels, w, invW, invH]() {
+    else if (texPixels) 
+    {
+        auto workerTex = [&, ps, cb, tt, texPixels, w, invW, invH]() 
+        {
             PROFILE_SCOPE("FullScreenQuad Tex Worker");
             while (true) {
                 uint idx = tileIndex.fetch_add(1);
@@ -505,15 +504,15 @@ void DeviceContext::DrawFullScreenQuad()
                 }
             }
         };
-        auto& pool = ThreadPoolManager::Get();
-        for (uint i = 0; i < pool.threadCount(); ++i)
-            pool.enqueue(workerTex);
-        pool.wait();
+        ThreadUtils::DispatchWorkers(workerTex);
     }
-    else {
-        auto workerFallback = [&, ps, cb, tt, rt, w, invW, invH]() {
+    else 
+    {
+        auto workerFallback = [&, ps, cb, tt, rt, w, invW, invH]() 
+        {
             PROFILE_SCOPE("FullScreenQuad Fallback Worker");
-            while (true) {
+            while (true) 
+            {
                 uint idx = tileIndex.fetch_add(1);
                 if (idx >= numTiles) break;
                 const Tile& tile = tiles[idx];
@@ -521,9 +520,11 @@ void DeviceContext::DrawFullScreenQuad()
                 const uint startY = tile.min.y, endY = tile.max.y;
 
                 float v = startY * invH;
-                for (uint y = startY; y <= endY; ++y, v += invH) {
+                for (uint y = startY; y <= endY; ++y, v += invH) 
+                {
                     float u = startX * invW;
-                    for (uint x = startX; x <= endX; ++x, u += invW) {
+                    for (uint x = startX; x <= endX; ++x, u += invW) 
+                    {
                         Interpolant input;
                         input.UV = float2(u, v);
                         rt->SetPixel(uint2(x, y), ps(input, cb, tt));
@@ -531,10 +532,7 @@ void DeviceContext::DrawFullScreenQuad()
                 }
             }
         };
-        auto& pool = ThreadPoolManager::Get();
-        for (uint i = 0; i < pool.threadCount(); ++i)
-            pool.enqueue(workerFallback);
-        pool.wait();
+        ThreadUtils::DispatchWorkers(workerFallback);
     }
 
 #ifdef DEBUG_TILING

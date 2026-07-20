@@ -9,6 +9,9 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
+namespace ThreadUtils
+{
+
 template <typename Index, typename Func>
 void ParallelFor(Index start, Index end, Index step, Func&& func)
 {
@@ -40,6 +43,18 @@ void ParallelFor(Index start, Index end, Index step, Func&& func)
     }
     pool.wait();
 }
+
+inline void DispatchWorkers(const std::function<void()>& worker)
+{
+    PROFILE_SCOPE("DispatchWorkers");
+    auto& pool = ThreadPoolManager::Get();
+    const size_t n = pool.threadCount();
+    for (size_t i = 0; i < n; ++i)
+        pool.enqueue(worker);
+    pool.wait();
+}
+
+} // namespace ThreadUtils
 
 SOFTX_END
 /////////////////////////////////////////////////////////////////

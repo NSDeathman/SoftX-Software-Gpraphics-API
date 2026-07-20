@@ -6,8 +6,8 @@
 #include <fstream>
 #include <iostream>
 
-#include "ThreadPoolManager.h"
 #include "../include/SoftX.h"
+#include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -38,71 +38,65 @@ void FrameBuffer::PresentASCII(HANDLE hConsole, uint2 consoleSize)
     const uint totalPixels = dstW * dstH;
     std::atomic<uint> pixelIndex(0);
 
-    auto& pool = ThreadPoolManager::Get();
-    for (size_t t = 0; t < pool.threadCount(); ++t)
+    auto Task = [&]()
     {
-        pool.enqueue([&]()
+        while (true)
+        {
+            uint idx = pixelIndex.fetch_add(1);
+            if (idx >= totalPixels) break;
+
+            uint y = idx / dstW;
+            uint x = idx % dstW;
+
+            uint srcYStart = static_cast<uint>(y * scaleY);
+            uint srcYEnd = (y == dstH - 1) ? srcH : static_cast<uint>((y + 1) * scaleY);
+            if (srcYEnd == 0) srcYEnd = 1;
+
+            uint srcXStart = static_cast<uint>(x * scaleX);
+            uint srcXEnd = (x == dstW - 1) ? srcW : static_cast<uint>((x + 1) * scaleX);
+            if (srcXEnd == 0) srcXEnd = 1;
+
+            float rSum = 0, gSum = 0, bSum = 0;
+            uint samples = 0;
+
+            for (uint sy = srcYStart; sy < srcYEnd && sy < srcH; ++sy)
             {
-                while (true)
+                for (uint sx = srcXStart; sx < srcXEnd && sx < srcW; ++sx)
                 {
-                    uint idx = pixelIndex.fetch_add(1);
-                    if (idx >= totalPixels) break;
-
-                    uint y = idx / dstW;
-                    uint x = idx % dstW;
-
-                    uint srcYStart = static_cast<uint>(y * scaleY);
-                    uint srcYEnd = (y == dstH - 1) ? srcH : static_cast<uint>((y + 1) * scaleY);
-                    if (srcYEnd == 0) srcYEnd = 1;
-
-                    uint srcXStart = static_cast<uint>(x * scaleX);
-                    uint srcXEnd = (x == dstW - 1) ? srcW : static_cast<uint>((x + 1) * scaleX);
-                    if (srcXEnd == 0) srcXEnd = 1;
-
-                    float rSum = 0, gSum = 0, bSum = 0;
-                    uint samples = 0;
-
-                    for (uint sy = srcYStart; sy < srcYEnd && sy < srcH; ++sy)
-                    {
-                        for (uint sx = srcXStart; sx < srcXEnd && sx < srcW; ++sx)
-                        {
-                            __m128 color = Read(uint2(sx, sy));
-                            float rgba[4];
-                            _mm_storeu_ps(rgba, color);
-                            rSum += rgba[0];
-                            gSum += rgba[1];
-                            bSum += rgba[2];
-                            ++samples;
-                        }
-                    }
-
-                    if (samples > 0)
-                    {
-                        rSum /= samples;
-                        gSum /= samples;
-                        bSum /= samples;
-
-                        float luminance = 0.2126f * rSum + 0.7152f * gSum + 0.0722f * bSum;
-                        luminance = AfterMath::clamp(luminance, 0.0f, 1.0f);
-
-                        int gradIdx = static_cast<int>(luminance * gradientSize);
-                        gradIdx = AfterMath::clamp(gradIdx, 0, gradientSize);
-                        charBuffer[idx] = gradient[gradIdx];
-                    }
-                    else
-                    {
-                        charBuffer[idx] = ' ';
-                    }
+                    __m128 color = Read(uint2(sx, sy));
+                    float rgba[4];
+                    _mm_storeu_ps(rgba, color);
+                    rSum += rgba[0];
+                    gSum += rgba[1];
+                    bSum += rgba[2];
+                    ++samples;
                 }
-            });
-    }
-    pool.wait();
+            }
+
+            if (samples > 0)
+            {
+                rSum /= samples;
+                gSum /= samples;
+                bSum /= samples;
+
+                float luminance = 0.2126f * rSum + 0.7152f * gSum + 0.0722f * bSum;
+                luminance = AfterMath::clamp(luminance, 0.0f, 1.0f);
+
+                int gradIdx = static_cast<int>(luminance * gradientSize);
+                gradIdx = AfterMath::clamp(gradIdx, 0, gradientSize);
+                charBuffer[idx] = gradient[gradIdx];
+            }
+            else
+            {
+                charBuffer[idx] = ' ';
+            }
+        }
+    };
+    ThreadUtils::DispatchWorkers(Task);
 
     DWORD written = 0;
     COORD coord = { 0, 0 };
-    WriteConsoleOutputCharacterA(hConsole, charBuffer.data(),
-        static_cast<DWORD>(totalPixels),
-        coord, &written);
+    WriteConsoleOutputCharacterA(hConsole, charBuffer.data(), static_cast<DWORD>(totalPixels), coord, &written);
 }
 
 void FrameBuffer::PresentBitmap(HDC hdc, int2 dstPos, int2 dstSize)

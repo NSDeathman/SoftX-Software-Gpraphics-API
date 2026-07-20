@@ -6,7 +6,7 @@
 #include "../include/SoftX.h"
 #include "../include/RasterizerInterface.h"
 #include "Renderer.h"
-#include "ThreadPoolManager.h"
+#include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -127,7 +127,7 @@ void Renderer::RenderTiles(const PipelineStateObject& pso,
     uint numTiles = static_cast<uint>(tiles.size());
     std::atomic<int> tileIndex(0);
 
-    auto worker = [&]()
+    auto Task = [&]()
     {
         PROFILE_SCOPE("RenderTiles::tile worker");
         while (true)
@@ -155,11 +155,8 @@ void Renderer::RenderTiles(const PipelineStateObject& pso,
             }
         }
     };
+    ThreadUtils::DispatchWorkers(Task);
 
-    auto& pool = ThreadPoolManager::Get();
-    for (uint i = 0; i < pool.threadCount(); ++i)
-        pool.enqueue(worker);
-    pool.wait();
 }
 
 SOFTX_END
