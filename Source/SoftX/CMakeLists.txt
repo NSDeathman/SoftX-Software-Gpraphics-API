@@ -15,28 +15,14 @@ set(SOFTX_SOURCES
     src/FrameBuffer.cpp
     src/TextureRGBA32F.cpp
     src/OcclusionQuery.cpp
-    src/QueryRasterizerAVX.cpp
-    src/QueryRasterizerFactory.cpp
-    src/QueryRasterizerScalar.cpp
-    src/QueryRasterizerSSE.cpp
-    src/RasterizerAVX.cpp
-    src/RasterizerFactory.cpp
-    src/RasterizerScalar.cpp
-    src/RasterizerSSE.cpp
     src/Renderer.cpp
 )
 
 set(SOFTX_PRIVATE_HEADERS
     src/CPUDetector.h
-    src/QueryRasterizerAVX.h
-    src/QueryRasterizerFactory.h
-    src/QueryRasterizerScalar.h
-    src/QueryRasterizerSSE.h
-    src/RasterizerAVX.h
+    src/QueryRasterizer.h
     src/RasterizerCommon.h
-    src/RasterizerFactory.h
-    src/RasterizerScalar.h
-    src/RasterizerSSE.h
+    src/Rasterizer.h
     src/Renderer.h
     src/ThreadPool.h
     src/ThreadPoolManager.h
@@ -52,8 +38,6 @@ set(SOFTX_PUBLIC_HEADERS
     include/FrameBuffer.h
     include/LibInternal.h
     include/OcclusionQuery.h
-    include/QueryRasterizerInterface.h
-    include/RasterizerInterface.h
     include/RenderTargetInterface.h
     include/RenderTargetTexture.h
     include/SoftX.h
@@ -101,16 +85,13 @@ set_target_properties(SoftX PROPERTIES
 )
 
 source_group("Source Files\\Core"          FILES src/Device.cpp src/DeviceContext.cpp src/DeviceContextDebug.cpp src/DeviceContextDraw.cpp src/Renderer.cpp src/OcclusionQuery.cpp)
-source_group("Source Files\\Rasterizer"    FILES src/RasterizerAVX.cpp src/RasterizerFactory.cpp src/RasterizerScalar.cpp src/RasterizerSSE.cpp
-                                                 src/QueryRasterizerAVX.cpp src/QueryRasterizerFactory.cpp src/QueryRasterizerScalar.cpp src/QueryRasterizerSSE.cpp)
 source_group("Source Files\\Tools"         FILES src/CPUDetector.cpp)
 source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp src/TextureRGBA32F.cpp)
 
 source_group("Header Files\\Core"          FILES src/Renderer.h)
-source_group("Header Files\\Rasterizer"    FILES src/RasterizerAVX.h src/RasterizerCommon.h src/RasterizerFactory.h src/RasterizerScalar.h src/RasterizerSSE.h
-                                                 src/QueryRasterizerAVX.h src/QueryRasterizerFactory.h src/QueryRasterizerScalar.h src/QueryRasterizerSSE.h)
+source_group("Header Files\\Rasterizer"    FILES src/RasterizerCommon.h src/Rasterizer.h src/QueryRasterizer.h)
 source_group("Header Files\\Tools"         FILES src/CPUDetector.h src/ThreadPool.h src/ThreadPoolManager.h src/ThreadUtils.h)
 source_group("Header Files\\API"           FILES include/SoftX.h include/Device.h include/DeviceContext.h include/OcclusionQuery.h include/Types.h
                                                  include/DepthBuffer.h include/DepthTextureView.h include/FrameBuffer.h include/Exceptions.h
                                                  include/RenderTargetInterface.h include/RenderTargetTexture.h include/TextureRGBA32F.h include/TextureInterface.h
-                                                 include/LibInternal.h include/ThirdPartyIncluding.h include/QueryRasterizerInterface.h include/RasterizerInterface.h)
+                                                 include/LibInternal.h include/ThirdPartyIncluding.h)

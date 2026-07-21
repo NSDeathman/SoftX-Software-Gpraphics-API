@@ -22,6 +22,9 @@ static HWND g_hWnd = nullptr;
 static Device* g_device = nullptr;
 /////////////////////////////////////////////////////////////////
 float g_timeDelta = 0.0f;
+int g_frameCount = 0;
+float g_fps = 0.0f;
+auto g_fpsLastTime = std::chrono::steady_clock::now();
 uint2 g_windowSize = uint2(1280, 768);
 /////////////////////////////////////////////////////////////////
 struct Mesh
@@ -259,7 +262,7 @@ void DrawFrame(std::vector<Mesh>& cubes, Mesh& occluder, float occluderAngle)
     }
 
     static char title[256];
-    sprintf_s(title, "SoftX Occlusion Query Demo (Sync) | Visible cubes: %d / %d", visibleCount, CUBE_COUNT);
+    sprintf_s(title, "SoftX Occlusion Query Demo (Sync) | FPS: %.1f | Visible cubes: %d / %d", g_fps, visibleCount, CUBE_COUNT);
     SetWindowTextA(g_hWnd, title);
 
     g_device->Present();
@@ -360,6 +363,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     float occluderAngle = 0.0f;
 
     auto lastTime = std::chrono::steady_clock::now();
+    g_fpsLastTime = lastTime;
 
     while (msg.message != WM_QUIT)
     {
@@ -373,6 +377,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         auto currentTime = std::chrono::steady_clock::now();
         g_timeDelta = std::chrono::duration<float>(currentTime - lastTime).count();
         lastTime = currentTime;
+
+        g_frameCount++;
+        float fpsElapsed = std::chrono::duration<float>(currentTime - g_fpsLastTime).count();
+        if (fpsElapsed >= 1.0f)
+        {
+            g_fps = g_frameCount / fpsElapsed;
+            g_frameCount = 0;
+            g_fpsLastTime = currentTime;
+        }
 
         DrawFrame(cubes, occluder, occluderAngle);
         occluderAngle += 1.25f * g_timeDelta;

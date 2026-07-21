@@ -3,11 +3,23 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "../include/SoftX.h"
+#pragma once
+/////////////////////////////////////////////////////////////////
 #include "RasterizerCommon.h"
-#include "RasterizerScalar.h"
+#include "../include/LibInternal.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
+
+struct RasterizerState
+{
+    CullMode cullMode = CullMode::Back;
+    FillMode fillMode = FillMode::Solid;
+    ComparisonFunc depthFunc = ComparisonFunc::Less;
+    bool depthWriteEnable = true;
+};
+
+namespace Rasterizer
+{
 
 // Shared depth test + pixel write — called from both traversal paths.
 // Inlined by the compiler; extracted here to avoid duplicating the switch.
@@ -39,17 +51,17 @@ static inline void ShadeSinglePixel(uint x, uint y,
     }
 }
 
-void RasterizerScalar::RasterizeTriangle(const Interpolant& v0,
-                                         const Interpolant& v1,
-                                         const Interpolant& v2,
-                                         const RasterizerState& state,
-                                         DepthBuffer& depthBuffer,
-                                         IRenderTarget* renderTarget,
-                                         const PixelShader& ps,
-                                         const ConstantBuffer& cb,
-                                         const TextureTable* tt,
-                                         uint2 tileMin,
-                                         uint2 tileMax)
+static inline void RasterizeTriangle(const Interpolant& v0,
+                                     const Interpolant& v1,
+                                     const Interpolant& v2,
+                                     const RasterizerState& state,
+                                     DepthBuffer& depthBuffer,
+                                     IRenderTarget* renderTarget,
+                                     const PixelShader& ps,
+                                     const ConstantBuffer& cb,
+                                     const TextureTable* tt,
+                                     uint2 tileMin,
+                                     uint2 tileMax)
 {
     float minX = std::min(std::min(v0.Position.x, v1.Position.x), v2.Position.x);
     float maxX = std::max(std::max(v0.Position.x, v1.Position.x), v2.Position.x);
@@ -206,6 +218,8 @@ void RasterizerScalar::RasterizeTriangle(const Interpolant& v0,
         }
     }
 }
+
+} // namespace Rasterizer
 
 SOFTX_END
 /////////////////////////////////////////////////////////////////

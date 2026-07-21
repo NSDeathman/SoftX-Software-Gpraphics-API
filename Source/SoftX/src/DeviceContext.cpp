@@ -4,20 +4,17 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
-#include "RasterizerFactory.h"
 #include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 DeviceContext::DeviceContext()
 {
-    rasterizer = CreateBestRasterizer();
 }
 
 DeviceContext::DeviceContext(const PipelineStateObject& initialState) : backState(initialState), 
                                                                         frontState(initialState)
 {
-    rasterizer = CreateBestRasterizer();
 }
 
 DeviceContext::~DeviceContext() = default;

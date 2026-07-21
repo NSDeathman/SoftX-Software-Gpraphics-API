@@ -3,14 +3,13 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "../include/SoftX.h"
-#include "../include/RasterizerInterface.h"
 #include "Renderer.h"
+#include "Rasterizer.h"
 #include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-Renderer::Renderer(IRasterizer& rasterizer) : rasterizer(rasterizer)
+Renderer::Renderer()
 {
 }
 
@@ -141,17 +140,17 @@ void Renderer::RenderTiles(const PipelineStateObject& pso,
             {
                 const int3& tri = triangles[triIdx];
 
-                rasterizer.RasterizeTriangle(verts[tri.x],
-                                             verts[tri.y],
-                                             verts[tri.z],
-                                             rasterState,
-                                             *pso.depthBuffer,
-                                             pso.renderTarget.get(),
-                                             pso.pixelShader,
-                                             pso.constantBuffer,
-                                             &pso.textureTable,
-                                             tile.min,
-                                             tile.max);
+                Rasterizer::RasterizeTriangle(verts[tri.x],
+                                              verts[tri.y],
+                                              verts[tri.z],
+                                              rasterState,
+                                              *pso.depthBuffer,
+                                              pso.renderTarget.get(),
+                                              pso.pixelShader,
+                                              pso.constantBuffer,
+                                              &pso.textureTable,
+                                              tile.min,
+                                              tile.max);
             }
         }
     };

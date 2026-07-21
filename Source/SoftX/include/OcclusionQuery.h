@@ -10,7 +10,6 @@
 #include <future>
 
 #include "LibInternal.h"
-#include "QueryRasterizerInterface.h"
 #include "Types.h"
 #include "DepthBuffer.h"
 /////////////////////////////////////////////////////////////////
@@ -64,7 +63,6 @@ private:
 
     std::vector<DrawCall> drawCalls;
     std::future<void> future;
-    std::unique_ptr<IQueryRasterizer> rasterizer;
 
     std::atomic<bool> ready{ false };
     bool begun = false;
@@ -74,7 +72,6 @@ private:
     void ProcessDrawCall(const DrawCall& dc,
                          const OcclusionPipelineState& state,
                          DepthBuffer& db,
-                         IQueryRasterizer& rasterizer,
                          std::atomic<uint>& totalVisible);
 };
 

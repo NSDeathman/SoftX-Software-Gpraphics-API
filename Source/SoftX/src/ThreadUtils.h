@@ -12,6 +12,16 @@ SOFTX_BEGIN
 namespace ThreadUtils
 {
 
+inline void DispatchWorkers(const std::function<void()>& task)
+{
+    PROFILE_SCOPE("DispatchWorkers");
+    auto& pool = ThreadPoolManager::Get();
+    const size_t n = pool.threadCount();
+    for (size_t i = 0; i < n; ++i)
+        pool.enqueue(task);
+    pool.wait();
+}
+
 template <typename Index, typename Func>
 void ParallelFor(Index start, Index end, Index step, Func&& func)
 {
@@ -35,23 +45,12 @@ void ParallelFor(Index start, Index end, Index step, Func&& func)
         Index chunkEnd = std::min(chunkStart + chunkSize, end);
         if (chunkStart >= end) break;
 
-        pool.enqueue([chunkStart, chunkEnd, step, &func]()
-            {
-                for (Index i = chunkStart; i < chunkEnd; i += step)
-                    func(i);
-            });
+        DispatchWorkers([chunkStart, chunkEnd, step, &func]()
+        {
+            for (Index i = chunkStart; i < chunkEnd; i += step)
+                func(i);
+        });
     }
-    pool.wait();
-}
-
-inline void DispatchWorkers(const std::function<void()>& worker)
-{
-    PROFILE_SCOPE("DispatchWorkers");
-    auto& pool = ThreadPoolManager::Get();
-    const size_t n = pool.threadCount();
-    for (size_t i = 0; i < n; ++i)
-        pool.enqueue(worker);
-    pool.wait();
 }
 
 } // namespace ThreadUtils

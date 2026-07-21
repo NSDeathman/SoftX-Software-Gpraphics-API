@@ -230,7 +230,7 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
     if (state.fillMode == FillMode::Solid)
     {
         PROFILE_SCOPE("Render Solid");
-        Renderer renderer(*rasterizer);
+        Renderer renderer;
         renderer.Execute(state, finalVerts, finalTriangles);
 #ifdef DEBUG_TILING
         DrawActiveTileBorders(state, renderer.GetTiles());

@@ -6,14 +6,13 @@
 #pragma once
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
-#include "../include/RasterizerInterface.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 class Renderer
 {
 public:
-    Renderer(IRasterizer& rasterizer);
+    Renderer();
 
     void Execute(const PipelineStateObject& pso, const std::vector<Interpolant>& verts, const std::vector<int3>& triangles);
 
@@ -27,7 +26,6 @@ private:
                      const std::vector<Interpolant>& verts,
                      const std::vector<int3>& triangles);
 
-    IRasterizer& rasterizer;
     uint width = 0;
     uint height = 0;
     uint tileSize = 0;

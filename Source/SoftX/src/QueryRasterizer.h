@@ -3,11 +3,14 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#include "../include/SoftX.h"
-#include "RasterizerCommon.h"
-#include "QueryRasterizerScalar.h"
+#pragma once
+/////////////////////////////////////////////////////////////////
+#include "Rasterizer.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
+
+namespace QueryRasterizer
+{
 
 static inline bool ProcessPixel(uint x, uint y,
                                 int64_t sf12, int64_t sf20, int64_t sf01,
@@ -35,14 +38,14 @@ static inline bool ProcessPixel(uint x, uint y,
     return false;
 }
 
-uint QueryRasterizerScalar::RasterizeTriangle(const Interpolant& v0,
-                                              const Interpolant& v1,
-                                              const Interpolant& v2,
-                                              const RasterizerState& state,
-                                              DepthBuffer& depthBuffer,
-                                              const ConstantBuffer& /*cb*/,
-                                              uint2 tileMin,
-                                              uint2 tileMax)
+static inline uint RasterizeTriangle(const Interpolant& v0,
+                                     const Interpolant& v1,
+                                     const Interpolant& v2,
+                                     const RasterizerState& state,
+                                     DepthBuffer& depthBuffer,
+                                     const ConstantBuffer& /*cb*/,
+                                     uint2 tileMin,
+                                     uint2 tileMax)
 {
     float minX = std::min(std::min(v0.Position.x, v1.Position.x), v2.Position.x);
     float maxX = std::max(std::max(v0.Position.x, v1.Position.x), v2.Position.x);
@@ -131,15 +134,13 @@ uint QueryRasterizerScalar::RasterizeTriangle(const Interpolant& v0,
                                                                       RasterizerCommon::PixelCentre(iMinX),
                                                                       RasterizerCommon::PixelCentre(iMinY));
 
-        for (int y = iMinY; y <= iMaxY;
-            ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
+        for (int y = iMinY; y <= iMaxY; ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
         {
             int64_t f01 = f01Row;
             int64_t f12 = f12Row;
             int64_t f20 = f20Row;
 
-            for (int x = iMinX; x <= iMaxX;
-                ++x, f01 += stepX01, f12 += stepX12, f20 += stepX20)
+            for (int x = iMinX; x <= iMaxX; ++x, f01 += stepX01, f12 += stepX12, f20 += stepX20)
             {
                 if ((f01 | f12 | f20) < 0) continue;
                 if (ProcessPixel(x, y, f12, f20, f01, area2Int, v0, v1, v2, depthBuffer, state, width))
@@ -150,6 +151,8 @@ uint QueryRasterizerScalar::RasterizeTriangle(const Interpolant& v0,
 
     return visibleCount;
 }
+
+} // namespace QueryRasterizer
 
 SOFTX_END
 /////////////////////////////////////////////////////////////////

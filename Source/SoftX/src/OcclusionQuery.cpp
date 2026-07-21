@@ -5,14 +5,13 @@
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
 #include "RasterizerCommon.h"
-#include "QueryRasterizerFactory.h"
+#include "QueryRasterizer.h"
 #include "ThreadPoolManager.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 OcclusionQuery::OcclusionQuery() : stateMutex(std::make_unique<std::mutex>())
 {
-    rasterizer = CreateBestQueryRasterizer();
 }
 
 OcclusionQuery::~OcclusionQuery()
@@ -134,12 +133,11 @@ void OcclusionQuery::End()
     auto drawCallsCopy = std::make_shared<std::vector<DrawCall>>(drawCalls);
     DepthBuffer* db = stateCaptured.depthBuffer.get();
     Viewport vpData = stateCaptured.viewport;
-    IQueryRasterizer* rast = rasterizer.get();
 
     ready = false;
     totalVisibleSamples = 0;
 
-    future = ThreadPoolManager::Get().enqueueBackground([this, drawCallsCopy, stateCaptured, db, rast]()
+    future = ThreadPoolManager::Get().enqueueBackground([this, drawCallsCopy, stateCaptured, db]()
     {
         PROFILE_THREAD("OcclusionQuery::AsyncExecution");
         PROFILE_SCOPE("OcclusionQuery::AsyncExecution");
@@ -147,7 +145,7 @@ void OcclusionQuery::End()
 
         size_t count = drawCallsCopy->size();
         for (size_t i = 0; i < count; ++i)
-            ProcessDrawCall((*drawCallsCopy)[i], stateCaptured, *db, *rast, totalVisible);
+            ProcessDrawCall((*drawCallsCopy)[i], stateCaptured, *db, totalVisible);
 
         for (size_t i = 0; i < drawCalls.size(); ++i)
             drawCalls[i].visibleSamples = (*drawCallsCopy)[i].visibleSamples;
@@ -177,7 +175,6 @@ void OcclusionQuery::Release()
 
     if (future.valid())
         future.wait();
-    rasterizer.reset();
     drawCalls.clear();
     {
         std::lock_guard<std::mutex> lock(*stateMutex);
@@ -209,7 +206,6 @@ bool OcclusionQuery::GetResult(queryID id, uint* outSamples) const
 void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
                                      const OcclusionPipelineState& pso,
                                      DepthBuffer& db,
-                                     IQueryRasterizer& rasterzer,
                                      std::atomic<uint>& totalVisible)
 {
     PROFILE_SCOPE("OcclusionQuery::ProcessDrawCall");
@@ -278,12 +274,12 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
             if (tileMinX > tileMaxX || tileMinY > tileMaxY)
                 continue;
 
-            localVisible += rasterzer.RasterizeTriangle( tv0, tv1, tv2,
-                                                         rasterState,
-                                                         db,
-                                                         dc.constantBuffer,
-                                                         uint2(tileMinX, tileMinY),
-                                                         uint2(tileMaxX, tileMaxY) );
+            localVisible += QueryRasterizer::RasterizeTriangle(tv0, tv1, tv2,
+                                                               rasterState,
+                                                               db,
+                                                               dc.constantBuffer,
+                                                               uint2(tileMinX, tileMinY),
+                                                               uint2(tileMaxX, tileMaxY));
         }
     }
 

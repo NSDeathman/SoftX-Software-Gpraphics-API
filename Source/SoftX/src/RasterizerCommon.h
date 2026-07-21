@@ -268,42 +268,6 @@ namespace RasterizerCommon
         return false;
     }
 
-    SOFTX_FORCE_INLINE __m128 DepthTest128(__m128 z, __m128 depth, ComparisonFunc func) 
-    {
-        switch (func) 
-        {
-        case ComparisonFunc::Never:        return _mm_setzero_ps();
-        case ComparisonFunc::Less:         return _mm_cmplt_ps(z, depth);
-        case ComparisonFunc::Equal:        return _mm_cmpeq_ps(z, depth);
-        case ComparisonFunc::LessEqual:    return _mm_cmple_ps(z, depth);
-        case ComparisonFunc::Greater:      return _mm_cmpgt_ps(z, depth);
-        case ComparisonFunc::NotEqual: 
-        {
-            __m128 eq = _mm_cmpeq_ps(z, depth);
-            return _mm_xor_ps(eq, _mm_castsi128_ps(_mm_set1_epi32(-1)));
-        }
-        case ComparisonFunc::GreaterEqual: return _mm_cmpge_ps(z, depth);
-        case ComparisonFunc::Always:       return _mm_castsi128_ps(_mm_set1_epi32(-1));
-        default:                           return _mm_cmplt_ps(z, depth);
-        }
-    }
-    
-    SOFTX_FORCE_INLINE __m256 DepthTest256(__m256 z, __m256 depth, ComparisonFunc func) 
-    {
-        switch (func) 
-        {
-        case ComparisonFunc::Never:        return _mm256_setzero_ps();
-        case ComparisonFunc::Less:         return _mm256_cmp_ps(z, depth, _CMP_LT_OQ);
-        case ComparisonFunc::Equal:        return _mm256_cmp_ps(z, depth, _CMP_EQ_OQ);
-        case ComparisonFunc::LessEqual:    return _mm256_cmp_ps(z, depth, _CMP_LE_OQ);
-        case ComparisonFunc::Greater:      return _mm256_cmp_ps(z, depth, _CMP_GT_OQ);
-        case ComparisonFunc::NotEqual:     return _mm256_cmp_ps(z, depth, _CMP_NEQ_OQ);
-        case ComparisonFunc::GreaterEqual: return _mm256_cmp_ps(z, depth, _CMP_GE_OQ);
-        case ComparisonFunc::Always:       return _mm256_castsi256_ps(_mm256_set1_epi32(-1));
-        }
-        return _mm256_cmp_ps(z, depth, _CMP_LT_OQ);
-    }
-
 } // namespace RasterizerCommon
 
 SOFTX_END

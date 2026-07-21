@@ -7,7 +7,6 @@
 /////////////////////////////////////////////////////////////////
 #include <mutex>
 #include "LibInternal.h"
-#include "RasterizerInterface.h"
 #include "RenderTargetInterface.h"
 #include "ThirdPartyIncluding.h"
 #include "Types.h"
@@ -107,8 +106,6 @@ private:
     PipelineStateObject backState;
     mutable std::mutex stateMutex;
     mutable std::mutex drawMutex;
-
-    std::unique_ptr<IRasterizer> rasterizer;
 };
 
 SOFTX_END
