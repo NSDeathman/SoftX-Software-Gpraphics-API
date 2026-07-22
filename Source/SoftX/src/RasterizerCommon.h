@@ -5,8 +5,6 @@
 /////////////////////////////////////////////////////////////////
 #pragma once
 /////////////////////////////////////////////////////////////////
-#include "../include/SoftX.h"
-/////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 namespace RasterizerCommon
@@ -286,6 +284,8 @@ namespace RasterizerCommon
         int bbMinX, bbMaxX;
         int bbMinY, bbMaxY;
 
+        int64_t f01Base, f12Base, f20Base;
+
         float invArea2;      // 1.0 / (2 * area in fixed-point units)
         int   normSign;      // 1 (CCW) or -1 (flipped CW)
 
@@ -345,6 +345,12 @@ namespace RasterizerCommon
         s.bbMinY = static_cast<int>(std::floor(minY));
         s.bbMaxY = static_cast<int>(std::ceil(maxY));
 
+        const int pcMinX = PixelCentre(s.bbMinX);
+        const int pcMinY = PixelCentre(s.bbMinY);
+        s.f01Base = normSign * EdgeFunctionInt(x0, y0, x1, y1, pcMinX, pcMinY);
+        s.f12Base = normSign * EdgeFunctionInt(x1, y1, x2, y2, pcMinX, pcMinY);
+        s.f20Base = normSign * EdgeFunctionInt(x2, y2, x0, y0, pcMinX, pcMinY);
+
         return s;
     }
 
@@ -361,6 +367,13 @@ namespace RasterizerCommon
         int bbMaxY = std::min(static_cast<int>(tileMax.y), s.bbMaxY);
 
         if (bbMinX > bbMaxX || bbMinY > bbMaxY) return;
+
+        const int64_t dxTile = bbMinX - s.bbMinX;
+        const int64_t dyTile = bbMinY - s.bbMinY;
+
+        int64_t f01Tile = s.f01Base + dxTile * s.stepX01 + dyTile * s.stepY01;
+        int64_t f12Tile = s.f12Base + dxTile * s.stepX12 + dyTile * s.stepY12;
+        int64_t f20Tile = s.f20Base + dxTile * s.stepX20 + dyTile * s.stepY20;
 
         // ── Traversal path selection ─────────────────────────────────────────────
         //
@@ -412,32 +425,26 @@ namespace RasterizerCommon
 
             for (uint code = 0; code < total; ++code)
             {
-                const uint dx = DecodeMorton2X(code);
-                const uint dy = DecodeMorton2Y(code);
+                const int dx = static_cast<int>(DecodeMorton2X(code));
+                const int dy = static_cast<int>(DecodeMorton2Y(code));
 
                 // Skip codes outside the actual (non-square) bounding box
-                if (dx >= bbW || dy >= bbH) continue;
+                if (dx >= static_cast<int>(bbW) || dy >= static_cast<int>(bbH)) continue;
 
                 const uint x = bbMinX + dx;
                 const uint y = bbMinY + dy;
 
-                // Integer edge test (exact, no floating-point error)
-                const int64_t sf01 = ns * EdgeFunctionInt(x0, y0, x1, y1,
-                                                          PixelCentre(x),
-                                                          PixelCentre(y));
-                const int64_t sf12 = ns * EdgeFunctionInt(x1, y1, x2, y2,
-                                                          PixelCentre(x),
-                                                          PixelCentre(y));
-                const int64_t sf20 = ns * EdgeFunctionInt(x2, y2, x0, y0,
-                                                          PixelCentre(x),
-                                                          PixelCentre(y));
+                // Edge test
+                int64_t f01 = f01Tile + int64_t(dx) * s.stepX01 + int64_t(dy) * s.stepY01;
+                int64_t f12 = f12Tile + int64_t(dx) * s.stepX12 + int64_t(dy) * s.stepY12;
+                int64_t f20 = f20Tile + int64_t(dx) * s.stepX20 + int64_t(dy) * s.stepY20;
 
-                if ((sf01 | sf12 | sf20) < 0) continue;
+                if ((f01 | f12 | f20) < 0) continue;
 
                 // Barycentrics from precomputed reciprocal area
-                const float fa = float(sf12) * invArea;
-                const float fb = float(sf20) * invArea;
-                const float fc = float(sf01) * invArea;
+                const float fa = float(f12) * invArea;
+                const float fb = float(f20) * invArea;
+                const float fc = float(f01) * invArea;
 
                 processPixel(x, y, fa, fb, fc);
             }
@@ -453,25 +460,19 @@ namespace RasterizerCommon
             // and are reused here unchanged.
 
             // Row-start values at pixel centre (bbMinX, bbMinY)
-            int64_t f01Row = ns * EdgeFunctionInt(x0, y0, x1, y1,
-                                                  PixelCentre(bbMinX),
-                                                  PixelCentre(bbMinY));
-            int64_t f12Row = ns * EdgeFunctionInt(x1, y1, x2, y2,
-                                                  PixelCentre(bbMinX),
-                                                  PixelCentre(bbMinY));
-            int64_t f20Row = ns * EdgeFunctionInt(x2, y2, x0, y0,
-                                                  PixelCentre(bbMinX),
-                                                  PixelCentre(bbMinY));
+            const int64_t dx = bbMinX - s.bbMinX;
+            const int64_t dy = bbMinY - s.bbMinY;
+            int64_t f01Row = s.f01Base + dx * s.stepX01 + dy * s.stepY01;
+            int64_t f12Row = s.f12Base + dx * s.stepX12 + dy * s.stepY12;
+            int64_t f20Row = s.f20Base + dx * s.stepX20 + dy * s.stepY20;
 
-            for (int y = bbMinY; y <= bbMaxY; ++y,
-                 f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20)
+            for (int y = bbMinY; y <= bbMaxY; ++y, f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20)
             {
                 int64_t f01 = f01Row;
                 int64_t f12 = f12Row;
                 int64_t f20 = f20Row;
 
-                for (int x = bbMinX; x <= bbMaxX; ++x,
-                     f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20)
+                for (int x = bbMinX; x <= bbMaxX; ++x, f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20)
                 {
                     // Single branch: OR of sign bits — negative if any f < 0
                     if ((f01 | f12 | f20) < 0) continue;

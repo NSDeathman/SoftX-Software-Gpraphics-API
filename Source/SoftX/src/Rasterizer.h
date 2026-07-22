@@ -23,8 +23,7 @@ static inline void ShadeSinglePixel(uint x, uint y,
                                     const RasterizerState& state,
                                     uint width)
 {
-    const uint idx = y * width + x;
-    float depthValue = depthBuffer.At(idx);
+    float depthValue = depthBuffer.At(int2(x, y));
     float zInterp = fa * v0.Position.z + fb * v1.Position.z + fc * v2.Position.z;
     bool depthPass = RasterizerCommon::DepthTest(zInterp, depthValue, state.depthFunc);
     if (!depthPass)
@@ -33,7 +32,7 @@ static inline void ShadeSinglePixel(uint x, uint y,
     Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
 
     if (state.depthWriteEnable)
-        depthBuffer.At(idx) = frag.Position.z;
+        depthBuffer.At(int2(x, y)) = frag.Position.z;
     if(renderTarget != nullptr)
         renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
 }

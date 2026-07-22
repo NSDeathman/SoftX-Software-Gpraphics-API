@@ -21,14 +21,13 @@ static inline bool ProcessPixel(uint x, uint y,
 {
     float z = fa * v0.Position.z + fb * v1.Position.z + fc * v2.Position.z;
 
-    const uint idx = y * width + x;
-    float depthValue = depthBuffer.At(idx);
+    float depthValue = depthBuffer.At(int2(x, y));
     bool depthPass = RasterizerCommon::DepthTest(z, depthValue, state.depthFunc);
 
     if (depthPass)
     {
         if (state.depthWriteEnable)
-            depthBuffer.At(idx) = z;
+            depthBuffer.At(int2(x, y)) = z;
         return true;
     }
     return false;
