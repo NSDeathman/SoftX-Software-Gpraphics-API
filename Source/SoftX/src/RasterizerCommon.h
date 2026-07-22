@@ -282,6 +282,10 @@ namespace RasterizerCommon
         int stepX01, stepX12, stepX20;
         int stepY01, stepY12, stepY20;
 
+        // Precomputed pixel‑space bounding box (integer, floor/ceil)
+        int bbMinX, bbMaxX;
+        int bbMinY, bbMaxY;
+
         float invArea2;      // 1.0 / (2 * area in fixed-point units)
         int   normSign;      // 1 (CCW) or -1 (flipped CW)
 
@@ -331,6 +335,16 @@ namespace RasterizerCommon
         s.v1 = b;
         s.v2 = c;
 
+        float minX = std::min({ a.Position.x, b.Position.x, c.Position.x });
+        float maxX = std::max({ a.Position.x, b.Position.x, c.Position.x });
+        float minY = std::min({ a.Position.y, b.Position.y, c.Position.y });
+        float maxY = std::max({ a.Position.y, b.Position.y, c.Position.y });
+
+        s.bbMinX = static_cast<int>(std::floor(minX));
+        s.bbMaxX = static_cast<int>(std::ceil(maxX));
+        s.bbMinY = static_cast<int>(std::floor(minY));
+        s.bbMaxY = static_cast<int>(std::ceil(maxY));
+
         return s;
     }
 
@@ -341,15 +355,10 @@ namespace RasterizerCommon
                                PixelFunc&& processPixel)
     {
         // ── Bounding box clipping to tile ──────────────────────────────────────
-        float minX = std::min({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
-        float maxX = std::max({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
-        float minY = std::min({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
-        float maxY = std::max({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
-
-        int bbMinX = std::max((int)tileMin.x, (int)std::floor(minX));
-        int bbMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));
-        int bbMinY = std::max((int)tileMin.y, (int)std::floor(minY));
-        int bbMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
+        int bbMinX = std::max(static_cast<int>(tileMin.x), s.bbMinX);
+        int bbMaxX = std::min(static_cast<int>(tileMax.x), s.bbMaxX);
+        int bbMinY = std::max(static_cast<int>(tileMin.y), s.bbMinY);
+        int bbMaxY = std::min(static_cast<int>(tileMax.y), s.bbMaxY);
 
         if (bbMinX > bbMaxX || bbMinY > bbMaxY) return;
 
