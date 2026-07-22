@@ -277,7 +277,6 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
             localVisible += QueryRasterizer::RasterizeTriangle(tv0, tv1, tv2,
                                                                rasterState,
                                                                db,
-                                                               dc.constantBuffer,
                                                                uint2(tileMinX, tileMinY),
                                                                uint2(tileMaxX, tileMaxY));
         }

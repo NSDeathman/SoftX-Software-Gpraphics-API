@@ -368,6 +368,14 @@ enum class CullMode { None, Front, Back };
 enum class FillMode { Point, Wireframe, Solid };
 enum class ComparisonFunc { Never, Less, Equal, LessEqual, Greater, NotEqual, GreaterEqual, Always };
 
+struct RasterizerState
+{
+    CullMode cullMode = CullMode::Back;
+    FillMode fillMode = FillMode::Solid;
+    ComparisonFunc depthFunc = ComparisonFunc::Less;
+    bool depthWriteEnable = true;
+};
+
 // ── Pipeline resources ───────────────────────────────────────
 enum class PipelineResource : uint32_t
 {
