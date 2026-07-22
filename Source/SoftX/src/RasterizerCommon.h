@@ -9,68 +9,6 @@ SOFTX_BEGIN
 
 namespace RasterizerCommon
 {
-    // ── Morton order (Z-order curve) ─────────────────────────────────────────────
-    //
-    // Interleaves bits of x into even positions: b3b2b1b0 → 0b3 0b2 0b1 0b0
-    // Used to encode 2D pixel coordinates into a 1D Morton code such that
-    // spatially adjacent pixels have nearby codes — improving cache locality.
-    //
-    inline uint32_t Part1By1(uint32_t x)
-    {
-        x &= 0x0000ffff;
-        x = (x ^ (x << 8)) & 0x00ff00ff;
-        x = (x ^ (x << 4)) & 0x0f0f0f0f;
-        x = (x ^ (x << 2)) & 0x33333333;
-        x = (x ^ (x << 1)) & 0x55555555;
-        return x;
-    }
-
-    // Compacts even bit positions back: 0b3 0b2 0b1 0b0 → b3b2b1b0
-    inline uint32_t Compact1By1(uint32_t x)
-    {
-        x &= 0x55555555;
-        x = (x ^ (x >> 1)) & 0x33333333;
-        x = (x ^ (x >> 2)) & 0x0f0f0f0f;
-        x = (x ^ (x >> 4)) & 0x00ff00ff;
-        x = (x ^ (x >> 8)) & 0x0000ffff;
-        return x;
-    }
-
-    // Encodes 2D coordinates into a Morton code (Z-order)
-    inline uint32_t EncodeMorton2(uint32_t x, uint32_t y)
-    {
-        return (Part1By1(y) << 1) | Part1By1(x);
-    }
-
-    inline uint32_t DecodeMorton2X(uint32_t code)
-    {
-        return Compact1By1(code);
-    }
-    inline uint32_t DecodeMorton2Y(uint32_t code)
-    {
-        return Compact1By1(code >> 1);
-    }
-
-    // Smallest power of two >= x
-    inline uint32_t NextPow2(uint32_t x)
-    {
-        if (x <= 1)
-            return 1;
-        --x;
-        x |= x >> 1;
-        x |= x >> 2;
-        x |= x >> 4;
-        x |= x >> 8;
-        x |= x >> 16;
-        return ++x;
-    }
-
-    // Bounding box side limit for Morton traversal.
-    // Morton is beneficial when the bbox is roughly square and fits in L1 cache:
-    //   side=32 → max 1024 Morton codes → ~4KB of pixel data (fits in L1).
-    // For larger or very non-square bboxes, scanline is more efficient.
-    static constexpr uint MORTON_MAX_SIDE = 32;
-
     // ─── Fixed-point sub-pixel rasterisation (28.4) ───────────────────────────
     //
     // Edge function at pixel P for edge A → B:
@@ -375,28 +313,6 @@ namespace RasterizerCommon
         int64_t f12Tile = s.f12Base + dxTile * s.stepX12 + dyTile * s.stepY12;
         int64_t f20Tile = s.f20Base + dxTile * s.stepX20 + dyTile * s.stepY20;
 
-        // ── Traversal path selection ─────────────────────────────────────────────
-        //
-        // Scanline (row-major) has poor cache locality for small triangles:
-        //   a 2×40 triangle visits ~2 pixels per row, jumping (width * 4) bytes
-        //   between rows — each row is a separate cache miss.
-        //
-        // Morton order (Z-order curve) interleaves X and Y bits so that a 4×4
-        // pixel block occupies 16 consecutive codes — all 16 pixels hit the same
-        // or adjacent cache lines regardless of triangle shape.
-        //
-        // Morton overhead: iterates side² codes where side = NextPow2(max(W, H)).
-        // For side=32 that is 1024 codes — negligible, and the bbox fits in L1.
-        // For larger bboxes the wasted iterations outweigh the benefit, so we
-        // fall back to scanline.
-        //
-        // All heavy triangle‑setup work (fixed‑point conversion, edge step
-        // deltas, reciprocal area, sign normalisation) has already been done
-        // once per triangle and is stored inside TriangleSetup.
-        const uint bbW = bbMaxX - bbMinX + 1;
-        const uint bbH = bbMaxY - bbMinY + 1;
-        const bool useMorton = (std::max(bbW, bbH) <= MORTON_MAX_SIDE);
-
         // Aliases for readability
         const int x0 = s.x0fp, y0 = s.y0fp;
         const int x1 = s.x1fp, y1 = s.y1fp;
@@ -404,85 +320,37 @@ namespace RasterizerCommon
         const int ns = s.normSign;
         const float invArea = s.invArea2;
 
-        if (useMorton)
+        // ── Scanline traversal ───────────────────────────────────────────────
+        //
+        // Efficient for large triangles: incremental edge functions advance
+        // by a fixed integer step per pixel / per row — no per-pixel multiply.
+        //
+        // The edge step deltas have been precomputed during TriangleSetup
+        // and are reused here unchanged.
+
+        // Row-start values at pixel centre (bbMinX, bbMinY)
+        const int64_t dx = bbMinX - s.bbMinX;
+        const int64_t dy = bbMinY - s.bbMinY;
+        int64_t f01Row = s.f01Base + dx * s.stepX01 + dy * s.stepY01;
+        int64_t f12Row = s.f12Base + dx * s.stepX12 + dy * s.stepY12;
+        int64_t f20Row = s.f20Base + dx * s.stepX20 + dy * s.stepY20;
+
+        for (int y = bbMinY; y <= bbMaxY; ++y, f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20)
         {
-            // ── Morton order traversal ───────────────────────────────────────────
-            //
-            // Iterate Morton codes 0 … side²-1.
-            // Each code decodes to an offset (dx, dy) from the bbox origin.
-            // Codes outside the actual bbox are skipped cheaply.
-            //
-            // Visiting order example for side=4:
-            //
-            //   code:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-            //   dx:    0  1  0  1  2  3  2  3  0  1  0  1  2  3  2  3
-            //   dy:    0  0  1  1  0  0  1  1  2  2  3  3  2  2  3  3
-            //
-            // Pixels (0,0),(1,0),(0,1),(1,1) are codes 0-3 — a 2×2 block is
-            // always contiguous, ensuring adjacent pixels share cache lines.
-            const uint side  = NextPow2(std::max(bbW, bbH));
-            const uint total = side * side;
+            int64_t f01 = f01Row;
+            int64_t f12 = f12Row;
+            int64_t f20 = f20Row;
 
-            for (uint code = 0; code < total; ++code)
+            for (int x = bbMinX; x <= bbMaxX; ++x, f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20)
             {
-                const int dx = static_cast<int>(DecodeMorton2X(code));
-                const int dy = static_cast<int>(DecodeMorton2Y(code));
-
-                // Skip codes outside the actual (non-square) bounding box
-                if (dx >= static_cast<int>(bbW) || dy >= static_cast<int>(bbH)) continue;
-
-                const uint x = bbMinX + dx;
-                const uint y = bbMinY + dy;
-
-                // Edge test
-                int64_t f01 = f01Tile + int64_t(dx) * s.stepX01 + int64_t(dy) * s.stepY01;
-                int64_t f12 = f12Tile + int64_t(dx) * s.stepX12 + int64_t(dy) * s.stepY12;
-                int64_t f20 = f20Tile + int64_t(dx) * s.stepX20 + int64_t(dy) * s.stepY20;
-
+                // Single branch: OR of sign bits — negative if any f < 0
                 if ((f01 | f12 | f20) < 0) continue;
 
-                // Barycentrics from precomputed reciprocal area
                 const float fa = float(f12) * invArea;
                 const float fb = float(f20) * invArea;
                 const float fc = float(f01) * invArea;
 
                 processPixel(x, y, fa, fb, fc);
-            }
-        }
-        else
-        {
-            // ── Scanline traversal ───────────────────────────────────────────────
-            //
-            // Efficient for large triangles: incremental edge functions advance
-            // by a fixed integer step per pixel / per row — no per-pixel multiply.
-            //
-            // The edge step deltas have been precomputed during TriangleSetup
-            // and are reused here unchanged.
-
-            // Row-start values at pixel centre (bbMinX, bbMinY)
-            const int64_t dx = bbMinX - s.bbMinX;
-            const int64_t dy = bbMinY - s.bbMinY;
-            int64_t f01Row = s.f01Base + dx * s.stepX01 + dy * s.stepY01;
-            int64_t f12Row = s.f12Base + dx * s.stepX12 + dy * s.stepY12;
-            int64_t f20Row = s.f20Base + dx * s.stepX20 + dy * s.stepY20;
-
-            for (int y = bbMinY; y <= bbMaxY; ++y, f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20)
-            {
-                int64_t f01 = f01Row;
-                int64_t f12 = f12Row;
-                int64_t f20 = f20Row;
-
-                for (int x = bbMinX; x <= bbMaxX; ++x, f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20)
-                {
-                    // Single branch: OR of sign bits — negative if any f < 0
-                    if ((f01 | f12 | f20) < 0) continue;
-
-                    const float fa = float(f12) * invArea;
-                    const float fb = float(f20) * invArea;
-                    const float fc = float(f01) * invArea;
-
-                    processPixel(x, y, fa, fb, fc);
-                }
             }
         }
     }
