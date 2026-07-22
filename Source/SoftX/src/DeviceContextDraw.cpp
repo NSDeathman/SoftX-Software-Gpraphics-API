@@ -101,7 +101,7 @@ std::vector<Interpolant> DeviceContext::ProcessIndexedVertices(const PipelineSta
     }
 
     const size_t totalUnique = uniqueIndices.size();
-    ThreadUtils::ParallelFor(size_t(0), totalUnique, size_t(1),
+    ThreadUtils::SmartParallelFor(size_t(0), totalUnique, size_t(1),
     [&](size_t i)
     {
         uint idx = uniqueIndices[i];
@@ -139,7 +139,7 @@ std::vector<Interpolant> DeviceContext::ProcessNonIndexedVertices(const Pipeline
     PROFILE_SCOPE("Vertex Shader (non-indexed)");
     std::vector<Interpolant> clipVerts(vertexCount);
 
-    ThreadUtils::ParallelFor(uint(0), vertexCount, uint(1),
+    ThreadUtils::SmartParallelFor(uint(0), vertexCount, uint(1),
     [&](uint i)
     {
         uint idx = startVertex + i;

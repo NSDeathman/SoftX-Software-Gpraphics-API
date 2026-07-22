@@ -23,7 +23,7 @@ inline void DispatchWorkers(const std::function<void()>& task)
 }
 
 template <typename Index, typename Func>
-void ParallelFor(Index start, Index end, Index step, Func&& func)
+void SmartParallelFor(Index start, Index end, Index step, Func&& func)
 {
     if (end <= start) return;
 
