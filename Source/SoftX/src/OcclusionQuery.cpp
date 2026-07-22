@@ -210,6 +210,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
 {
     PROFILE_SCOPE("OcclusionQuery::ProcessDrawCall");
 
+    // Rasterizer state for both TriangleSetup creation and rasterisation
     RasterizerState rasterState;
     rasterState.cullMode = pso.cullMode;
     rasterState.depthFunc = pso.depthFunc;
@@ -220,6 +221,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
     const size_t indexCount = ibData.Size();
     if (indexCount < 3) return;
 
+    // Gather unique indices
     const size_t vertexCount = vbData.size();
     std::vector<bool> visited(vertexCount, false);
     std::vector<uint32_t> uniqueIndices;
@@ -233,6 +235,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
         }
     }
 
+    // Transform only the unique vertices
     std::vector<Interpolant> transformedVerts(vertexCount);
     for (uint32_t idx : uniqueIndices)
     {
@@ -250,21 +253,28 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
         Interpolant v1 = transformedVerts[i1];
         Interpolant v2 = transformedVerts[i2];
 
+        // Near-plane clipping
         Interpolant clipped[2][3];
         int numTris = RasterizerCommon::ClipTriangleNearPlane(v0, v1, v2, clipped);
         for (int t = 0; t < numTris; ++t)
         {
+            // Perspective divide for all three vertices of the clipped triangle
             for (int j = 0; j < 3; ++j)
                 RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], pso.viewport);
 
-            const Interpolant& tv0 = clipped[t][0];
-            const Interpolant& tv1 = clipped[t][1];
-            const Interpolant& tv2 = clipped[t][2];
+            // Pre‑compute triangle setup (culling + edge deltas + invArea)
+            auto optSetup = RasterizerCommon::CreateTriangleSetup(
+                clipped[t][0], clipped[t][1], clipped[t][2], rasterState);
+            if (!optSetup)
+                continue;   // culled or degenerate
 
-            float minX = std::min({ tv0.Position.x, tv1.Position.x, tv2.Position.x });
-            float maxX = std::max({ tv0.Position.x, tv1.Position.x, tv2.Position.x });
-            float minY = std::min({ tv0.Position.y, tv1.Position.y, tv2.Position.y });
-            float maxY = std::max({ tv0.Position.y, tv1.Position.y, tv2.Position.y });
+            const RasterizerCommon::TriangleSetup& s = *optSetup;
+
+            // Screen-space bounding box from the already transformed vertices
+            float minX = std::min({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
+            float maxX = std::max({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
+            float minY = std::min({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
+            float maxY = std::max({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
 
             int tileMinX = std::max(0, (int)std::floor(minX));
             int tileMinY = std::max(0, (int)std::floor(minY));
@@ -274,11 +284,10 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
             if (tileMinX > tileMaxX || tileMinY > tileMaxY)
                 continue;
 
-            localVisible += QueryRasterizer::RasterizeTriangle(tv0, tv1, tv2,
-                                                               rasterState,
-                                                               db,
-                                                               uint2(tileMinX, tileMinY),
-                                                               uint2(tileMaxX, tileMaxY));
+            // Rasterise using the pre‑computed setup
+            localVisible += QueryRasterizer::RasterizeTriangle(
+                s, rasterState, db,
+                uint2(tileMinX, tileMinY), uint2(tileMaxX, tileMaxY));
         }
     }
 

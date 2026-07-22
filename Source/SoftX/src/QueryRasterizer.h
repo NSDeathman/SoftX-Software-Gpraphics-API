@@ -34,9 +34,7 @@ static inline bool ProcessPixel(uint x, uint y,
     return false;
 }
 
-static inline uint RasterizeTriangle(const Interpolant& v0,
-                                     const Interpolant& v1,
-                                     const Interpolant& v2,
+static inline uint RasterizeTriangle(const RasterizerCommon::TriangleSetup& setup,
                                      const RasterizerState& state,
                                      DepthBuffer& depthBuffer,
                                      uint2 tileMin,
@@ -45,12 +43,12 @@ static inline uint RasterizeTriangle(const Interpolant& v0,
     uint width = depthBuffer.Width();
     uint visibleCount = 0;
 
-    RasterizerCommon::RasterizeTriangleImpl(v0, v1, v2, state, tileMin, tileMax, width,
+    RasterizerCommon::RasterizeTriangleImpl(setup, tileMin, tileMax, width,
         [&](uint x, uint y, float fa, float fb, float fc) 
         {
             if(ProcessPixel(x, y,
                             fa, fb, fc,
-                            v0, v1, v2,
+                            setup.v0, setup.v1, setup.v2,
                             depthBuffer,
                             state, 
                             width))

@@ -5,7 +5,8 @@
 /////////////////////////////////////////////////////////////////
 #pragma once
 /////////////////////////////////////////////////////////////////
-#include "../include/SoftX.h"
+#include "../include/Types.h"
+#include "RasterizerCommon.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -14,17 +15,14 @@ class Renderer
 public:
     Renderer();
 
-    void Execute(const PipelineStateObject& pso, const std::vector<Interpolant>& verts, const std::vector<int3>& triangles);
+    void Execute(const PipelineStateObject& pso, std::vector<RasterizerCommon::TriangleSetup>& setups);
 
     const std::vector<Tile>& GetTiles() const { return tiles; }
 
 private:
     void BuildTiles();
-    void BinTriangles(const std::vector<Interpolant>& verts, 
-                      const std::vector<int3>& triangles);
-    void RenderTiles(const PipelineStateObject& pso,
-                     const std::vector<Interpolant>& verts,
-                     const std::vector<int3>& triangles);
+    void BinTriangles(const std::vector<RasterizerCommon::TriangleSetup>& setups);
+    void RenderTiles(const PipelineStateObject& pso, const std::vector<RasterizerCommon::TriangleSetup>& setups);
 
     uint width = 0;
     uint height = 0;

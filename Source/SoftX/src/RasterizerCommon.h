@@ -130,11 +130,11 @@ namespace RasterizerCommon
     // where invW0/1/2 = Position.w of each vertex (set in ClipSpaceToScreenSpace),
     // and α, β, γ are barycentric coordinates in screen space.
     inline Interpolant Trilerp(const Interpolant& v0, 
-                                const Interpolant& v1, 
-                                const Interpolant& v2, 
-                                float alpha,
-                                float beta, 
-                                float gamma)
+                               const Interpolant& v1, 
+                               const Interpolant& v2, 
+                               float alpha,
+                               float beta, 
+                               float gamma)
     {
         // Position.w stores 1/w — weight each vertex
         float w0 = alpha * v0.Position.w;
@@ -198,23 +198,24 @@ namespace RasterizerCommon
     // Clips triangle against near plane (w = nearW) in clip space.
     // Returns 0, 1 or 2 triangles in outTris[2][3].
     // Sutherland-Hodgman algorithm for a single plane.
-    inline int ClipTriangleNearPlane(
-        const Interpolant& v0,
-        const Interpolant& v1,
-        const Interpolant& v2,
-        Interpolant outTris[2][3])
+    inline int ClipTriangleNearPlane(const Interpolant& v0,
+                                     const Interpolant& v1,
+                                     const Interpolant& v2,
+                                     Interpolant outTris[2][3])
     {
         const Interpolant* verts[3] = { &v0, &v1, &v2 };
         bool inside[3];
         int insideCount = 0;
 
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 3; ++i) 
+        {
             inside[i] = (verts[i]->Position.z >= 0.0f) && (verts[i]->Position.w > 0.0f);
             if (inside[i]) ++insideCount;
         }
 
         if (insideCount == 0) return 0;
-        if (insideCount == 3) {
+        if (insideCount == 3) 
+        {
             outTris[0][0] = v0; outTris[0][1] = v1; outTris[0][2] = v2;
             return 1;
         }
@@ -222,7 +223,8 @@ namespace RasterizerCommon
         Interpolant poly[4];
         int polySize = 0;
 
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 3; ++i) 
+        {
             int j = (i + 1) % 3;
             const Interpolant& A = *verts[i];
             const Interpolant& B = *verts[j];
@@ -231,7 +233,8 @@ namespace RasterizerCommon
 
             if (aIn) poly[polySize++] = A;
 
-            if (aIn != bIn) {
+            if (aIn != bIn) 
+            {
                 float t = (0.0f - A.Position.z) / (B.Position.z - A.Position.z);
                 t = AfterMath::clamp(t, 0.0f, 1.0f);
                 poly[polySize++] = LerpVertexClipSpace(A, B, t);
@@ -243,7 +246,8 @@ namespace RasterizerCommon
         outTris[0][0] = poly[0];
         outTris[0][1] = poly[1];
         outTris[0][2] = poly[2];
-        if (polySize == 4) {
+        if (polySize == 4) 
+        {
             outTris[1][0] = poly[0];
             outTris[1][1] = poly[2];
             outTris[1][2] = poly[3];
@@ -268,165 +272,210 @@ namespace RasterizerCommon
         return false;
     }
 
-template <typename PixelFunc>
-void RasterizeTriangleImpl(const Interpolant& v0, const Interpolant& v1, const Interpolant& v2,
-                           const RasterizerState& state,
-                           uint2 tileMin, uint2 tileMax,
-                           uint width,
-                           PixelFunc&& processPixel)
-{
-    // ---- bounding box ----
-    float minX = std::min({v0.Position.x, v1.Position.x, v2.Position.x});
-    float maxX = std::max({v0.Position.x, v1.Position.x, v2.Position.x});
-    float minY = std::min({v0.Position.y, v1.Position.y, v2.Position.y});
-    float maxY = std::max({v0.Position.y, v1.Position.y, v2.Position.y});
-
-    int iMinX = std::max((int)tileMin.x, (int)std::floor(minX));
-    int iMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));
-    int iMinY = std::max((int)tileMin.y, (int)std::floor(minY));
-    int iMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
-
-    if (iMinX > iMaxX || iMinY > iMaxY) SOFTX_UNLIKELY return;
-
-    // ── Fixed-point vertex coordinates (28.4) ───────────────────────────────
-    const int x0fp = ToFixed(v0.Position.x);
-    const int y0fp = ToFixed(v0.Position.y);
-    const int x1fp = ToFixed(v1.Position.x);
-    const int y1fp = ToFixed(v1.Position.y);
-    const int x2fp = ToFixed(v2.Position.x);
-    const int y2fp = ToFixed(v2.Position.y);
-
-    int64_t area2Int = EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp, x2fp, y2fp);
-
-    const CullMode cull = state.cullMode;
-    if (cull == CullMode::Back  && area2Int > 0) return;
-    if (cull == CullMode::Front && area2Int < 0) return;
-    if (area2Int == 0) SOFTX_UNLIKELY return;
-
-    // Normalize to CCW so the inside test is always f >= 0
-    const int normSign = (area2Int > 0) ? 1 : -1;
-    if (area2Int < 0) area2Int = -area2Int;
-    const float invArea2 = 1.0f / float(area2Int);
-
-    // ── Traversal path selection ─────────────────────────────────────────────
-    //
-    // Scanline (row-major) has poor cache locality for small triangles:
-    //   a 2×40 triangle visits ~2 pixels per row, jumping (width * 4) bytes
-    //   between rows — each row is a separate cache miss.
-    //
-    // Morton order (Z-order curve) interleaves X and Y bits so that a 4×4
-    // pixel block occupies 16 consecutive codes — all 16 pixels hit the same
-    // or adjacent cache lines regardless of triangle shape.
-    //
-    // Morton overhead: iterates side² codes where side = NextPow2(max(W, H)).
-    // For side=32 that is 1024 codes — negligible, and the bbox fits in L1.
-    // For larger bboxes the wasted iterations outweigh the benefit, so we
-    // fall back to scanline.
-    const uint bbW = iMaxX - iMinX + 1;
-    const uint bbH = iMaxY - iMinY + 1;
-    const bool useMorton = (std::max(bbW, bbH) <= MORTON_MAX_SIDE);
-
-    if (useMorton)
+    struct TriangleSetup
     {
-        // ── Morton order traversal ───────────────────────────────────────────
-        //
-        // Iterate Morton codes 0 … side²-1.
-        // Each code decodes to an offset (dx, dy) from the bbox origin.
-        // Codes outside the actual bbox are skipped cheaply.
-        //
-        // Visiting order example for side=4:
-        //
-        //   code:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-        //   dx:    0  1  0  1  2  3  2  3  0  1  0  1  2  3  2  3
-        //   dy:    0  0  1  1  0  0  1  1  2  2  3  3  2  2  3  3
-        //
-        // Pixels (0,0),(1,0),(0,1),(1,1) are codes 0-3 — a 2×2 block is
-        // always contiguous, ensuring adjacent pixels share cache lines.
-        const uint side  = NextPow2(std::max(bbW, bbH));
-        const uint total = side * side;
+        // Fixed point (28.4) vert coords
+        int x0fp, y0fp;
+        int x1fp, y1fp;
+        int x2fp, y2fp;
 
-        for (uint code = 0; code < total; ++code)
-        {
-            const uint dx = DecodeMorton2X(code);
-            const uint dy = DecodeMorton2Y(code);
+        int stepX01, stepX12, stepX20;
+        int stepY01, stepY12, stepY20;
 
-            // Skip codes outside the actual (non-square) bounding box
-            if (dx >= bbW || dy >= bbH) continue;
+        float invArea2;      // 1.0 / (2 * area in fixed-point units)
+        int   normSign;      // 1 (CCW) or -1 (flipped CW)
 
-            const uint x = iMinX + dx;
-            const uint y = iMinY + dy;
+        Interpolant v0, v1, v2;
+    };
 
-            // Tile boundary guard
-            if (x < tileMin.x || x > tileMax.x || y < tileMin.y || y > tileMax.y) continue;
+    inline std::optional<TriangleSetup> CreateTriangleSetup(const Interpolant& a,
+                                                            const Interpolant& b,
+                                                            const Interpolant& c,
+                                                            const RasterizerState& state)
+    {
+        // Convert to fixed point
+        const int x0 = ToFixed(a.Position.x), y0 = ToFixed(a.Position.y);
+        const int x1 = ToFixed(b.Position.x), y1 = ToFixed(b.Position.y);
+        const int x2 = ToFixed(c.Position.x), y2 = ToFixed(c.Position.y);
 
-            // Integer edge test (exact, no floating-point error)
-            const int64_t sf01 = normSign * EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
-                                                            PixelCentre(x),
-                                                            PixelCentre(y));
-            const int64_t sf12 = normSign * EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
-                                                            PixelCentre(x),
-                                                            PixelCentre(y));
-            const int64_t sf20 = normSign * EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
-                                                            PixelCentre(x),
-                                                            PixelCentre(y));
+        // Area (squared) and degeneracy test
+        int64_t area2 = EdgeFunctionInt(x0, y0, x1, y1, x2, y2);
+        if (area2 == 0) return std::nullopt;
 
-            if ((sf01 | sf12 | sf20) < 0) continue;
+        // Backface / frontface culling
+        const CullMode cull = state.cullMode;
+        if (cull == CullMode::Back && area2 > 0) return std::nullopt;
+        if (cull == CullMode::Front && area2 < 0) return std::nullopt;
 
-            // вычисляем барицентрические веса сразу
-            const float fa = float(sf12) * invArea2;
-            const float fb = float(sf20) * invArea2;
-            const float fc = float(sf01) * invArea2;
+        // Normalizing: always CCW (area2 > 0)
+        int normSign = (area2 > 0) ? 1 : -1;
+        if (area2 < 0) area2 = -area2;
 
-            processPixel(x, y, fa, fb, fc);
-        }
+        TriangleSetup s;
+        s.x0fp = x0; s.y0fp = y0;
+        s.x1fp = x1; s.y1fp = y1;
+        s.x2fp = x2; s.y2fp = y2;
+
+        s.invArea2 = 1.0f / static_cast<float>(area2);
+        s.normSign = normSign;
+
+        s.stepX01 = normSign * SUBPIXEL_STEP * (y1 - y0);
+        s.stepX12 = normSign * SUBPIXEL_STEP * (y2 - y1);
+        s.stepX20 = normSign * SUBPIXEL_STEP * (y0 - y2);
+
+        s.stepY01 = -normSign * SUBPIXEL_STEP * (x1 - x0);
+        s.stepY12 = -normSign * SUBPIXEL_STEP * (x2 - x1);
+        s.stepY20 = -normSign * SUBPIXEL_STEP * (x0 - x2);
+
+        s.v0 = a;
+        s.v1 = b;
+        s.v2 = c;
+
+        return s;
     }
-    else
+
+    template <typename PixelFunc>
+    void RasterizeTriangleImpl(const TriangleSetup& s,
+                               uint2 tileMin, uint2 tileMax,
+                               uint width,
+                               PixelFunc&& processPixel)
     {
-        // ── Scanline traversal ───────────────────────────────────────────────
+        // ── Bounding box clipping to tile ──────────────────────────────────────
+        float minX = std::min({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
+        float maxX = std::max({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
+        float minY = std::min({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
+        float maxY = std::max({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
+
+        int bbMinX = std::max((int)tileMin.x, (int)std::floor(minX));
+        int bbMaxX = std::min((int)tileMax.x, (int)std::ceil(maxX));
+        int bbMinY = std::max((int)tileMin.y, (int)std::floor(minY));
+        int bbMaxY = std::min((int)tileMax.y, (int)std::ceil(maxY));
+
+        if (bbMinX > bbMaxX || bbMinY > bbMaxY) return;
+
+        // ── Traversal path selection ─────────────────────────────────────────────
         //
-        // Efficient for large triangles: incremental edge functions advance
-        // by a fixed integer step per pixel / per row — no per-pixel multiply.
+        // Scanline (row-major) has poor cache locality for small triangles:
+        //   a 2×40 triangle visits ~2 pixels per row, jumping (width * 4) bytes
+        //   between rows — each row is a separate cache miss.
+        //
+        // Morton order (Z-order curve) interleaves X and Y bits so that a 4×4
+        // pixel block occupies 16 consecutive codes — all 16 pixels hit the same
+        // or adjacent cache lines regardless of triangle shape.
+        //
+        // Morton overhead: iterates side² codes where side = NextPow2(max(W, H)).
+        // For side=32 that is 1024 codes — negligible, and the bbox fits in L1.
+        // For larger bboxes the wasted iterations outweigh the benefit, so we
+        // fall back to scanline.
+        //
+        // All heavy triangle‑setup work (fixed‑point conversion, edge step
+        // deltas, reciprocal area, sign normalisation) has already been done
+        // once per triangle and is stored inside TriangleSetup.
+        const uint bbW = bbMaxX - bbMinX + 1;
+        const uint bbH = bbMaxY - bbMinY + 1;
+        const bool useMorton = (std::max(bbW, bbH) <= MORTON_MAX_SIDE);
 
-        // Per-pixel x-step: ΔE = +S * Δy_fp
-        // Per-row   y-step: ΔE = -S * Δx_fp
-        const int stepX01 = normSign * SUBPIXEL_STEP * (y1fp - y0fp);
-        const int stepX12 = normSign * SUBPIXEL_STEP * (y2fp - y1fp);
-        const int stepX20 = normSign * SUBPIXEL_STEP * (y0fp - y2fp);
-        const int stepY01 = -normSign * SUBPIXEL_STEP * (x1fp - x0fp);
-        const int stepY12 = -normSign * SUBPIXEL_STEP * (x2fp - x1fp);
-        const int stepY20 = -normSign * SUBPIXEL_STEP * (x0fp - x2fp);
+        // Aliases for readability
+        const int x0 = s.x0fp, y0 = s.y0fp;
+        const int x1 = s.x1fp, y1 = s.y1fp;
+        const int x2 = s.x2fp, y2 = s.y2fp;
+        const int ns = s.normSign;
+        const float invArea = s.invArea2;
 
-        // Row-start values at pixel centre (iMinX, iMinY)
-        int64_t f01Row = normSign * EdgeFunctionInt(x0fp, y0fp, x1fp, y1fp,
-                                                    PixelCentre(iMinX),
-                                                    PixelCentre(iMinY));
-        int64_t f12Row = normSign * EdgeFunctionInt(x1fp, y1fp, x2fp, y2fp,
-                                                    PixelCentre(iMinX),
-                                                    PixelCentre(iMinY));
-        int64_t f20Row = normSign * EdgeFunctionInt(x2fp, y2fp, x0fp, y0fp,
-                                                    PixelCentre(iMinX),
-                                                    PixelCentre(iMinY));
-
-        for (int y = iMinY; y <= iMaxY; ++y, f01Row += stepY01, f12Row += stepY12, f20Row += stepY20)
+        if (useMorton)
         {
-            int64_t f01 = f01Row;
-            int64_t f12 = f12Row;
-            int64_t f20 = f20Row;
+            // ── Morton order traversal ───────────────────────────────────────────
+            //
+            // Iterate Morton codes 0 … side²-1.
+            // Each code decodes to an offset (dx, dy) from the bbox origin.
+            // Codes outside the actual bbox are skipped cheaply.
+            //
+            // Visiting order example for side=4:
+            //
+            //   code:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+            //   dx:    0  1  0  1  2  3  2  3  0  1  0  1  2  3  2  3
+            //   dy:    0  0  1  1  0  0  1  1  2  2  3  3  2  2  3  3
+            //
+            // Pixels (0,0),(1,0),(0,1),(1,1) are codes 0-3 — a 2×2 block is
+            // always contiguous, ensuring adjacent pixels share cache lines.
+            const uint side  = NextPow2(std::max(bbW, bbH));
+            const uint total = side * side;
 
-            for (int x = iMinX; x <= iMaxX; ++x, f01 += stepX01, f12 += stepX12, f20 += stepX20)
+            for (uint code = 0; code < total; ++code)
             {
-                // Single branch: OR of sign bits — negative if any f < 0
-                if ((f01 | f12 | f20) < 0) continue;
+                const uint dx = DecodeMorton2X(code);
+                const uint dy = DecodeMorton2Y(code);
 
-                const float fa = float(f12) * invArea2;
-                const float fb = float(f20) * invArea2;
-                const float fc = float(f01) * invArea2;
+                // Skip codes outside the actual (non-square) bounding box
+                if (dx >= bbW || dy >= bbH) continue;
+
+                const uint x = bbMinX + dx;
+                const uint y = bbMinY + dy;
+
+                // Integer edge test (exact, no floating-point error)
+                const int64_t sf01 = ns * EdgeFunctionInt(x0, y0, x1, y1,
+                                                          PixelCentre(x),
+                                                          PixelCentre(y));
+                const int64_t sf12 = ns * EdgeFunctionInt(x1, y1, x2, y2,
+                                                          PixelCentre(x),
+                                                          PixelCentre(y));
+                const int64_t sf20 = ns * EdgeFunctionInt(x2, y2, x0, y0,
+                                                          PixelCentre(x),
+                                                          PixelCentre(y));
+
+                if ((sf01 | sf12 | sf20) < 0) continue;
+
+                // Barycentrics from precomputed reciprocal area
+                const float fa = float(sf12) * invArea;
+                const float fb = float(sf20) * invArea;
+                const float fc = float(sf01) * invArea;
 
                 processPixel(x, y, fa, fb, fc);
             }
         }
+        else
+        {
+            // ── Scanline traversal ───────────────────────────────────────────────
+            //
+            // Efficient for large triangles: incremental edge functions advance
+            // by a fixed integer step per pixel / per row — no per-pixel multiply.
+            //
+            // The edge step deltas have been precomputed during TriangleSetup
+            // and are reused here unchanged.
+
+            // Row-start values at pixel centre (bbMinX, bbMinY)
+            int64_t f01Row = ns * EdgeFunctionInt(x0, y0, x1, y1,
+                                                  PixelCentre(bbMinX),
+                                                  PixelCentre(bbMinY));
+            int64_t f12Row = ns * EdgeFunctionInt(x1, y1, x2, y2,
+                                                  PixelCentre(bbMinX),
+                                                  PixelCentre(bbMinY));
+            int64_t f20Row = ns * EdgeFunctionInt(x2, y2, x0, y0,
+                                                  PixelCentre(bbMinX),
+                                                  PixelCentre(bbMinY));
+
+            for (int y = bbMinY; y <= bbMaxY; ++y,
+                 f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20)
+            {
+                int64_t f01 = f01Row;
+                int64_t f12 = f12Row;
+                int64_t f20 = f20Row;
+
+                for (int x = bbMinX; x <= bbMaxX; ++x,
+                     f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20)
+                {
+                    // Single branch: OR of sign bits — negative if any f < 0
+                    if ((f01 | f12 | f20) < 0) continue;
+
+                    const float fa = float(f12) * invArea;
+                    const float fb = float(f20) * invArea;
+                    const float fc = float(f01) * invArea;
+
+                    processPixel(x, y, fa, fb, fc);
+                }
+            }
+        }
     }
-}
 
 } // namespace RasterizerCommon
 

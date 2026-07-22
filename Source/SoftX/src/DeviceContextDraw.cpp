@@ -201,7 +201,7 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
             RasterizerCommon::ClipSpaceToScreenSpace(v, state.viewport);
     }
 
-    // Step 5: Geometry shader (опционально)
+    // Step 5: Geometry shader (optional)
     if (state.geometryShader)
     {
         PROFILE_SCOPE("Geometry shader");
@@ -229,12 +229,37 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
     // Step 6: Rasterization
     if (state.fillMode == FillMode::Solid)
     {
-        PROFILE_SCOPE("Render Solid");
-        Renderer renderer;
-        renderer.Execute(state, finalVerts, finalTriangles);
+        // ------------------------------------------------------------------
+        // Pre‑compute TriangleSetups once for every triangle.
+        // All heavy fixed‑point conversion, area, edge step deltas and
+        // reciprocal area are evaluated here and stored compactly.
+        // Culling is also applied at this stage so that back‑/front‑facing
+        // triangles never reach the rasteriser.
+        // ------------------------------------------------------------------
+        PROFILE_SCOPE("Create TriangleSetups");
+        RasterizerState rasterState;
+        rasterState.cullMode = state.cullMode;   // only cull mode matters here
+
+        std::vector<RasterizerCommon::TriangleSetup> setups;
+        setups.reserve(finalTriangles.size());
+
+        for (const auto& tri : finalTriangles)
+        {
+            auto optSetup = RasterizerCommon::CreateTriangleSetup(
+                finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z], rasterState);
+            if (optSetup)
+                setups.push_back(std::move(*optSetup));
+        }
+
+        if (!setups.empty())
+        {
+            PROFILE_SCOPE("Render Solid");
+            Renderer renderer;
+            renderer.Execute(state, setups);
 #ifdef DEBUG_TILING
-        DrawActiveTileBorders(state, renderer.GetTiles());
+            DrawActiveTileBorders(state, renderer.GetTiles());
 #endif
+        }
     }
     else if (state.fillMode == FillMode::Wireframe)
     {
