@@ -5,40 +5,25 @@
 /////////////////////////////////////////////////////////////////
 #pragma once
 /////////////////////////////////////////////////////////////////
+#include "../include/Types.h"
+/////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 namespace RasterizerCommon
 {
-    // ─── Fixed-point sub-pixel rasterisation (28.4) ───────────────────────────
-    //
-    // Edge function at pixel P for edge A → B:
-    //   E = (px − ax)·(by − ay) − (py − ay)·(bx − ax)  (all in fixed-point)
-    //
-    // Pixel x±1 step:  ΔE_x = S·(by − ay)   (int32 safe: ≤ 16 × 2·4096·16 ≈ 2²¹)
-    // Row   y±1 step:  ΔE_y = −S·(bx − ax)  (same)
-    // Initial value:   ≤ (2·4096·16)²        = 2³⁴  → int64 required
-    //
-    // int64→int32 cast in SIMD is lossless up to ~1920×1080 (SUBPIXEL_BITS=4).
-    // For 4 K, set SUBPIXEL_BITS = 2.
-
     static constexpr int SUBPIXEL_BITS = 4;
-    static constexpr int SUBPIXEL_STEP = 1 << SUBPIXEL_BITS; // 16
+    static constexpr int SUBPIXEL_STEP = 1 << SUBPIXEL_BITS;
 
-    // Screen-space float → fixed-point integer
     inline int ToFixed(float v)
     {
         return static_cast<int>(std::lround(v * float(SUBPIXEL_STEP)));
     }
 
-    // Fixed-point coordinate of pixel-centre for pixel index i
-    //   Pixel i occupies [i·S, (i+1)·S)  →  centre = i·S + S/2
     inline int PixelCentre(int i)
     {
         return i * SUBPIXEL_STEP + (SUBPIXEL_STEP >> 1);
     }
 
-    // Integer edge function — int64 to avoid overflow during initial setup.
-    // Units: SUBPIXEL_STEP² × float_edge_func (ratio f/area is preserved).
     inline int64_t EdgeFunctionInt(int ax, int ay, int bx, int by, int px, int py)
     {
         return int64_t(px - ax) * (by - ay) - int64_t(py - ay) * (bx - ax);
@@ -54,25 +39,22 @@ namespace RasterizerCommon
         return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
     }
 
-    // Perspective-correct interpolation of triangle attributes.
-    //
-    // Linear interpolation in screen space yields incorrect results
-    // because perspective division is non-linear — equal steps on screen
-    // do not correspond to equal steps in 3D space.
-    //
-    // Formula:
-    //   A = (α * A0*invW0 + β * A1*invW1 + γ * A2*invW2) / (α*invW0 + β*invW1 + γ*invW2)
-    //
-    // where invW0/1/2 = Position.w of each vertex (set in ClipSpaceToScreenSpace),
-    // and α, β, γ are barycentric coordinates in screen space.
-    inline Interpolant Trilerp(const Interpolant& v0, 
-                               const Interpolant& v1, 
-                               const Interpolant& v2, 
-                               float alpha,
-                               float beta, 
-                               float gamma)
+    inline float ComputeDepth(float z_clip, float invW, const Viewport& vp)
     {
-        // Position.w stores 1/w — weight each vertex
+        float zNDC = z_clip * invW;
+        return vp.minZ + zNDC * (vp.maxZ - vp.minZ);
+    }
+
+#define PLERP(field) result.field = (w0 * v0.field + w1 * v1.field + w2 * v2.field) * wsum
+#define LERP(field) result.field = (alpha * v0.field + beta * v1.field + gamma * v2.field)
+
+    inline Interpolant TrilerpDepthOnly(const Interpolant& v0, 
+                                        const Interpolant& v1, 
+                                        const Interpolant& v2, 
+                                        float alpha,
+                                        float beta, 
+                                        float gamma)
+    {
         float w0 = alpha * v0.Position.w;
         float w1 = beta * v1.Position.w;
         float w2 = gamma * v2.Position.w;
@@ -82,25 +64,44 @@ namespace RasterizerCommon
 
         Interpolant result;
 
-#define PLERP(field) result.field = (w0 * v0.field + w1 * v1.field + w2 * v2.field) * wsum
-        PLERP(Color);
-        PLERP(Normal);
-        PLERP(UV);
-#undef PLERP
-
-        // Position.xyz — linear, perspective correction not needed
-#define LERP(field) result.field = (alpha * v0.field + beta * v1.field + gamma * v2.field)
-        LERP(Position);
-#undef LERP
-
-        result.Position.w = invWsum; // interpolated 1/w available in PS
+        PLERP(Position.z);
+        LERP(Position.x);
+        LERP(Position.y);
+        LERP(Position.w);
 
         return result;
     }
 
-    // Transforms vertex from clip space to screen space.
-    // Stores 1/w in Position.w for perspective-correct interpolation
-    // in the rasterizer (DX11 style: after rasterization Position.w == 1/w).
+    inline Interpolant Trilerp(const Interpolant& v0, 
+                               const Interpolant& v1, 
+                               const Interpolant& v2, 
+                               float alpha,
+                               float beta, 
+                               float gamma)
+    {
+        float w0 = alpha * v0.Position.w;
+        float w1 = beta * v1.Position.w;
+        float w2 = gamma * v2.Position.w;
+
+        float invWsum = w0 + w1 + w2;
+        float wsum = (std::abs(invWsum) > 1e-10f) ? (1.0f / invWsum) : 0.0f;
+
+        Interpolant result;
+
+        PLERP(Color);
+        PLERP(Normal);
+        PLERP(UV);
+        PLERP(Position.z);
+        LERP(Position.x);
+        LERP(Position.y);
+        LERP(Position.w);
+
+        return result;
+    }
+
+#undef PLERP
+#undef LERP
+
     inline void ClipSpaceToScreenSpace(Interpolant& vert, const Viewport& vp)
     {
         float w = vert.Position.w;
@@ -108,15 +109,13 @@ namespace RasterizerCommon
 
         float xNDC = vert.Position.x * invW;
         float yNDC = vert.Position.y * invW;
-        float zNDC = vert.Position.z * invW;
 
         vert.Position.x = vp.pos.x + (xNDC * 0.5f + 0.5f) * static_cast<float>(vp.size.x);
         vert.Position.y = vp.pos.y + (1.0f - (yNDC * 0.5f + 0.5f)) * static_cast<float>(vp.size.y);
-        vert.Position.z = vp.minZ + zNDC * (vp.maxZ - vp.minZ);
-        vert.Position.w = invW; // DX11 style: Position.w = 1/w after rasterization
+        vert.Position.z = vert.Position.z;
+        vert.Position.w = invW;
     }
 
-    // Linear interpolation of two vertices in clip space
     inline Interpolant LerpVertexClipSpace(const Interpolant& a, const Interpolant& b, float t)
     {
         Interpolant r;
@@ -131,9 +130,6 @@ namespace RasterizerCommon
         return r;
     }
 
-    // Clips triangle against near plane (w = nearW) in clip space.
-    // Returns 0, 1 or 2 triangles in outTris[2][3].
-    // Sutherland-Hodgman algorithm for a single plane.
     inline int ClipTriangleNearPlane(const Interpolant& v0,
                                      const Interpolant& v1,
                                      const Interpolant& v2,
@@ -223,6 +219,10 @@ namespace RasterizerCommon
         int bbMinY, bbMaxY;
 
         int64_t f01Base, f12Base, f20Base;
+        int32_t f01Base_i32, f12Base_i32, f20Base_i32;
+
+        float faStepX, fbStepX, fcStepX;
+        float faStepY, fbStepY, fcStepY;
 
         float invArea2;      // 1.0 / (2 * area in fixed-point units)
         int   normSign;      // 1 (CCW) or -1 (flipped CW)
@@ -235,21 +235,17 @@ namespace RasterizerCommon
                                                             const Interpolant& c,
                                                             const RasterizerState& state)
     {
-        // Convert to fixed point
         const int x0 = ToFixed(a.Position.x), y0 = ToFixed(a.Position.y);
         const int x1 = ToFixed(b.Position.x), y1 = ToFixed(b.Position.y);
         const int x2 = ToFixed(c.Position.x), y2 = ToFixed(c.Position.y);
 
-        // Area (squared) and degeneracy test
         int64_t area2 = EdgeFunctionInt(x0, y0, x1, y1, x2, y2);
         if (area2 == 0) return std::nullopt;
 
-        // Backface / frontface culling
         const CullMode cull = state.cullMode;
         if (cull == CullMode::Back && area2 > 0) return std::nullopt;
         if (cull == CullMode::Front && area2 < 0) return std::nullopt;
 
-        // Normalizing: always CCW (area2 > 0)
         int normSign = (area2 > 0) ? 1 : -1;
         if (area2 < 0) area2 = -area2;
 
@@ -268,6 +264,13 @@ namespace RasterizerCommon
         s.stepY01 = -normSign * SUBPIXEL_STEP * (x1 - x0);
         s.stepY12 = -normSign * SUBPIXEL_STEP * (x2 - x1);
         s.stepY20 = -normSign * SUBPIXEL_STEP * (x0 - x2);
+
+        s.faStepX = static_cast<float>(s.stepX12) * s.invArea2;
+        s.fbStepX = static_cast<float>(s.stepX20) * s.invArea2;
+        s.fcStepX = static_cast<float>(s.stepX01) * s.invArea2;
+        s.faStepY = static_cast<float>(s.stepY12) * s.invArea2;
+        s.fbStepY = static_cast<float>(s.stepY20) * s.invArea2;
+        s.fcStepY = static_cast<float>(s.stepY01) * s.invArea2;
 
         s.v0 = a;
         s.v1 = b;
@@ -288,6 +291,9 @@ namespace RasterizerCommon
         s.f01Base = normSign * EdgeFunctionInt(x0, y0, x1, y1, pcMinX, pcMinY);
         s.f12Base = normSign * EdgeFunctionInt(x1, y1, x2, y2, pcMinX, pcMinY);
         s.f20Base = normSign * EdgeFunctionInt(x2, y2, x0, y0, pcMinX, pcMinY);
+        s.f01Base_i32 = static_cast<int32_t>(s.f01Base);
+        s.f12Base_i32 = static_cast<int32_t>(s.f12Base);
+        s.f20Base_i32 = static_cast<int32_t>(s.f20Base);
 
         return s;
     }
@@ -298,63 +304,38 @@ namespace RasterizerCommon
                                uint width,
                                PixelFunc&& processPixel)
     {
-        // ── Bounding box clipping to tile ──────────────────────────────────────
         int bbMinX = std::max(static_cast<int>(tileMin.x), s.bbMinX);
         int bbMaxX = std::min(static_cast<int>(tileMax.x), s.bbMaxX);
         int bbMinY = std::max(static_cast<int>(tileMin.y), s.bbMinY);
         int bbMaxY = std::min(static_cast<int>(tileMax.y), s.bbMaxY);
-
         if (bbMinX > bbMaxX || bbMinY > bbMaxY) return;
 
         const int64_t dxTile = bbMinX - s.bbMinX;
         const int64_t dyTile = bbMinY - s.bbMinY;
 
-        int64_t f01Tile = s.f01Base + dxTile * s.stepX01 + dyTile * s.stepY01;
-        int64_t f12Tile = s.f12Base + dxTile * s.stepX12 + dyTile * s.stepY12;
-        int64_t f20Tile = s.f20Base + dxTile * s.stepX20 + dyTile * s.stepY20;
+        int64_t f01Row = s.f01Base + dxTile * s.stepX01 + dyTile * s.stepY01;
+        int64_t f12Row = s.f12Base + dxTile * s.stepX12 + dyTile * s.stepY12;
+        int64_t f20Row = s.f20Base + dxTile * s.stepX20 + dyTile * s.stepY20;
 
-        // Aliases for readability
-        const int x0 = s.x0fp, y0 = s.y0fp;
-        const int x1 = s.x1fp, y1 = s.y1fp;
-        const int x2 = s.x2fp, y2 = s.y2fp;
-        const int ns = s.normSign;
-        const float invArea = s.invArea2;
+        double faRow = static_cast<double>(f12Row) * s.invArea2;
+        double fbRow = static_cast<double>(f20Row) * s.invArea2;
+        double fcRow = static_cast<double>(f01Row) * s.invArea2;
 
-        // ── Scanline traversal ───────────────────────────────────────────────
-        //
-        // Efficient for large triangles: incremental edge functions advance
-        // by a fixed integer step per pixel / per row — no per-pixel multiply.
-        //
-        // The edge step deltas have been precomputed during TriangleSetup
-        // and are reused here unchanged.
-
-        // Row-start values at pixel centre (bbMinX, bbMinY)
-        const int64_t dx = bbMinX - s.bbMinX;
-        const int64_t dy = bbMinY - s.bbMinY;
-        int64_t f01Row = s.f01Base + dx * s.stepX01 + dy * s.stepY01;
-        int64_t f12Row = s.f12Base + dx * s.stepX12 + dy * s.stepY12;
-        int64_t f20Row = s.f20Base + dx * s.stepX20 + dy * s.stepY20;
-
-        for (int y = bbMinY; y <= bbMaxY; ++y, f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20)
+        for (int y = bbMinY; y <= bbMaxY; ++y, f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20, faRow += s.faStepY, fbRow += s.fbStepY, fcRow += s.fcStepY)
         {
             int64_t f01 = f01Row;
             int64_t f12 = f12Row;
             int64_t f20 = f20Row;
 
-            for (int x = bbMinX; x <= bbMaxX; ++x, f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20)
-            {
-                // Single branch: OR of sign bits — negative if any f < 0
-                if ((f01 | f12 | f20) < 0) continue;
+            double fa = faRow;
+            double fb = fbRow;
+            double fc = fcRow;
 
-                const float fa = float(f12) * invArea;
-                const float fb = float(f20) * invArea;
-                const float fc = float(f01) * invArea;
-
-                processPixel(x, y, fa, fb, fc);
-            }
+            for (int x = bbMinX; x <= bbMaxX; ++x, f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20, fa += s.faStepX, fb += s.fbStepX, fc += s.fcStepX)
+                if ((f01 | f12 | f20) >= 0)
+                    processPixel(x, y, static_cast<float>(fa), static_cast<float>(fb), static_cast<float>(fc));
         }
     }
-
 } // namespace RasterizerCommon
 
 SOFTX_END

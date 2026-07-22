@@ -119,6 +119,7 @@ void Renderer::RenderTiles(const PipelineStateObject& pso, const std::vector<Ras
                                               rasterState,
                                               *pso.depthBuffer,
                                               pso.renderTarget.get(),
+                                              pso.viewport,
                                               pso.pixelShader,
                                               pso.constantBuffer,
                                               &pso.textureTable,

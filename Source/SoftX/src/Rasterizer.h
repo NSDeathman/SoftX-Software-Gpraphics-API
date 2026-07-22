@@ -5,35 +5,38 @@
 /////////////////////////////////////////////////////////////////
 #pragma once
 /////////////////////////////////////////////////////////////////
-#include "RasterizerCommon.h"
 #include "../include/LibInternal.h"
+#include "../include/DepthBuffer.h"
+#include "../include/RenderTargetInterface.h"
+#include "RasterizerCommon.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 namespace Rasterizer
 {
 
-// Shared depth test + pixel write — called from both traversal paths.
-// Inlined by the compiler; extracted here to avoid duplicating the switch.
 static inline void ShadeSinglePixel(uint x, uint y,
                                     float fa, float fb, float fc,
                                     const Interpolant& v0, const Interpolant& v1, const Interpolant& v2,
                                     DepthBuffer& depthBuffer, IRenderTarget* renderTarget,
+                                    const Viewport& vp,
                                     const PixelShader& ps, const ConstantBuffer& cb, const TextureTable* tt,
                                     const RasterizerState& state,
                                     uint width)
 {
-    float depthValue = depthBuffer.At(int2(x, y));
-    float zInterp = fa * v0.Position.z + fb * v1.Position.z + fc * v2.Position.z;
-    bool depthPass = RasterizerCommon::DepthTest(zInterp, depthValue, state.depthFunc);
-    if (!depthPass)
-        return;
-
     Interpolant frag = RasterizerCommon::Trilerp(v0, v1, v2, fa, fb, fc);
 
+    float depth = RasterizerCommon::ComputeDepth(frag.Position.z, frag.Position.w, vp);
+
+    float depthValue = depthBuffer.At(int2(x, y));
+
+    if (!RasterizerCommon::DepthTest(depth, depthValue, state.depthFunc))
+        return;
+
     if (state.depthWriteEnable)
-        depthBuffer.At(int2(x, y)) = frag.Position.z;
-    if(renderTarget != nullptr)
+        depthBuffer.At(int2(x, y)) = depth;
+
+    if (renderTarget)
         renderTarget->SetPixel(uint2(x, y), ps(frag, cb, *tt));
 }
 
@@ -41,6 +44,7 @@ static inline void RasterizeTriangle(const RasterizerCommon::TriangleSetup& setu
                                      const RasterizerState& state,
                                      DepthBuffer& depthBuffer,
                                      IRenderTarget* renderTarget,
+                                     const Viewport& vp,
                                      const PixelShader& ps,
                                      const ConstantBuffer& cb,
                                      const TextureTable* tt,
@@ -52,10 +56,14 @@ static inline void RasterizeTriangle(const RasterizerCommon::TriangleSetup& setu
     RasterizerCommon::RasterizeTriangleImpl(setup, tileMin, tileMax, width,
         [&](uint x, uint y, float fa, float fb, float fc)
         {
-            ShadeSinglePixel(x, y, fa, fb, fc,
-                setup.v0, setup.v1, setup.v2,
-                depthBuffer, renderTarget,
-                ps, cb, tt, state, width);
+            ShadeSinglePixel(x, y, 
+                             fa, fb, fc,
+                             setup.v0, setup.v1, setup.v2,
+                             depthBuffer, renderTarget,
+                             vp,
+                             ps, cb, tt,
+                             state, 
+                             width);
         });
 }
 

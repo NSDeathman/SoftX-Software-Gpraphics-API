@@ -285,9 +285,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
                 continue;
 
             // Rasterise using the pre‑computed setup
-            localVisible += QueryRasterizer::RasterizeTriangle(
-                s, rasterState, db,
-                uint2(tileMinX, tileMinY), uint2(tileMaxX, tileMaxY));
+            localVisible += QueryRasterizer::RasterizeTriangle(s, rasterState, db, pso.viewport, uint2(tileMinX, tileMinY), uint2(tileMaxX, tileMaxY));
         }
     }
 
