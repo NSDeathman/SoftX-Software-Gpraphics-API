@@ -14,54 +14,77 @@ SOFTX_BEGIN
 
 namespace QueryRasterizer
 {
-
-static inline bool ProcessPixel(uint x, uint y,
-                                float fa, float fb, float fc,
-                                const Interpolant& v0, const Interpolant& v1, const Interpolant& v2,
-                                DepthBuffer& depthBuffer,
-                                const Viewport& vp,
-                                const RasterizerState& state,
-                                uint width)
-{
-    Interpolant frag = RasterizerCommon::TrilerpDepthOnly(v0, v1, v2, fa, fb, fc);
-    float depth = RasterizerCommon::ComputeDepth(frag.Position.z, frag.Position.w, vp);
-
-    float depthValue = depthBuffer.At(int2(x, y));
-    bool depthPass = RasterizerCommon::DepthTest(depth, depthValue, state.depthFunc);
-
-    if (depthPass)
+    static inline uint RasterizeTriangle(const RasterizerCommon::TriangleSetup& s,
+                                         const RasterizerState& state,
+                                         DepthBuffer& depthBuffer,
+                                         const Viewport& vp,
+                                         uint2 tileMin,
+                                         uint2 tileMax)
     {
-        if (state.depthWriteEnable)
-            depthBuffer.At(int2(x, y)) = depth;
-        return true;
-    }
-    return false;
-}
+        const uint width = depthBuffer.Width();
+        uint visibleCount = 0;
 
-static inline uint RasterizeTriangle(const RasterizerCommon::TriangleSetup& setup,
-                                     const RasterizerState& state,
-                                     DepthBuffer& depthBuffer,
-                                     const Viewport& vp,
-                                     uint2 tileMin,
-                                     uint2 tileMax)
-{
-    uint width = depthBuffer.Width();
-    uint visibleCount = 0;
+        int bbMinX = std::max(static_cast<int>(tileMin.x), s.bbMinX);
+        int bbMaxX = std::min(static_cast<int>(tileMax.x), s.bbMaxX);
+        int bbMinY = std::max(static_cast<int>(tileMin.y), s.bbMinY);
+        int bbMaxY = std::min(static_cast<int>(tileMax.y), s.bbMaxY);
+        if (bbMinX > bbMaxX || bbMinY > bbMaxY) return 0;
 
-    RasterizerCommon::RasterizeTriangleImpl(setup, tileMin, tileMax, width,
-        [&](uint x, uint y, float fa, float fb, float fc) 
+        int pcX = RasterizerCommon::PixelCentre(bbMinX);
+        int pcY = RasterizerCommon::PixelCentre(bbMinY);
+
+        int32_t f01Row = s.normSign * RasterizerCommon::EdgeFunctionInt(s.x0fp, s.y0fp, s.x1fp, s.y1fp, pcX, pcY);
+        int32_t f12Row = s.normSign * RasterizerCommon::EdgeFunctionInt(s.x1fp, s.y1fp, s.x2fp, s.y2fp, pcX, pcY);
+        int32_t f20Row = s.normSign * RasterizerCommon::EdgeFunctionInt(s.x2fp, s.y2fp, s.x0fp, s.y0fp, pcX, pcY);
+
+        float faRow = static_cast<float>(f12Row) * s.invArea2;
+        float fbRow = static_cast<float>(f20Row) * s.invArea2;
+        float fcRow = static_cast<float>(f01Row) * s.invArea2;
+
+        for (int y = bbMinY; y <= bbMaxY; ++y)
         {
-            if(ProcessPixel(x, y,
-                            fa, fb, fc,
-                            setup.v0, setup.v1, setup.v2,
-                            depthBuffer,
-                            vp,
-                            state, 
-                            width))
-            visibleCount++;
-        });
-    return visibleCount;
-}
+            int32_t f01 = f01Row;
+            int32_t f12 = f12Row;
+            int32_t f20 = f20Row;
+
+            float fa = faRow;
+            float fb = fbRow;
+            float fc = fcRow;
+
+            for (int x = bbMinX; x <= bbMaxX; ++x)
+            {
+                if ((f01 | f12 | f20) >= 0)
+                {
+                    Interpolant frag = RasterizerCommon::TrilerpDepthOnly(s.v0, s.v1, s.v2, fa, fb, fc);
+                    float depth = RasterizerCommon::ComputeDepth(frag.Position.z, frag.Position.w, vp);
+                    float oldDepth = depthBuffer.At(int2(x, y));
+
+                    if (RasterizerCommon::DepthTest(depth, oldDepth, state.depthFunc))
+                    {
+                        if (state.depthWriteEnable)
+                            depthBuffer.At(int2(x, y)) = depth;
+                        ++visibleCount;
+                    }
+                }
+
+                f01 += s.stepX01;
+                f12 += s.stepX12;
+                f20 += s.stepX20;
+                fa += s.faStepX;
+                fb += s.fbStepX;
+                fc += s.fcStepX;
+            }
+
+            f01Row += s.stepY01;
+            f12Row += s.stepY12;
+            f20Row += s.stepY20;
+            faRow += s.faStepY;
+            fbRow += s.fbStepY;
+            fcRow += s.fcStepY;
+        }
+
+        return visibleCount;
+    }
 
 } // namespace QueryRasterizer
 

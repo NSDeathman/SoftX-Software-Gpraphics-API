@@ -24,9 +24,9 @@ namespace RasterizerCommon
         return i * SUBPIXEL_STEP + (SUBPIXEL_STEP >> 1);
     }
 
-    inline int64_t EdgeFunctionInt(int ax, int ay, int bx, int by, int px, int py)
+    inline int32_t EdgeFunctionInt(int ax, int ay, int bx, int by, int px, int py)
     {
-        return int64_t(px - ax) * (by - ay) - int64_t(py - ay) * (bx - ax);
+        return int32_t(px - ax) * (by - ay) - int32_t(py - ay) * (bx - ax);
     }
 
     inline float EdgeFunction(const float4& a, const float4& b, const float2& c)
@@ -43,6 +43,14 @@ namespace RasterizerCommon
     {
         float zNDC = z_clip * invW;
         return vp.minZ + zNDC * (vp.maxZ - vp.minZ);
+    }
+
+    inline __m128 ComputeDepthForBlock(__m128 z_clip, __m128 invW, const Viewport& vp)
+    {
+        __m128 zNDC = _mm_mul_ps(z_clip, invW);
+        __m128 range = _mm_set1_ps(vp.maxZ - vp.minZ);
+        __m128 minZ = _mm_set1_ps(vp.minZ);
+        return _mm_add_ps(minZ, _mm_mul_ps(zNDC, range));
     }
 
 #define PLERP(field) result.field = (w0 * v0.field + w1 * v1.field + w2 * v2.field) * wsum
@@ -218,9 +226,6 @@ namespace RasterizerCommon
         int bbMinX, bbMaxX;
         int bbMinY, bbMaxY;
 
-        int64_t f01Base, f12Base, f20Base;
-        int32_t f01Base_i32, f12Base_i32, f20Base_i32;
-
         float faStepX, fbStepX, fcStepX;
         float faStepY, fbStepY, fcStepY;
 
@@ -286,55 +291,7 @@ namespace RasterizerCommon
         s.bbMinY = static_cast<int>(std::floor(minY));
         s.bbMaxY = static_cast<int>(std::ceil(maxY));
 
-        const int pcMinX = PixelCentre(s.bbMinX);
-        const int pcMinY = PixelCentre(s.bbMinY);
-        s.f01Base = normSign * EdgeFunctionInt(x0, y0, x1, y1, pcMinX, pcMinY);
-        s.f12Base = normSign * EdgeFunctionInt(x1, y1, x2, y2, pcMinX, pcMinY);
-        s.f20Base = normSign * EdgeFunctionInt(x2, y2, x0, y0, pcMinX, pcMinY);
-        s.f01Base_i32 = static_cast<int32_t>(s.f01Base);
-        s.f12Base_i32 = static_cast<int32_t>(s.f12Base);
-        s.f20Base_i32 = static_cast<int32_t>(s.f20Base);
-
         return s;
-    }
-
-    template <typename PixelFunc>
-    void RasterizeTriangleImpl(const TriangleSetup& s,
-                               uint2 tileMin, uint2 tileMax,
-                               uint width,
-                               PixelFunc&& processPixel)
-    {
-        int bbMinX = std::max(static_cast<int>(tileMin.x), s.bbMinX);
-        int bbMaxX = std::min(static_cast<int>(tileMax.x), s.bbMaxX);
-        int bbMinY = std::max(static_cast<int>(tileMin.y), s.bbMinY);
-        int bbMaxY = std::min(static_cast<int>(tileMax.y), s.bbMaxY);
-        if (bbMinX > bbMaxX || bbMinY > bbMaxY) return;
-
-        const int64_t dxTile = bbMinX - s.bbMinX;
-        const int64_t dyTile = bbMinY - s.bbMinY;
-
-        int64_t f01Row = s.f01Base + dxTile * s.stepX01 + dyTile * s.stepY01;
-        int64_t f12Row = s.f12Base + dxTile * s.stepX12 + dyTile * s.stepY12;
-        int64_t f20Row = s.f20Base + dxTile * s.stepX20 + dyTile * s.stepY20;
-
-        double faRow = static_cast<double>(f12Row) * s.invArea2;
-        double fbRow = static_cast<double>(f20Row) * s.invArea2;
-        double fcRow = static_cast<double>(f01Row) * s.invArea2;
-
-        for (int y = bbMinY; y <= bbMaxY; ++y, f01Row += s.stepY01, f12Row += s.stepY12, f20Row += s.stepY20, faRow += s.faStepY, fbRow += s.fbStepY, fcRow += s.fcStepY)
-        {
-            int64_t f01 = f01Row;
-            int64_t f12 = f12Row;
-            int64_t f20 = f20Row;
-
-            double fa = faRow;
-            double fb = fbRow;
-            double fc = fcRow;
-
-            for (int x = bbMinX; x <= bbMaxX; ++x, f01 += s.stepX01, f12 += s.stepX12, f20 += s.stepX20, fa += s.faStepX, fb += s.fbStepX, fc += s.fcStepX)
-                if ((f01 | f12 | f20) >= 0)
-                    processPixel(x, y, static_cast<float>(fa), static_cast<float>(fb), static_cast<float>(fc));
-        }
     }
 } // namespace RasterizerCommon
 

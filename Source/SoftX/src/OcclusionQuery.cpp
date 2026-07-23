@@ -238,9 +238,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
     // Transform only the unique vertices
     std::vector<Interpolant> transformedVerts(vertexCount);
     for (uint32_t idx : uniqueIndices)
-    {
         transformedVerts[idx] = dc.vertexShader(vbData[idx], dc.constantBuffer);
-    }
 
     uint32_t localVisible = 0;
     for (size_t i = 0; i + 2 < indexCount; i += 3)
@@ -263,8 +261,7 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
                 RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], pso.viewport);
 
             // Pre‑compute triangle setup (culling + edge deltas + invArea)
-            auto optSetup = RasterizerCommon::CreateTriangleSetup(
-                clipped[t][0], clipped[t][1], clipped[t][2], rasterState);
+            auto optSetup = RasterizerCommon::CreateTriangleSetup(clipped[t][0], clipped[t][1], clipped[t][2], rasterState);
             if (!optSetup)
                 continue;   // culled or degenerate
 
