@@ -2,7 +2,7 @@
 setlocal
 
 set "GENERATED_DIR=%~dp0generated"
-set "BUILD_DIR=%GENERATED_DIR%\VS2019_x64"
+set "BUILD_DIR=%GENERATED_DIR%\VS2022_x64"
 set "SOURCE_DIR=%~dp0.."
 
 echo ========================================

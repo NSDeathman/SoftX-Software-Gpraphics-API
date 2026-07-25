@@ -194,7 +194,7 @@ AFTERMATH_BEGIN
         * @return True if a > b + epsilon
         */
     template<typename T>
-    constexpr bool greater_than(T a, T b, T epsilon = Constants<T>::Epsilon) noexcept {
+    constexpr bool greater_than(T a, T b, T epsilon = Constants::Constants<T>::Epsilon) noexcept {
         static_assert(std::is_floating_point_v<T>, "T must be a floating-point type");
         return a > b + epsilon;
     }
@@ -208,7 +208,7 @@ AFTERMATH_BEGIN
         * @return True if a < b - epsilon
         */
     template<typename T>
-    constexpr bool less_than(T a, T b, T epsilon = Constants<T>::Epsilon) noexcept {
+    constexpr bool less_than(T a, T b, T epsilon = Constants::Constants<T>::Epsilon) noexcept {
         static_assert(std::is_floating_point_v<T>, "T must be a floating-point type");
         return a < b - epsilon;
     }
@@ -222,7 +222,7 @@ AFTERMATH_BEGIN
         * @return True if a >= b - epsilon
         */
     template<typename T>
-    constexpr bool greater_than_or_equal(T a, T b, T epsilon = Constants<T>::Epsilon) noexcept {
+    constexpr bool greater_than_or_equal(T a, T b, T epsilon = Constants::Constants<T>::Epsilon) noexcept {
         static_assert(std::is_floating_point_v<T>, "T must be a floating-point type");
         return a >= b - epsilon;
     }
@@ -236,7 +236,7 @@ AFTERMATH_BEGIN
         * @return True if a <= b + epsilon
         */
     template<typename T>
-    constexpr bool less_than_or_equal(T a, T b, T epsilon = Constants<T>::Epsilon) noexcept {
+    constexpr bool less_than_or_equal(T a, T b, T epsilon = Constants::Constants<T>::Epsilon) noexcept {
         static_assert(std::is_floating_point_v<T>, "T must be a floating-point type");
         return a <= b + epsilon;
     }
