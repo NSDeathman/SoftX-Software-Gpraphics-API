@@ -4,9 +4,9 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
-#include "RasterizerCommon.h"
 #include "QueryRasterizer.h"
 #include "ThreadPoolManager.h"
+#include "TileGrid.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
@@ -72,6 +72,12 @@ void OcclusionQuery::SetDepthWriteEnable(bool enable)
 {
     std::lock_guard<std::mutex> lock(*stateMutex);
     state.depthWriteEnable = enable;
+}
+
+void OcclusionQuery::SetTileSize(uint size)
+{
+    std::lock_guard<std::mutex> lock(*stateMutex);
+    state.tileSize = size;
 }
 
 void OcclusionQuery::Begin()
@@ -219,7 +225,8 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
     const auto& vbData = *dc.vb;
     const auto& ibData = dc.ib;
     const size_t indexCount = ibData.Size();
-    if (indexCount < 3) return;
+    if (indexCount < 3)
+        return;
 
     // Gather unique indices
     const size_t vertexCount = vbData.size();
@@ -240,7 +247,10 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
     for (uint32_t idx : uniqueIndices)
         transformedVerts[idx] = dc.vertexShader(vbData[idx], dc.constantBuffer);
 
-    uint32_t localVisible = 0;
+    // Collect triangle setups after clipping and perspective divide
+    std::vector<RasterizerCommon::TriangleSetup> setups;
+    setups.reserve(indexCount / 3); // rough estimate
+
     for (size_t i = 0; i + 2 < indexCount; i += 3)
     {
         uint32_t i0 = ibData.GetByIndex(static_cast<uint>(i));
@@ -261,28 +271,35 @@ void OcclusionQuery::ProcessDrawCall(const DrawCall& dc,
                 RasterizerCommon::ClipSpaceToScreenSpace(clipped[t][j], pso.viewport);
 
             // Pre‑compute triangle setup (culling + edge deltas + invArea)
-            auto optSetup = RasterizerCommon::CreateTriangleSetup(clipped[t][0], clipped[t][1], clipped[t][2], rasterState);
-            if (!optSetup)
-                continue;   // culled or degenerate
+            auto optSetup =
+                RasterizerCommon::CreateTriangleSetup(clipped[t][0], clipped[t][1], clipped[t][2], rasterState);
+            if (optSetup)
+                setups.push_back(std::move(*optSetup));
+        }
+    }
 
-            const RasterizerCommon::TriangleSetup& s = *optSetup;
+    if (setups.empty())
+    {
+        const_cast<DrawCall&>(dc).visibleSamples = 0;
+        return;
+    }
 
-            // Screen-space bounding box from the already transformed vertices
-            float minX = std::min({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
-            float maxX = std::max({ s.v0.Position.x, s.v1.Position.x, s.v2.Position.x });
-            float minY = std::min({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
-            float maxY = std::max({ s.v0.Position.y, s.v1.Position.y, s.v2.Position.y });
+    // Tile binning
+    const uint tileSize = pso.tileSize;
+    TileGrid tileGrid;
+    tileGrid.Build(db.Width(), db.Height(), tileSize);
+    tileGrid.BinTriangles(setups);
 
-            int tileMinX = std::max(0, (int)std::floor(minX));
-            int tileMinY = std::max(0, (int)std::floor(minY));
-            int tileMaxX = std::min((int)db.Width() - 1, (int)std::ceil(maxX));
-            int tileMaxY = std::min((int)db.Height() - 1, (int)std::ceil(maxY));
+    uint32_t localVisible = 0;
+    const auto& tiles = tileGrid.GetTiles();
 
-            if (tileMinX > tileMaxX || tileMinY > tileMaxY)
-                continue;
-
-            // Rasterise using the pre‑computed setup
-            localVisible += QueryRasterizer::RasterizeTriangle(s, rasterState, db, pso.viewport, uint2(tileMinX, tileMinY), uint2(tileMaxX, tileMaxY));
+    // Rasterise all triangles tile by tile
+    for (const auto& tile : tiles)
+    {
+        for (int setupIndex : tile.triangleIndices)
+        {
+            const RasterizerCommon::TriangleSetup& s = setups[setupIndex];
+            localVisible += QueryRasterizer::RasterizeTriangle(s, rasterState, db, pso.viewport, tile.min, tile.max);
         }
     }
 

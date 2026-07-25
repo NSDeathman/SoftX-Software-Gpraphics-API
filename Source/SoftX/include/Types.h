@@ -459,6 +459,7 @@ struct OcclusionPipelineState
     CullMode cullMode = CullMode::Back;
     ComparisonFunc depthFunc = ComparisonFunc::Less;
     bool depthWriteEnable = false;
+    uint tileSize = 64;
 
     void Validate(uint32_t requiredResourcesMask) const
     {
@@ -477,6 +478,7 @@ struct OcclusionPipelineState
         check(PipelineResource::ConstantBuffer, "constant buffer", constantBuffer.Size() > 0);
         check(PipelineResource::DepthBuffer, "depth buffer", depthBuffer != nullptr);
         check(PipelineResource::Viewport, "viewport", viewport.size.x > 0 && viewport.size.y > 0);
+        check(PipelineResource::TileSize, "tile size > 0", tileSize > 0);
 
         if (!errors.empty())
             SOFTX_THROW(InvalidState("Missing required pipeline state: " + errors));

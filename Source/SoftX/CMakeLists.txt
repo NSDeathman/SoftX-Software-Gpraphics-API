@@ -15,7 +15,6 @@ set(SOFTX_SOURCES
     src/FrameBuffer.cpp
     src/TextureRGBA32F.cpp
     src/OcclusionQuery.cpp
-    src/Renderer.cpp
 )
 
 set(SOFTX_PRIVATE_HEADERS
@@ -23,7 +22,7 @@ set(SOFTX_PRIVATE_HEADERS
     src/QueryRasterizer.h
     src/RasterizerCommon.h
     src/Rasterizer.h
-    src/Renderer.h
+    src/TileGrid.h
     src/ThreadPool.h
     src/ThreadPoolManager.h
     src/ThreadUtils.h
@@ -84,14 +83,40 @@ set_target_properties(SoftX PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Source/SoftX/lib/$<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>,x64,x86>"
 )
 
-source_group("Source Files\\Core"          FILES src/Device.cpp src/DeviceContext.cpp src/DeviceContextDebug.cpp src/DeviceContextDraw.cpp src/Renderer.cpp src/OcclusionQuery.cpp)
-source_group("Source Files\\Tools"         FILES src/CPUDetector.cpp)
-source_group("Source Files\\Resources"     FILES src/FrameBuffer.cpp src/TextureRGBA32F.cpp)
+source_group("Source Files\\Core"          			FILES 	src/Device.cpp
+									src/DeviceContext.cpp
+									src/DeviceContextDebug.cpp
+									src/DeviceContextDraw.cpp
+									src/OcclusionQuery.cpp)
 
-source_group("Header Files\\Core"          FILES src/Renderer.h)
-source_group("Header Files\\Rasterizer"    FILES src/RasterizerCommon.h src/Rasterizer.h src/QueryRasterizer.h)
-source_group("Header Files\\Tools"         FILES src/CPUDetector.h src/ThreadPool.h src/ThreadPoolManager.h src/ThreadUtils.h)
-source_group("Header Files\\API"           FILES include/SoftX.h include/Device.h include/DeviceContext.h include/OcclusionQuery.h include/Types.h
-                                                 include/DepthBuffer.h include/DepthTextureView.h include/FrameBuffer.h include/Exceptions.h
-                                                 include/RenderTargetInterface.h include/RenderTargetTexture.h include/TextureRGBA32F.h include/TextureInterface.h
-                                                 include/LibInternal.h include/ThirdPartyIncluding.h)
+source_group("Source Files\\Tools\\CPU Detection"         	FILES 	src/CPUDetector.h
+									src/CPUDetector.cpp)
+
+source_group("Source Files\\Tools\\Threading"         		FILES 	src/ThreadPool.h
+									src/ThreadPoolManager.h
+									src/ThreadUtils.h)
+
+source_group("Source Files\\Tools\\Tile binning"     		FILES 	src/TileGrid.h)
+
+source_group("Source Files\\Resources"     			FILES 	src/FrameBuffer.cpp
+									src/TextureRGBA32F.cpp)
+
+source_group("Source Files\\Rastization"     			FILES 	src/RasterizerCommon.h
+									src/Rasterizer.h
+									src/QueryRasterizer.h)
+
+source_group("Header Files\\API"           			FILES 	include/SoftX.h
+									include/Device.h
+									include/DeviceContext.h
+									include/OcclusionQuery.h
+									include/Types.h
+                                                 			include/DepthBuffer.h
+									include/DepthTextureView.h
+									include/FrameBuffer.h
+									include/Exceptions.h
+                                                 			include/RenderTargetInterface.h
+									include/RenderTargetTexture.h
+									include/TextureRGBA32F.h
+									include/TextureInterface.h
+                                                 			include/LibInternal.h
+									include/ThirdPartyIncluding.h)

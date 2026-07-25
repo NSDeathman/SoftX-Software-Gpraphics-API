@@ -4,8 +4,8 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
-#include "RasterizerCommon.h"
-#include "Renderer.h"
+#include "Rasterizer.h"
+#include "TileGrid.h"
 #include "ThreadPoolManager.h"
 #include "ThreadUtils.h"
 /////////////////////////////////////////////////////////////////
@@ -238,7 +238,7 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
         // ------------------------------------------------------------------
         PROFILE_SCOPE("Create TriangleSetups");
         RasterizerState rasterState;
-        rasterState.cullMode = state.cullMode;   // only cull mode matters here
+        rasterState.cullMode = state.cullMode;
 
         std::vector<RasterizerCommon::TriangleSetup> setups;
         setups.reserve(finalTriangles.size());
@@ -253,12 +253,57 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
 
         if (!setups.empty())
         {
-            PROFILE_SCOPE("Render Solid");
-            Renderer renderer;
-            renderer.Execute(state, setups);
+            TileGrid tileGrid;
+            {
+                PROFILE_SCOPE("Tile binning");
+                uint width = state.renderTarget ? state.renderTarget->Width() : state.depthBuffer->Width();
+                uint height = state.renderTarget ? state.renderTarget->Height() : state.depthBuffer->Height();
+                tileGrid.Build(width, height, state.tileSize);
+                tileGrid.BinTriangles(setups);
+            }
+
+            {
+                PROFILE_SCOPE("Render Solid");
+                const auto& tiles = tileGrid.GetTiles();
+                uint numTiles = static_cast<uint>(tiles.size());
+                std::atomic<int> tileIndex(0);
+
+                RasterizerState fullRasterState;
+                fullRasterState.cullMode = state.cullMode;
+                fullRasterState.fillMode = state.fillMode;
+                fullRasterState.depthFunc = state.depthFunc;
+                fullRasterState.depthWriteEnable = state.depthWriteEnable;
+
+                auto Task = [&]()
+                {
+                    PROFILE_SCOPE("RenderTiles::tile worker");
+                    while (true)
+                    {
+                        uint idx = static_cast<uint>(tileIndex.fetch_add(1));
+                        if (idx >= numTiles)
+                            break;
+
+                        const Tile& tile = tiles[idx];
+                        for (int triIdx : tile.triangleIndices)
+                        {
+                            Rasterizer::RasterizeTriangle(setups[triIdx],
+                                                          fullRasterState,
+                                                          *state.depthBuffer,
+                                                          state.renderTarget.get(),
+                                                          state.viewport,
+                                                          state.pixelShader,
+                                                          state.constantBuffer,
+                                                          &state.textureTable,
+                                                          tile.min,
+                                                          tile.max);
+                        }
+                    }
+                };
+                ThreadUtils::DispatchWorkers(Task);
 #ifdef DEBUG_TILING
-            DrawActiveTileBorders(state, renderer.GetTiles());
+                DrawActiveTileBorders(state, tiles);
 #endif
+            }
         }
     }
     else if (state.fillMode == FillMode::Wireframe)
@@ -443,19 +488,10 @@ void DeviceContext::DrawFullScreenQuad()
     auto tt = state.textureTable;
 
     const uint ts = state.tileSize;
-    const uint tilesX = (w + ts - 1u) / ts;
-    const uint tilesY = (h + ts - 1u) / ts;
-    std::vector<Tile> tiles;
-    tiles.reserve(tilesX * tilesY);
-    for (uint ty = 0; ty < tilesY; ++ty)
-        for (uint tx = 0; tx < tilesX; ++tx) {
-            uint2 mn(tx * ts, ty * ts);
-            uint2 mx(std::min((tx + 1) * ts - 1u, w - 1u),
-                std::min((ty + 1u) * ts - 1u, h - 1u));
-            tiles.emplace_back(mn, mx);
-        }
-
-    const uint numTiles = (uint)tiles.size();
+    TileGrid tileGrid;
+    tileGrid.Build(w, h, ts);
+    const auto& tiles = tileGrid.GetTiles();
+    uint numTiles = static_cast<uint>(tiles.size());
     std::atomic<uint> tileIndex(0);
 
     if (fbPixels) 

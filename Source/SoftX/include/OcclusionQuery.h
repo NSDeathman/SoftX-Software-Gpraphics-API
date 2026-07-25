@@ -36,6 +36,7 @@ public:
     void SetCullMode(CullMode mode);
     void SetDepthFunc(ComparisonFunc func);
     void SetDepthWriteEnable(bool enable);
+    void SetTileSize(uint size);
 
     SOFTX_FORCE_INLINE bool IsReady() const { return ready; }
 
