@@ -11,15 +11,25 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
+/**
+ * Manages a uniform grid of tiles covering the render target and
+ * provides binning of triangles into the tiles they overlap.
+ */
 class TileGrid
 {
-    public:
+public:
     TileGrid() = default;
 
+    /**
+     * Builds a grid of tiles for the given render target dimensions.
+     * @param inWidth       Width of the render target in pixels.
+     * @param inHeight      Height of the render target in pixels.
+     * @param inTileSize    Side length of a square tile in pixels.
+     */
     void Build(uint inWidth, uint inHeight, uint inTileSize)
     {
-        width = inWidth;
-        height = inHeight;
+        width    = inWidth;
+        height   = inHeight;
         tileSize = inTileSize;
 
         tilesX = (width + tileSize - 1) / tileSize;
@@ -33,12 +43,18 @@ class TileGrid
             for (uint tx = 0; tx < tilesX; ++tx)
             {
                 uint2 mn(tx * tileSize, ty * tileSize);
-                uint2 mx(std::min((tx + 1) * tileSize - 1, width - 1), std::min((ty + 1) * tileSize - 1, height - 1));
+                uint2 mx(std::min((tx + 1) * tileSize - 1, width - 1),
+                         std::min((ty + 1) * tileSize - 1, height - 1));
                 tiles.emplace_back(mn, mx);
             }
         }
     }
 
+    /**
+     * Assigns each triangle from the provided list to every tile
+     * whose screen-space axis-aligned bounding box overlaps it.
+     * @param setups   Pre-computed triangle setups (in screen space).
+     */
     void BinTriangles(const std::vector<RasterizerCommon::TriangleSetup>& setups)
     {
         for (auto& tile : tiles)
@@ -47,7 +63,7 @@ class TileGrid
         if (tiles.empty() || setups.empty())
             return;
 
-        const float renderTargetWidthFloat = static_cast<float>(width) - 1.0f;
+        const float renderTargetWidthFloat  = static_cast<float>(width)  - 1.0f;
         const float renderTargetHeightFloat = static_cast<float>(height) - 1.0f;
 
         const int tilesXInt = static_cast<int>(tilesX);
@@ -68,12 +84,13 @@ class TileGrid
             float clampedX2 = AfterMath::clamp(v2.Position.x, 0.0f, renderTargetWidthFloat);
             float clampedY2 = AfterMath::clamp(v2.Position.y, 0.0f, renderTargetHeightFloat);
 
-            float minX = std::min({clampedX0, clampedX1, clampedX2});
-            float maxX = std::max({clampedX0, clampedX1, clampedX2});
-            float minY = std::min({clampedY0, clampedY1, clampedY2});
-            float maxY = std::max({clampedY0, clampedY1, clampedY2});
+            float minX = std::min({ clampedX0, clampedX1, clampedX2 });
+            float maxX = std::max({ clampedX0, clampedX1, clampedX2 });
+            float minY = std::min({ clampedY0, clampedY1, clampedY2 });
+            float maxY = std::max({ clampedY0, clampedY1, clampedY2 });
 
-            if (minX >= renderTargetWidthFloat || maxX <= 0.0f || minY >= renderTargetHeightFloat || maxY <= 0.0f)
+            if (minX >= renderTargetWidthFloat || maxX <= 0.0f ||
+                minY >= renderTargetHeightFloat || maxY <= 0.0f)
                 continue;
 
             int tileX0 = AfterMath::clamp(static_cast<int>(std::floor(minX)) / tileSizeInt, 0, tilesXInt - 1);
@@ -87,39 +104,21 @@ class TileGrid
         }
     }
 
-    const std::vector<Tile>& GetTiles() const
-    {
-        return tiles;
-    }
+    const std::vector<Tile>& GetTiles() const { return tiles; }
 
-    uint GetWidth() const
-    {
-        return width;
-    }
-    uint GetHeight() const
-    {
-        return height;
-    }
-    uint GetTileSize() const
-    {
-        return tileSize;
-    }
-    uint GetTilesX() const
-    {
-        return tilesX;
-    }
-    uint GetTilesY() const
-    {
-        return tilesY;
-    }
+    uint GetWidth()    const { return width; }
+    uint GetHeight()   const { return height; }
+    uint GetTileSize() const { return tileSize; }
+    uint GetTilesX()   const { return tilesX; }
+    uint GetTilesY()   const { return tilesY; }
 
-    private:
+private:
     std::vector<Tile> tiles;
-    uint width = 0;
-    uint height = 0;
+    uint width    = 0;
+    uint height   = 0;
     uint tileSize = 0;
-    uint tilesX = 0;
-    uint tilesY = 0;
+    uint tilesX   = 0;
+    uint tilesY   = 0;
 };
 
 SOFTX_END

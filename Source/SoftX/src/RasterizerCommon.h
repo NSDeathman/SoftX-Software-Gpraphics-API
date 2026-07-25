@@ -54,63 +54,6 @@ namespace RasterizerCommon
         return _mm_add_ps(minZ, _mm_mul_ps(zNDC, range));
     }
 
-#define PLERP(field) result.field = (w0 * v0.field + w1 * v1.field + w2 * v2.field) * wsum
-#define LERP(field) result.field = (alpha * v0.field + beta * v1.field + gamma * v2.field)
-
-    inline Interpolant TrilerpDepthOnly(const Interpolant& v0, 
-                                        const Interpolant& v1, 
-                                        const Interpolant& v2, 
-                                        float alpha,
-                                        float beta, 
-                                        float gamma)
-    {
-        float w0 = alpha * v0.Position.w;
-        float w1 = beta * v1.Position.w;
-        float w2 = gamma * v2.Position.w;
-
-        float invWsum = w0 + w1 + w2;
-        float wsum = (std::abs(invWsum) > 1e-10f) ? (1.0f / invWsum) : 0.0f;
-
-        Interpolant result;
-
-        PLERP(Position.z);
-        LERP(Position.x);
-        LERP(Position.y);
-        LERP(Position.w);
-
-        return result;
-    }
-
-    inline Interpolant Trilerp(const Interpolant& v0, 
-                               const Interpolant& v1, 
-                               const Interpolant& v2, 
-                               float alpha,
-                               float beta, 
-                               float gamma)
-    {
-        float w0 = alpha * v0.Position.w;
-        float w1 = beta * v1.Position.w;
-        float w2 = gamma * v2.Position.w;
-
-        float invWsum = w0 + w1 + w2;
-        float wsum = (std::abs(invWsum) > 1e-10f) ? (1.0f / invWsum) : 0.0f;
-
-        Interpolant result;
-
-        PLERP(Color);
-        PLERP(Normal);
-        PLERP(UV);
-        PLERP(Position.z);
-        LERP(Position.x);
-        LERP(Position.y);
-        LERP(Position.w);
-
-        return result;
-    }
-
-#undef PLERP
-#undef LERP
-
     inline void ClipSpaceToScreenSpace(Interpolant& vert, const Viewport& vp)
     {
         float w = vert.Position.w;
