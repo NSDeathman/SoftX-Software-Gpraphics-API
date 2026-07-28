@@ -46,14 +46,6 @@ namespace RasterizerCommon
         return vp.minZ + zNDC * (vp.maxZ - vp.minZ);
     }
 
-    inline __m128 ComputeDepthForBlock(__m128 z_clip, __m128 invW, const Viewport& vp)
-    {
-        __m128 zNDC = _mm_mul_ps(z_clip, invW);
-        __m128 range = _mm_set1_ps(vp.maxZ - vp.minZ);
-        __m128 minZ = _mm_set1_ps(vp.minZ);
-        return _mm_add_ps(minZ, _mm_mul_ps(zNDC, range));
-    }
-
     inline void ClipSpaceToScreenSpace(Interpolant& vert, const Viewport& vp)
     {
         float w = vert.Position.w;

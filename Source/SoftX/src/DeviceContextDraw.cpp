@@ -13,67 +13,44 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-void DeviceContext::DrawPoint(const PipelineStateObject& state, int x, int y, float z, const float4& color)
+void DeviceContext::DrawPoint(Texture& rt, DepthBuffer& db, const RasterizerState& rasterState, int x, int y, float z, const float4& color)
 {
-    IRenderTarget* rt = state.renderTarget.get();
-    if (!rt)
+    const uint w = rt.Width();
+    const uint h = rt.Height();
+    if (x < 0 || y < 0 || x >= static_cast<int>(w) || y >= static_cast<int>(h))
         return;
 
-    if (!state.depthBuffer)
-        return;
+    uint idx = y * w + x;
+    float depthValue = db.At(idx);
 
-    if (x >= (int)rt->Width() || y >= (int)rt->Height())
-        return;
-
-    if (x < 0 || y < 0)
-        return;
-
-    uint idx = y * rt->Width() + x;
-    float depthValue = state.depthBuffer->At(idx);
-
-    bool pass = RasterizerCommon::DepthTest(z, depthValue, state.depthFunc);
-
-    if (pass)
+    if (RasterizerCommon::DepthTest(z, depthValue, rasterState.depthFunc))
     {
-        if (state.depthWriteEnable) state.depthBuffer->At(idx) = z;
-        if (state.renderTarget) rt->SetPixel(uint2(x, y), color);
+        if (rasterState.depthWriteEnable)
+            db.At(idx) = z;
+
+        __m128 col = _mm_set_ps(color.w, color.z, color.y, color.x);
+        rt.StreamWrite(uint2(x, y), col);
     }
 }
 
-void DeviceContext::DrawLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
+void DeviceContext::DrawLine(Texture& rt, DepthBuffer& db, const RasterizerState& rasterState, int x0, int y0, int x1, int y1, float z0, float z1, const float4& color)
 {
-    IRenderTarget* rt = state.renderTarget.get();
-    if (!rt)
-        return;
-
-    if (!state.depthBuffer)
-        return;
-
-    int dx = std::abs((int)x1 - (int)x0);
-    int dy = -std::abs((int)y1 - (int)y0);
+    int dx = std::abs(x1 - x0);
+    int dy = -std::abs(y1 - y0);
     int sx = (x0 < x1) ? 1 : -1;
     int sy = (y0 < y1) ? 1 : -1;
     int err = dx + dy;
     int steps = std::max(dx, -dy);
-    float zStep = (steps > 0) ? (z1 - z0) / steps : 0.0f;
+    float zStep = (steps > 0) ? (z1 - z0) / static_cast<float>(steps) : 0.0f;
     float z = z0;
-    uint x = x0, y = y0;
+    int x = x0, y = y0;
 
     for (int i = 0; i <= steps; ++i)
     {
-        DrawPoint(state, x, y, z, color);
-
+        DrawPoint(rt, db, rasterState, x, y, z, color);
         int e2 = 2 * err;
-        if (e2 >= dy)
-        {
-            err += dy;
-            x += sx;
-        }
-        if (e2 <= dx)
-        {
-            err += dx;
-            y += sy;
-        }
+        if (e2 >= dy) { err += dy; x += sx; }
+        if (e2 <= dx) { err += dx; y += sy; }
         z += zStep;
     }
 }
@@ -166,7 +143,6 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
                                      std::vector<Interpolant>& clipVerts,
                                      const std::vector<int3>& sourceTriangles)
 {
-    // Step 3: Near plane clipping
     std::vector<Interpolant> finalVerts;
     std::vector<int3> finalTriangles;
     finalVerts.reserve(sourceTriangles.size() * 3);
@@ -177,9 +153,7 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
         for (const auto& tri : sourceTriangles)
         {
             Interpolant clipped[2][3];
-            int numTris = RasterizerCommon::ClipTriangleNearPlane(
-                clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
-
+            int numTris = RasterizerCommon::ClipTriangleNearPlane(clipVerts[tri.x], clipVerts[tri.y], clipVerts[tri.z], clipped);
             for (int t = 0; t < numTris; ++t)
             {
                 int base = static_cast<int>(finalVerts.size());
@@ -190,18 +164,15 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
             }
         }
     }
-
     if (finalTriangles.empty())
         return;
 
-    // Step 4: Perspective divide
     {
         PROFILE_SCOPE("Perspective divide");
         for (auto& v : finalVerts)
             RasterizerCommon::ClipSpaceToScreenSpace(v, state.viewport);
     }
 
-    // Step 5: Geometry shader (optional)
     if (state.geometryShader)
     {
         PROFILE_SCOPE("Geometry shader");
@@ -226,82 +197,113 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
         finalTriangles = std::move(gsTriangles);
     }
 
-    // Step 6: Rasterization
+    Texture* rt = state.renderTarget.get();
+    DepthBuffer* db = state.depthBuffer.get();
+
+    RasterizerState fullRasterState;
+    fullRasterState.cullMode = state.cullMode;
+    fullRasterState.fillMode = state.fillMode;
+    fullRasterState.depthFunc = state.depthFunc;
+    fullRasterState.depthWriteEnable = state.depthWriteEnable;
+
     if (state.fillMode == FillMode::Solid)
     {
-        // ------------------------------------------------------------------
-        // Pre‑compute TriangleSetups once for every triangle.
-        // All heavy fixed‑point conversion, area, edge step deltas and
-        // reciprocal area are evaluated here and stored compactly.
-        // Culling is also applied at this stage so that back‑/front‑facing
-        // triangles never reach the rasteriser.
-        // ------------------------------------------------------------------
         PROFILE_SCOPE("Create TriangleSetups");
-        RasterizerState rasterState;
-        rasterState.cullMode = state.cullMode;
+        RasterizerState cullRasterState;
+        cullRasterState.cullMode = state.cullMode;
 
         std::vector<RasterizerCommon::TriangleSetup> setups;
         setups.reserve(finalTriangles.size());
 
+        uint64_t totalPixelCoverage = 0;
+        constexpr uint64_t PIXEL_COVERAGE_THRESHOLD = 4096;
+
         for (const auto& tri : finalTriangles)
         {
-            auto optSetup = RasterizerCommon::CreateTriangleSetup(
-                finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z], rasterState);
+            auto optSetup = RasterizerCommon::CreateTriangleSetup(finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z], cullRasterState);
             if (optSetup)
+            {
+                const auto& s = *optSetup;
+                totalPixelCoverage += static_cast<uint64_t>(s.bbMaxX - s.bbMinX + 1) * static_cast<uint64_t>(s.bbMaxY - s.bbMinY + 1);
                 setups.push_back(std::move(*optSetup));
+            }
         }
 
         if (!setups.empty())
         {
-            TileGrid tileGrid;
+            if (totalPixelCoverage < PIXEL_COVERAGE_THRESHOLD)
             {
-                PROFILE_SCOPE("Tile binning");
-                uint width = state.renderTarget ? state.renderTarget->Width() : state.depthBuffer->Width();
-                uint height = state.renderTarget ? state.renderTarget->Height() : state.depthBuffer->Height();
-                tileGrid.Build(width, height, state.tileSize);
-                tileGrid.BinTriangles(setups);
-            }
-
-            {
-                PROFILE_SCOPE("Render Solid");
-                const auto& tiles = tileGrid.GetTiles();
-                uint numTiles = static_cast<uint>(tiles.size());
-                std::atomic<int> tileIndex(0);
-
-                RasterizerState fullRasterState;
-                fullRasterState.cullMode = state.cullMode;
-                fullRasterState.fillMode = state.fillMode;
-                fullRasterState.depthFunc = state.depthFunc;
-                fullRasterState.depthWriteEnable = state.depthWriteEnable;
-
-                auto Task = [&]()
+                PROFILE_SCOPE("Render Solid (single-threaded)");
+                const uint w = rt->Width();
+                const uint h = rt->Height();
+                for (const auto& s : setups)
                 {
-                    PROFILE_SCOPE("RenderTiles::tile worker");
-                    while (true)
-                    {
-                        uint idx = static_cast<uint>(tileIndex.fetch_add(1));
-                        if (idx >= numTiles)
-                            break;
+                    int minX = std::max(0, s.bbMinX);
+                    int minY = std::max(0, s.bbMinY);
+                    int maxX = std::min(static_cast<int>(w) - 1, s.bbMaxX);
+                    int maxY = std::min(static_cast<int>(h) - 1, s.bbMaxY);
 
-                        const Tile& tile = tiles[idx];
-                        for (int triIdx : tile.triangleIndices)
+                    if (minX >= maxX || minY >= maxY) continue;
+
+                    Rasterizer::RasterizeTriangle(s,
+                                                  fullRasterState,
+                                                  *db,
+                                                  rt,
+                                                  state.viewport,
+                                                  state.pixelShader,
+                                                  state.constantBuffer,
+                                                  &state.textureTable,
+                                                  uint2(minX, minY),
+                                                  uint2(maxX, maxY));
+                }
+            }
+            else
+            {
+                TileGrid tileGrid;
+                {
+                    PROFILE_SCOPE("Tile binning");
+                    uint width  = rt->Width();
+                    uint height = rt->Height();
+                    tileGrid.Build(width, height, state.tileSize);
+                    tileGrid.BinTriangles(setups);
+                }
+
+                {
+                    PROFILE_SCOPE("Render Solid");
+                    const auto& tiles = tileGrid.GetTiles();
+                    uint numTiles = static_cast<uint>(tiles.size());
+                    std::atomic<int> tileIndex(0);
+
+                    auto Task = [&]()
+                    {
+                        PROFILE_SCOPE("RenderTiles::tile worker");
+                        while (true)
                         {
-                            Rasterizer::RasterizeTriangle(setups[triIdx],
-                                                          fullRasterState,
-                                                          *state.depthBuffer,
-                                                          state.renderTarget.get(),
-                                                          state.viewport,
-                                                          state.pixelShader,
-                                                          state.constantBuffer,
-                                                          &state.textureTable,
-                                                          tile.min,
-                                                          tile.max);
+                            uint idx = static_cast<uint>(tileIndex.fetch_add(1));
+                            if (idx >= numTiles)
+                                break;
+
+                            const Tile& tile = tiles[idx];
+                            for (int triIdx : tile.triangleIndices)
+                            {
+                                Rasterizer::RasterizeTriangle(
+                                    setups[triIdx],
+                                    fullRasterState,
+                                    *db,
+                                    rt,
+                                    state.viewport,
+                                    state.pixelShader,
+                                    state.constantBuffer,
+                                    &state.textureTable,
+                                    tile.min,
+                                    tile.max);
+                            }
                         }
-                    }
-                };
-                ThreadUtils::DispatchWorkers(Task);
+                    };
+                    ThreadUtils::DispatchWorkers(Task);
+                }
 #ifdef DEBUG_TILING
-                DrawActiveTileBorders(state, tiles);
+                DrawActiveTileBorders(*rt, fullRasterState, state.tileSize, tiles);
 #endif
             }
         }
@@ -309,8 +311,7 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
     else if (state.fillMode == FillMode::Wireframe)
     {
         PROFILE_SCOPE("Render Wireframe");
-        if (!state.renderTarget) return;
-        float4 wireColor(1, 1, 1, 1);
+        float4 wireColor(1.0f, 1.0f, 1.0f, 1.0f);
         for (const auto& tri : finalTriangles)
         {
             const auto& v0 = finalVerts[tri.x];
@@ -319,36 +320,26 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
             float depth0 = RasterizerCommon::ComputeDepth(v0.Position.z, v0.Position.w, state.viewport);
             float depth1 = RasterizerCommon::ComputeDepth(v1.Position.z, v1.Position.w, state.viewport);
             float depth2 = RasterizerCommon::ComputeDepth(v2.Position.z, v2.Position.w, state.viewport);
-            DrawLine(state, 
-                     (int)round(v0.Position.x), 
-                     (int)round(v0.Position.y),
-                     (int)round(v1.Position.x), 
-                     (int)round(v1.Position.y),
-                     depth0, 
-                     depth1, 
-                     wireColor);
-            DrawLine(state, 
-                     (int)round(v1.Position.x), 
-                     (int)round(v1.Position.y),
-                     (int)round(v2.Position.x), 
-                     (int)round(v2.Position.y),
-                     depth1, 
-                     depth2, 
-                     wireColor);
-            DrawLine(state, 
-                     (int)round(v2.Position.x), 
-                     (int)round(v2.Position.y),
-                     (int)round(v0.Position.x), 
-                     (int)round(v0.Position.y),
-                     depth2, 
-                     depth0, 
-                     wireColor);
+
+            DrawLine(*rt, *db, fullRasterState,
+                     (int)round(v0.Position.x), (int)round(v0.Position.y),
+                     (int)round(v1.Position.x), (int)round(v1.Position.y),
+                     depth0, depth1, wireColor);
+
+            DrawLine(*rt, *db, fullRasterState,
+                     (int)round(v1.Position.x), (int)round(v1.Position.y),
+                     (int)round(v2.Position.x), (int)round(v2.Position.y),
+                     depth1, depth2, wireColor);
+
+            DrawLine(*rt, *db, fullRasterState,
+                     (int)round(v2.Position.x), (int)round(v2.Position.y),
+                     (int)round(v0.Position.x), (int)round(v0.Position.y),
+                     depth2, depth0, wireColor);
         }
     }
     else if (state.fillMode == FillMode::Point)
     {
         PROFILE_SCOPE("Render Point");
-        if (!state.renderTarget) return;
         std::vector<bool> drawn(finalVerts.size(), false);
         for (const auto& tri : finalTriangles)
         {
@@ -359,7 +350,7 @@ void DeviceContext::ClipAndRasterize(const PipelineStateObject& state,
                     drawn[idx] = true;
                     const auto& v = finalVerts[idx];
                     float depth = RasterizerCommon::ComputeDepth(v.Position.z, v.Position.w, state.viewport);
-                    DrawPoint(state, (int)round(v.Position.x), (int)round(v.Position.y), depth, v.Color);
+                    DrawPoint(*rt, *db, fullRasterState, (int)round(v.Position.x), (int)round(v.Position.y), depth, v.Color);
                 }
             }
         }
@@ -472,16 +463,13 @@ void DeviceContext::DrawFullScreenQuad()
                    PipelineResource::Viewport |
                    PipelineResource::TileSize);
 
-    IRenderTarget* rt = state.renderTarget.get();
+    Texture* rt = state.renderTarget.get();
     const uint w = rt->Width();
     const uint h = rt->Height();
     const float invW = 1.0f / (w - 1u);
     const float invH = 1.0f / (h - 1u);
 
-    FrameBuffer* fb = dynamic_cast<FrameBuffer*>(rt);
-    RenderTargetTexture* rtt = dynamic_cast<RenderTargetTexture*>(rt);
-    uint32_t* fbPixels = fb ? fb->GetRawPixels() : nullptr;
-    __m128* texPixels = rtt ? rtt->Texture().GetRawPixels() : nullptr;
+    __m128* pixels = rt->GetRawPixels();
 
     auto ps = state.pixelShader;
     auto cb = state.constantBuffer;
@@ -494,114 +482,47 @@ void DeviceContext::DrawFullScreenQuad()
     uint numTiles = static_cast<uint>(tiles.size());
     std::atomic<uint> tileIndex(0);
 
-    if (fbPixels) 
+    auto worker = [&]()
     {
-        auto workerFB = [&, ps, cb, tt, fbPixels, w, invW, invH]() 
+        PROFILE_SCOPE("FullScreenQuad Worker");
+        while (true)
         {
-            PROFILE_SCOPE("FullScreenQuad FB Worker");
-            while (true) {
-                uint idx = tileIndex.fetch_add(1);
-                if (idx >= numTiles) break;
-                const Tile& tile = tiles[idx];
-                const uint startX = tile.min.x, endX = tile.max.x;
-                const uint startY = tile.min.y, endY = tile.max.y;
+            uint idx = tileIndex.fetch_add(1);
+            if (idx >= numTiles) break;
+            const Tile& tile = tiles[idx];
+            const uint startX = tile.min.x, endX = tile.max.x;
+            const uint startY = tile.min.y, endY = tile.max.y;
 
-                float v = startY * invH;
-                for (uint y = startY; y <= endY; ++y, v += invH) {
-                    float u = startX * invW;
-                    uint x = startX;
-                    uint32_t* row = fbPixels + y * w;
-
-                    for (; x + 3 <= endX; x += 4, u += 4.0f * invW) {
-                        uint32_t packed[4];
-                        for (int i = 0; i < 4; ++i) {
-                            Interpolant input;
-                            input.UV = float2(u + i * invW, v);
-                            packed[i] = FrameBuffer::PackColor(ps(input, cb, tt));
-                        }
-                        std::memcpy(row + x, packed, sizeof(packed));
-                    }
-
-                    for (; x <= endX; ++x, u += invW) {
-                        Interpolant input;
-                        input.UV = float2(u, v);
-                        row[x] = FrameBuffer::PackColor(ps(input, cb, tt));
-                    }
-                }
-            }
-        };
-        ThreadUtils::DispatchWorkers(workerFB);
-    }
-    else if (texPixels) 
-    {
-        auto workerTex = [&, ps, cb, tt, texPixels, w, invW, invH]() 
-        {
-            PROFILE_SCOPE("FullScreenQuad Tex Worker");
-            while (true) {
-                uint idx = tileIndex.fetch_add(1);
-                if (idx >= numTiles) break;
-                const Tile& tile = tiles[idx];
-                const uint startX = tile.min.x, endX = tile.max.x;
-                const uint startY = tile.min.y, endY = tile.max.y;
-
-                float v = startY * invH;
-                for (uint y = startY; y <= endY; ++y, v += invH) {
-                    float u = startX * invW;
-                    uint x = startX;
-                    __m128* row = texPixels + y * w;
-
-                    for (; x + 3 <= endX; x += 4, u += 4.0f * invW) {
-                        for (int i = 0; i < 4; ++i) {
-                            Interpolant input;
-                            input.UV = float2(u + i * invW, v);
-                            float4 c = ps(input, cb, tt);
-                            _mm_store_ps((float*)(row + x + i), _mm_set_ps(c.w, c.z, c.y, c.x));
-                        }
-                    }
-
-                    for (; x <= endX; ++x, u += invW) {
-                        Interpolant input;
-                        input.UV = float2(u, v);
-                        float4 c = ps(input, cb, tt);
-                        _mm_store_ps((float*)(row + x), _mm_set_ps(c.w, c.z, c.y, c.x));
-                    }
-                }
-            }
-        };
-        ThreadUtils::DispatchWorkers(workerTex);
-    }
-    else 
-    {
-        auto workerFallback = [&, ps, cb, tt, rt, w, invW, invH]() 
-        {
-            PROFILE_SCOPE("FullScreenQuad Fallback Worker");
-            while (true) 
+            float v = startY * invH;
+            for (uint y = startY; y <= endY; ++y, v += invH)
             {
-                uint idx = tileIndex.fetch_add(1);
-                if (idx >= numTiles) break;
-                const Tile& tile = tiles[idx];
-                const uint startX = tile.min.x, endX = tile.max.x;
-                const uint startY = tile.min.y, endY = tile.max.y;
+                float u = startX * invW;
+                uint x = startX;
+                __m128* row = pixels + y * w;
 
-                float v = startY * invH;
-                for (uint y = startY; y <= endY; ++y, v += invH) 
+                for (; x + 3 <= endX; x += 4, u += 4.0f * invW)
                 {
-                    float u = startX * invW;
-                    for (uint x = startX; x <= endX; ++x, u += invW) 
+                    for (int i = 0; i < 4; ++i)
                     {
                         Interpolant input;
-                        input.UV = float2(u, v);
-                        rt->SetPixel(uint2(x, y), ps(input, cb, tt));
+                        input.UV = float2(u + i * invW, v);
+                        float4 c = ps(input, cb, tt);
+                        _mm_stream_ps(reinterpret_cast<float*>(row + x + i), _mm_set_ps(c.w, c.z, c.y, c.x));
                     }
                 }
-            }
-        };
-        ThreadUtils::DispatchWorkers(workerFallback);
-    }
 
-#ifdef DEBUG_TILING
-    DrawActiveTileBorders(state, tiles);
-#endif
+                for (; x <= endX; ++x, u += invW)
+                {
+                    Interpolant input;
+                    input.UV = float2(u, v);
+                    float4 c = ps(input, cb, tt);
+                    _mm_stream_ps(reinterpret_cast<float*>(row + x), _mm_set_ps(c.w, c.z, c.y, c.x));
+                }
+            }
+        }
+    };
+
+    ThreadUtils::DispatchWorkers(worker);
 }
 
 SOFTX_END

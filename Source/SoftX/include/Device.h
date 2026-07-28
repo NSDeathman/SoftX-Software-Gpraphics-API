@@ -39,7 +39,7 @@ public:
 
     std::unique_ptr<DeviceContext> CreateDeferredContext() { return std::make_unique<DeviceContext>(); }
 
-    SOFTX_FORCE_INLINE std::shared_ptr<FrameBuffer> GetBackBuffer() { return backBuffer; }
+    SOFTX_FORCE_INLINE std::shared_ptr<Texture> GetBackBuffer() { return backBuffer; }
     SOFTX_FORCE_INLINE std::shared_ptr<DepthBuffer> GetDepthBuffer() { return depthBuffer; }
 
     SOFTX_FORCE_INLINE PresentParameters& GetPresentParams() { return presentParams; }
@@ -58,8 +58,8 @@ private:
 
 private:
     std::unique_ptr<DeviceContext> immediateContext;
-    std::shared_ptr<FrameBuffer> backBuffer;
-    std::shared_ptr<FrameBuffer> frontBuffer;
+    std::shared_ptr<Texture> backBuffer;
+    std::shared_ptr<Texture> frontBuffer;
     std::shared_ptr<DepthBuffer> depthBuffer;
     HANDLE hConsoleBuffer = nullptr;
     PresentParameters presentParams;

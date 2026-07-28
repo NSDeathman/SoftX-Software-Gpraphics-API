@@ -61,5 +61,4 @@ cmake-build*/
 *.pdb
 *.exp
 
-Source/SoftX/lib/*
 /Build/generated

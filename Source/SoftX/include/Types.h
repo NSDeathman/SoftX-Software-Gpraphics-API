@@ -13,9 +13,7 @@
 
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
-#include "TextureInterface.h"
 /////////////////////////////////////////////////////////////////
-class SOFTX_API SoftX::IRenderTarget;
 class SOFTX_API SoftX::DepthBuffer;
 struct HWND__; typedef HWND__* HWND;
 /////////////////////////////////////////////////////////////////
@@ -292,17 +290,17 @@ struct SamplerState
 // ── Textures ─────────────────────────────────────────────────
 struct TextureBinding
 {
-    std::shared_ptr<const ITexture> texture;
+    std::shared_ptr<const Texture> texture;
     SamplerState sampler;
 
     TextureBinding() = default;
-    TextureBinding(std::shared_ptr<const ITexture> tex, SamplerState samp = SamplerState{})
+    TextureBinding(std::shared_ptr<const Texture> tex, SamplerState samp = SamplerState{})
         : texture(std::move(tex)), sampler(samp) {}
 
     SOFTX_FORCE_INLINE bool IsValid() const { return texture != nullptr; }
     SOFTX_FORCE_INLINE bool IsEmpty() const { return !IsValid(); }
 
-    SOFTX_FORCE_INLINE void SetTexture(std::shared_ptr<const ITexture> tex) { texture = std::move(tex); }
+    SOFTX_FORCE_INLINE void SetTexture(std::shared_ptr<const Texture> tex) { texture = std::move(tex); }
     SOFTX_FORCE_INLINE void SetSamplerState(const SamplerState& samp) { sampler = samp; }
 
     float4 Sample(const float2& uv) const
@@ -333,7 +331,7 @@ struct TextureBinding
 class TextureTable
 {
 public:
-    SOFTX_FORCE_INLINE void Set(const std::string& name, std::shared_ptr<const ITexture> texture, const SamplerState& sampler = SamplerState{})
+    SOFTX_FORCE_INLINE void Set(const std::string& name, std::shared_ptr<const Texture> texture, const SamplerState& sampler = SamplerState{})
     {
         bindings[name] = { std::move(texture), sampler };
     }
@@ -407,7 +405,7 @@ struct PipelineStateObject
 
     TextureTable textureTable;
 
-    std::shared_ptr<IRenderTarget> renderTarget;
+    std::shared_ptr<Texture> renderTarget;
     std::shared_ptr<DepthBuffer> depthBuffer;
 
     CullMode cullMode = CullMode::Back;

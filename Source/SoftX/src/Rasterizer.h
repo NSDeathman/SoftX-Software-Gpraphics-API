@@ -7,7 +7,6 @@
 /////////////////////////////////////////////////////////////////
 #include "../include/LibInternal.h"
 #include "../include/DepthBuffer.h"
-#include "../include/RenderTargetInterface.h"
 #include "RasterizerCommon.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
@@ -26,7 +25,7 @@ namespace Rasterizer
     static inline void RasterizeTriangle(const RasterizerCommon::TriangleSetup& setup,
                                          const RasterizerState& rasterizerState,
                                          DepthBuffer& depthBuffer,
-                                         IRenderTarget* renderTarget,
+                                         Texture* renderTarget,
                                          const Viewport& viewport,
                                          const PixelShader& pixelShader,
                                          const ConstantBuffer& constantBuffer,
@@ -115,7 +114,7 @@ namespace Rasterizer
                             fragment.Position.w = interpolatedW;
 
                             // Execute pixel shader and write to render target
-                            renderTarget->SetPixel(uint2(x, y), pixelShader(fragment, constantBuffer, *textureTable));
+                            renderTarget->StreamWrite(uint2(x, y), pixelShader(fragment, constantBuffer, *textureTable).simd_);
                         }
                     }
                 }

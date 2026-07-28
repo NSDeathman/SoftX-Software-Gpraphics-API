@@ -12,7 +12,7 @@
 
 // Your custom profiler
 #ifdef ENABLE_PROFILER
-#include "../../../Optick/Include/optick.h"
+#include "../../Optick/Include/optick.h"
 #define PROFILE_FRAME(x) OPTICK_FRAME(x)
 #define PROFILE_SCOPE(x) OPTICK_EVENT(x)
 #define PROFILE_THREAD(x) OPTICK_THREAD(x)

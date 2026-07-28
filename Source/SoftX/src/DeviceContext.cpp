@@ -50,14 +50,14 @@ void DeviceContext::SetVertexBuffer(const VertexBuffer& buffer)
 }
 
 void DeviceContext::SetTexture(const std::string& name,
-                               std::shared_ptr<const ITexture> texture,
+                               std::shared_ptr<const Texture> texture,
                                const SamplerState& sampler) 
 {
     std::lock_guard<std::mutex> lock(stateMutex);
     backState.textureTable.Set(name, std::move(texture), sampler);
 }
 
-void DeviceContext::SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer) 
+void DeviceContext::SetRenderTarget(std::shared_ptr<Texture> target, bool createDepthBuffer)
 {
     std::lock_guard<std::mutex> lock(stateMutex);
     backState.renderTarget = std::move(target);
@@ -145,18 +145,8 @@ void DeviceContext::Clear(ClearFlags flags,
 
     if (!clearColor && !clearDepth) return;
 
-    const bool useParallel = clearColor && clearDepth;
-
-    if (useParallel) 
-    {
-        state.renderTarget->Clear(color);
-        ThreadUtils::DispatchWorkers([db = state.depthBuffer, depth]{ db->Clear(depth); });
-    }
-    else 
-    {
-        if (clearColor) state.renderTarget->Clear(color);
-        if (clearDepth) state.depthBuffer->Clear(depth);
-    }
+    if (clearColor) state.renderTarget->Clear(color);
+    if (clearDepth) state.depthBuffer->Clear(depth);
 }
 
 SOFTX_END

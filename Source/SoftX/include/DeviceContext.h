@@ -7,7 +7,6 @@
 /////////////////////////////////////////////////////////////////
 #include <mutex>
 #include "LibInternal.h"
-#include "RenderTargetInterface.h"
 #include "ThirdPartyIncluding.h"
 #include "Types.h"
 /////////////////////////////////////////////////////////////////
@@ -45,10 +44,10 @@ public:
     void SetConstantBuffer(const ConstantBuffer& buffer);
     SOFTX_FORCE_INLINE ConstantBuffer GetConstantBuffer() const { return frontState.constantBuffer; }
 
-    void SetTexture(const std::string& name, std::shared_ptr<const ITexture> texture, const SamplerState& sampler = SamplerState{});
+    void SetTexture(const std::string& name, std::shared_ptr<const Texture> texture, const SamplerState& sampler = SamplerState{});
 
-    void SetRenderTarget(std::shared_ptr<IRenderTarget> target, bool createDepthBuffer = false);
-    SOFTX_FORCE_INLINE std::shared_ptr<IRenderTarget> GetRenderTarget() const { return frontState.renderTarget; }
+    void SetRenderTarget(std::shared_ptr<Texture> target, bool createDepthBuffer = false);
+    SOFTX_FORCE_INLINE std::shared_ptr<Texture> GetRenderTarget() const { return frontState.renderTarget; }
 
     void SetDepthBuffer(std::shared_ptr<DepthBuffer> depth);
     SOFTX_FORCE_INLINE std::shared_ptr<DepthBuffer> GetDepthBuffer() const { return frontState.depthBuffer; }
@@ -85,11 +84,11 @@ public:
     void DrawFullScreenQuad();
 
 private:
-    void DrawPoint(const PipelineStateObject& state, int x, int y, float z, const float4& color);
-    void DrawLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
-    void DrawDebugLine(const PipelineStateObject& state, int x0, int y0, int x1, int y1, const float4& color);
-    void DrawTileBorders(const PipelineStateObject& state);
-    void DrawActiveTileBorders(const PipelineStateObject& state, const std::vector<Tile>& tiles);
+    void DrawPoint(Texture& rt, DepthBuffer& db, const RasterizerState& rasterState, int x, int y, float z, const float4& color);
+    void DrawLine(Texture& rt, DepthBuffer& db, const RasterizerState& rasterState, int x0, int y0, int x1, int y1, float z0, float z1, const float4& color);
+    void DrawDebugLine(Texture& rt, const RasterizerState& rasterState, int x0, int y0, int x1, int y1, const float4& color);
+    void DrawTileBorders(Texture& rt, uint tileSize);
+    void DrawActiveTileBorders(Texture& rt, const RasterizerState& rasterState, uint tileSize, const std::vector<Tile>& tiles);
     std::vector<Interpolant> ProcessIndexedVertices(const PipelineStateObject& state, uint indexCount, uint startIndex, uint totalVertices);
     std::vector<int3> GatherIndexedTriangles(const PipelineStateObject& state, uint indexCount, uint startIndex);
     std::vector<Interpolant> ProcessNonIndexedVertices(const PipelineStateObject& state, uint vertexCount, uint startVertex);

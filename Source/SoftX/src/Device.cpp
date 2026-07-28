@@ -4,13 +4,14 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
-#include "ThreadPoolManager.h"
+#include "ThreadUtils.h"
+#include <Windows.h>
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
 Device::Device(const PresentParameters& params, size_t numThreads): presentParams(params),
-                                                                    backBuffer(std::make_shared<FrameBuffer>(params.BackBufferSize)),
-                                                                    frontBuffer(std::make_shared<FrameBuffer>(params.BackBufferSize)),
+                                                                    backBuffer(std::make_shared<Texture>(params.BackBufferSize)),
+                                                                    frontBuffer(std::make_shared<Texture>(params.BackBufferSize)),
                                                                     depthBuffer(std::make_shared<DepthBuffer>(params.BackBufferSize)),
                                                                     immediateContext(std::make_unique<DeviceContext>())
 {
@@ -104,8 +105,8 @@ void Device::Reset(const PresentParameters& newParams)
 
     if (!presentParams.Headless)
     {
-        backBuffer = std::make_shared<FrameBuffer>(presentParams.BackBufferSize);
-        frontBuffer = std::make_shared<FrameBuffer>(presentParams.BackBufferSize);
+        backBuffer = std::make_shared<Texture>(presentParams.BackBufferSize);
+        frontBuffer = std::make_shared<Texture>(presentParams.BackBufferSize);
         depthBuffer = std::make_shared<DepthBuffer>(presentParams.BackBufferSize);
 
         immediateContext->SetRenderTarget(backBuffer, false);
@@ -113,7 +114,7 @@ void Device::Reset(const PresentParameters& newParams)
     }
     else
     {
-        backBuffer = std::make_shared<FrameBuffer>(uint2(1, 1));
+        backBuffer = std::make_shared<Texture>(uint2(1, 1));
         frontBuffer.reset();
         depthBuffer = std::make_shared<DepthBuffer>(uint2(1, 1));
 
@@ -137,16 +138,83 @@ void Device::PresentToWindow()
         return;
 
     HDC hdc = GetDC(presentParams.hDeviceWindow);
-    if (hdc)
+    if (!hdc) return;
+
+    RECT clientRect;
+    GetClientRect(presentParams.hDeviceWindow, &clientRect);
+    int dstW = clientRect.right - clientRect.left;
+    int dstH = clientRect.bottom - clientRect.top;
+
+    const Texture* tex = frontBuffer.get();
+    const uint w = tex->Width();
+    const uint h = tex->Height();
+    const size_t totalPixels = static_cast<size_t>(w) * h;
+
+    // Выделяем память для BGRA8 с выравниванием по 16 байт
+    uint32_t* bgraPixels = static_cast<uint32_t*>(
+        _aligned_malloc(totalPixels * sizeof(uint32_t), 16));
+    if (!bgraPixels) return;
+
+    const __m128* src = tex->GetRawPixels();
+    const __m128 scale = _mm_set1_ps(255.0f);
+
+    // Маска для перестановки байт: [B, G, R, A] (индексы байт после cvtps_epi32)
+    const __m128i shuffleMask = _mm_setr_epi8(
+        8, 4, 0, 12,        // берём B(8), G(4), R(0), A(12)
+        (char)0x80, (char)0x80, (char)0x80, (char)0x80,
+        (char)0x80, (char)0x80, (char)0x80, (char)0x80,
+        (char)0x80, (char)0x80, (char)0x80, (char)0x80);
+
+    // Параллельная обработка: разбиваем на строки (можно и на тайлы)
+    std::atomic<uint32_t> nextRow(0);
+    auto convertRow = [&]()
     {
-        RECT clientRect;
-        GetClientRect(presentParams.hDeviceWindow, &clientRect);
-        int2 dstSize(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
-        frontBuffer->PresentBitmap(hdc, int2(0, 0), dstSize);
-        ReleaseDC(presentParams.hDeviceWindow, hdc);
-    }
+        while (true)
+        {
+            uint32_t y = nextRow.fetch_add(1);
+            if (y >= h) break;
+
+            const __m128* srcRow = src + y * w;
+            uint32_t* dstRow = bgraPixels + y * w;
+
+            for (uint32_t x = 0; x < w; ++x)
+            {
+                __m128 px = srcRow[x];
+                __m128 scaled = _mm_mul_ps(px, scale);
+                __m128i int32s = _mm_cvtps_epi32(scaled);
+                __m128i shuffled = _mm_shuffle_epi8(int32s, shuffleMask);
+                dstRow[x] = static_cast<uint32_t>(_mm_cvtsi128_si32(shuffled));
+            }
+        }
+    };
+
+    // Запускаем столько же потоков, сколько используется в ThreadPool
+    ThreadUtils::DispatchWorkers(convertRow);
+
+    BITMAPINFO bmi = {};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = (LONG)w;
+    bmi.bmiHeader.biHeight = -(LONG)h;   // top-down
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    SetDIBitsToDevice(hdc,
+        0, 0,
+        dstW, dstH,
+        0, 0,
+        0, h,
+        bgraPixels,
+        &bmi,
+        DIB_RGB_COLORS);
+
+    ReleaseDC(presentParams.hDeviceWindow, hdc);
+    _aligned_free(bgraPixels);
 }
 
+// Inspired by Onigiri :D
+// https://www.youtube.com/watch?v=n4zUgtDk95w
+// https://github.com/ArtemOnigiri/Console3D/blob/main/ConsoleRayTracing.cpp
 void Device::PresentToConsole()
 {
     PROFILE_SCOPE("Device::PresentToConsole");
@@ -154,7 +222,82 @@ void Device::PresentToConsole()
     if (hConsoleBuffer == nullptr)
         return;
 
-    frontBuffer->PresentASCII(hConsoleBuffer, presentParams.ConsoleSize);
+    const Texture* tex = frontBuffer.get();
+    uint srcW = tex->Width();
+    uint srcH = tex->Height();
+    uint2 consoleSize = presentParams.ConsoleSize;
+    uint dstW = consoleSize.x;
+    uint dstH = consoleSize.y;
+
+    static const char gradient[] = " .:!/r(l1Z4H9W8$@";
+    static const int gradientSize = static_cast<int>(std::size(gradient)) - 2;
+
+    std::vector<char> charBuffer(dstW * dstH);
+    float scaleX = static_cast<float>(srcW) / dstW;
+    float scaleY = static_cast<float>(srcH) / dstH;
+
+    const uint totalPixels = dstW * dstH;
+    std::atomic<uint> pixelIndex(0);
+
+    auto Task = [&]()
+    {
+        while (true)
+        {
+            uint idx = pixelIndex.fetch_add(1);
+            if (idx >= totalPixels) break;
+
+            uint y = idx / dstW;
+            uint x = idx % dstW;
+
+            uint srcYStart = static_cast<uint>(y * scaleY);
+            uint srcYEnd = (y == dstH - 1) ? srcH : static_cast<uint>((y + 1) * scaleY);
+            if (srcYEnd == 0) srcYEnd = 1;
+
+            uint srcXStart = static_cast<uint>(x * scaleX);
+            uint srcXEnd = (x == dstW - 1) ? srcW : static_cast<uint>((x + 1) * scaleX);
+            if (srcXEnd == 0) srcXEnd = 1;
+
+            float rSum = 0, gSum = 0, bSum = 0;
+            uint samples = 0;
+
+            for (uint sy = srcYStart; sy < srcYEnd && sy < srcH; ++sy)
+            {
+                for (uint sx = srcXStart; sx < srcXEnd && sx < srcW; ++sx)
+                {
+                    __m128 color = tex->Read(uint2(sx, sy));
+                    float rgba[4];
+                    _mm_storeu_ps(rgba, color);
+                    rSum += rgba[0];
+                    gSum += rgba[1];
+                    bSum += rgba[2];
+                    ++samples;
+                }
+            }
+
+            if (samples > 0)
+            {
+                rSum /= samples;
+                gSum /= samples;
+                bSum /= samples;
+
+                float luminance = 0.2126f * rSum + 0.7152f * gSum + 0.0722f * bSum;
+                luminance = AfterMath::clamp(luminance, 0.0f, 1.0f);
+
+                int gradIdx = static_cast<int>(luminance * gradientSize);
+                gradIdx = AfterMath::clamp(gradIdx, 0, gradientSize);
+                charBuffer[idx] = gradient[gradIdx];
+            }
+            else
+            {
+                charBuffer[idx] = ' ';
+            }
+        }
+    };
+    ThreadUtils::DispatchWorkers(Task);
+
+    DWORD written = 0;
+    COORD coord = { 0, 0 };
+    WriteConsoleOutputCharacterA(hConsoleBuffer, charBuffer.data(), static_cast<DWORD>(totalPixels), coord, &written);
 }
 
 void Device::Present()

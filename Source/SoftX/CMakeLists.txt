@@ -12,8 +12,7 @@ set(SOFTX_SOURCES
     src/DeviceContext.cpp
     src/DeviceContextDebug.cpp
     src/DeviceContextDraw.cpp
-    src/FrameBuffer.cpp
-    src/TextureRGBA32F.cpp
+    src/Texture.cpp
     src/OcclusionQuery.cpp
 )
 
@@ -30,18 +29,13 @@ set(SOFTX_PRIVATE_HEADERS
 
 set(SOFTX_PUBLIC_HEADERS
     include/DepthBuffer.h
-    include/DepthTextureView.h
     include/Device.h
     include/DeviceContext.h
     include/Exceptions.h
-    include/FrameBuffer.h
     include/LibInternal.h
     include/OcclusionQuery.h
-    include/RenderTargetInterface.h
-    include/RenderTargetTexture.h
     include/SoftX.h
-    include/TextureRGBA32F.h
-    include/TextureInterface.h
+    include/Texture.h
     include/ThirdPartyIncluding.h
     include/Types.h
 )
@@ -98,8 +92,7 @@ source_group("Source Files\\Tools\\Threading"         		FILES 	src/ThreadPool.h
 
 source_group("Source Files\\Tools\\Tile binning"     		FILES 	src/TileGrid.h)
 
-source_group("Source Files\\Resources"     			FILES 	src/FrameBuffer.cpp
-									src/TextureRGBA32F.cpp)
+source_group("Source Files\\Resources"     			FILES 	src/Texture.cpp)
 
 source_group("Source Files\\Rastization"     			FILES 	src/RasterizerCommon.h
 									src/Rasterizer.h
@@ -111,12 +104,8 @@ source_group("Header Files\\API"           			FILES 	include/SoftX.h
 									include/OcclusionQuery.h
 									include/Types.h
                                                  			include/DepthBuffer.h
-									include/DepthTextureView.h
-									include/FrameBuffer.h
 									include/Exceptions.h
-                                                 			include/RenderTargetInterface.h
-									include/RenderTargetTexture.h
-									include/TextureRGBA32F.h
-									include/TextureInterface.h
+									include/Texture.h
                                                  			include/LibInternal.h
 									include/ThirdPartyIncluding.h)
+#target_link_libraries(SoftX PUBLIC OptickCore)
