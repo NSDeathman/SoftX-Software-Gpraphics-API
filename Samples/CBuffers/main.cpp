@@ -6,6 +6,7 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <chrono>
 
 #include <SoftX.h>
 #include <AfterMath.h>
