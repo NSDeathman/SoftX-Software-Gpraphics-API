@@ -30,7 +30,7 @@ SoftX is designed from the ground up for performance and flexibility:
 - **Tile‑based renderer** – splits the screen into tiles, bins triangles, and processes tiles in parallel using a thread pool.
 - **Occlusion Query** – dedicated query rasteriser runs geometry in a low‑overhead async pass, recording visible sample counts without pixel shading.
 - **Depth Buffer** – supports multiple MIP levels (Hi‑Z) for fast hierarchical depth tests, generated on demand.
-- **Textures** – `TextureRGBA32F` provides a full mip‑map chain, bilinear filtering, and LOD‑aware sampling through the sampler interface.
+- **Textures** – `Texture` provides a full mip‑map chain, bilinear filtering, and LOD‑aware sampling through the sampler interface.
 - **Shader stages** – user‑supplied functors that follow a simple signature; no separate shader compilation required.
 
 ## Examples
