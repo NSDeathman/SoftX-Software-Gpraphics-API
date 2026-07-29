@@ -10,8 +10,6 @@ set(SOFTX_SOURCES
     src/CPUDetector.cpp
     src/Device.cpp
     src/DeviceContext.cpp
-    src/DeviceContextDebug.cpp
-    src/DeviceContextDraw.cpp
     src/Texture.cpp
     src/OcclusionQuery.cpp
 )
@@ -77,35 +75,33 @@ set_target_properties(SoftX PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/Source/SoftX/lib/$<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>,x64,x86>"
 )
 
-source_group("Source Files\\Core"          			FILES 	src/Device.cpp
-									src/DeviceContext.cpp
-									src/DeviceContextDebug.cpp
-									src/DeviceContextDraw.cpp
-									src/OcclusionQuery.cpp)
+source_group("Source Files\\Core"          			        FILES 	src/Device.cpp
+									                                src/DeviceContext.cpp
+									                                src/OcclusionQuery.cpp)
 
 source_group("Source Files\\Tools\\CPU Detection"         	FILES 	src/CPUDetector.h
-									src/CPUDetector.cpp)
+									                                src/CPUDetector.cpp)
 
 source_group("Source Files\\Tools\\Threading"         		FILES 	src/ThreadPool.h
-									src/ThreadPoolManager.h
-									src/ThreadUtils.h)
+									                                src/ThreadPoolManager.h
+									                                src/ThreadUtils.h)
 
 source_group("Source Files\\Tools\\Tile binning"     		FILES 	src/TileGrid.h)
 
-source_group("Source Files\\Resources"     			FILES 	src/Texture.cpp)
+source_group("Source Files\\Resources"     			        FILES 	src/Texture.cpp)
 
-source_group("Source Files\\Rastization"     			FILES 	src/RasterizerCommon.h
-									src/Rasterizer.h
-									src/QueryRasterizer.h)
+source_group("Source Files\\Rastization"     			    FILES 	src/RasterizerCommon.h
+									                                src/Rasterizer.h
+									                                src/QueryRasterizer.h)
 
-source_group("Header Files\\API"           			FILES 	include/SoftX.h
-									include/Device.h
-									include/DeviceContext.h
-									include/OcclusionQuery.h
-									include/Types.h
-                                                 			include/DepthBuffer.h
-									include/Exceptions.h
-									include/Texture.h
-                                                 			include/LibInternal.h
-									include/ThirdPartyIncluding.h)
+source_group("Header Files\\API"           			        FILES 	include/SoftX.h
+									                                include/Device.h
+									                                include/DeviceContext.h
+									                                include/OcclusionQuery.h
+									                                include/Types.h
+                                                 			        include/DepthBuffer.h
+									                                include/Exceptions.h
+									                                include/Texture.h
+                                                 			        include/LibInternal.h
+									                                include/ThirdPartyIncluding.h)
 #target_link_libraries(SoftX PUBLIC OptickCore)
