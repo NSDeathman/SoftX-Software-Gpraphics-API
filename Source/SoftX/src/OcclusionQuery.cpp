@@ -7,6 +7,7 @@
 #include "QueryRasterizer.h"
 #include "ThreadPoolManager.h"
 #include "TileGrid.h"
+#include "InternalTypes.h"
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 

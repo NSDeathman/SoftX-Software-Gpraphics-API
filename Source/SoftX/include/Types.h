@@ -241,15 +241,6 @@ struct Viewport
         : pos(pos), size(size), minZ(minZ), maxZ(maxZ) {}
 };
 
-struct Tile
-{
-    uint2 min;
-    uint2 max;
-    std::vector<int> triangleIndices;
-
-    Tile(uint2 min, uint2 max) : min(min), max(max) {}
-};
-
 // ── Sampler ──────────────────────────────────────────────────
 enum class Filter { Nearest, Bilinear };
 enum class Wrap { Repeat, Clamp, Mirror };
@@ -366,14 +357,6 @@ enum class CullMode { None, Front, Back };
 enum class FillMode { Point, Wireframe, Solid };
 enum class ComparisonFunc { Never, Less, Equal, LessEqual, Greater, NotEqual, GreaterEqual, Always };
 
-struct RasterizerState
-{
-    CullMode cullMode = CullMode::Back;
-    FillMode fillMode = FillMode::Solid;
-    ComparisonFunc depthFunc = ComparisonFunc::Less;
-    bool depthWriteEnable = true;
-};
-
 // ── Pipeline resources ───────────────────────────────────────
 enum class PipelineResource : uint32_t
 {
@@ -434,46 +417,6 @@ struct PipelineStateObject
         check(PipelineResource::IndexBuffer, "index buffer", !indexBuffer.IsEmpty());
         check(PipelineResource::ConstantBuffer, "constant buffer", constantBuffer.Size() > 0);
         check(PipelineResource::RenderTarget, "render target", renderTarget != nullptr);
-        check(PipelineResource::DepthBuffer, "depth buffer", depthBuffer != nullptr);
-        check(PipelineResource::Viewport, "viewport", viewport.size.x > 0 && viewport.size.y > 0);
-        check(PipelineResource::TileSize, "tile size > 0", tileSize > 0);
-
-        if (!errors.empty())
-            SOFTX_THROW(InvalidState("Missing required pipeline state: " + errors));
-    }
-};
-
-struct OcclusionPipelineState
-{
-    using OcclusionVertexShader = std::function<Interpolant(const Vertex&, const ConstantBuffer&)>;
-
-    VertexBuffer vertexBuffer;
-    IndexBuffer  indexBuffer;
-    ConstantBuffer constantBuffer;
-    OcclusionVertexShader vertexShader;
-
-    std::shared_ptr<DepthBuffer> depthBuffer;
-    Viewport viewport;
-    CullMode cullMode = CullMode::Back;
-    ComparisonFunc depthFunc = ComparisonFunc::Less;
-    bool depthWriteEnable = false;
-    uint tileSize = 64;
-
-    void Validate(uint32_t requiredResourcesMask) const
-    {
-        std::string errors;
-        auto check = [&](PipelineResource res, const char* name, bool present)
-        {
-            if ((requiredResourcesMask & static_cast<uint32_t>(res)) && !present)
-            {
-                if (!errors.empty()) errors += "; ";
-                errors += name;
-            }
-        };
-        check(PipelineResource::VertexShader, "vertex shader", vertexShader != nullptr);
-        check(PipelineResource::VertexBuffer, "vertex buffer", !vertexBuffer.IsEmpty());
-        check(PipelineResource::IndexBuffer, "index buffer", !indexBuffer.IsEmpty());
-        check(PipelineResource::ConstantBuffer, "constant buffer", constantBuffer.Size() > 0);
         check(PipelineResource::DepthBuffer, "depth buffer", depthBuffer != nullptr);
         check(PipelineResource::Viewport, "viewport", viewport.size.x > 0 && viewport.size.y > 0);
         check(PipelineResource::TileSize, "tile size > 0", tileSize > 0);
