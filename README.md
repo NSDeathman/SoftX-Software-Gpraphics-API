@@ -35,32 +35,48 @@ SoftX is designed from the ground up for performance and flexibility:
 
 ## Examples
 
-### A minimal example of setting up a device and clearing the screen
+### A minimal example of setting up a device and output triangle to the screen
 
 ```cpp
 #include <SoftX/SoftX.h>
 
-// Vertex and pixel shaders (lambdas)
-auto vs = [](const Vertex& v, ConstantBuffer, const TextureTable&) -> Interpolant { ... };
-auto ps = [](const Interpolant& v, ConstantBuffer, const TextureTable&) -> float4 { ... };
-
 // Create device
 PresentParameters params = { {800,600}, hwnd, true };
 Device device(params);
+
+// Create vertex buffer
+VertexBuffer myVertexBuffer;
+myVertexBuffer.Reserve(3);
+myVertexBuffer.Add({ float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f) }); // Setup NDC pos and color attribute
+myVertexBuffer.Add({ float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f) });
+myVertexBuffer.Add({ float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f) });
+
+// Vertex and pixel shaders (lambdas)
+auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
+{
+    Interpolant Output;
+    Output.ClipSpacePosition = float4(Input.Position.xyz(), 1.0f);
+    Output.Attributes[0] = Input.Attributes[0];
+    return Output;
+};
+auto ps = [](const Interpolant& Input, ConstantBuffer, const TextureTable&) -> float4
+{
+    return Input.Attributes[0];
+};
 
 // Set shaders and resources
 auto& ctx = device.GetImmediateContext();
 ctx.SetVertexShader(vs);
 ctx.SetPixelShader(ps);
 ctx.SetVertexBuffer(myVertexBuffer);
-ctx.SetIndexBuffer(myIndexBuffer);
 ctx.SetRenderTarget(device.GetBackBuffer());
 
 // Draw
 ctx.Clear(ClearFlags::All, float4(0,0,0,1), 1.0);
-ctx.DrawIndexed();
+ctx.Draw();
 device.Present();
 ```
+<img width="1921" height="855" alt="image" src="https://github.com/user-attachments/assets/cf887f5b-c3cc-4a9b-b2eb-dd6bb80ecd9a" />
 
 ### Headless rendering
 Create a device without a window and save the result to a TGA file.
