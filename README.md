@@ -1,16 +1,16 @@
 ﻿# SoftX – Software Graphics API
 
 SoftX is a modern, high-performance software graphics API designed for x86/x64 platforms.  
-It provides a DirectX‑style programming model with full support for **vertex**, **geometry**, and **pixel shaders**, while leveraging **tile‑based multithreaded rendering** and **SIMD acceleration** (SSE/AVX) for maximum efficiency.
+It provides a DirectX‑style programming model with full support for **vertex**, **geometry**, and **pixel shaders**, while leveraging **tile‑based multithreaded rendering** and **SIMD acceleration** for maximum efficiency.
 
 ## Key Features
 
 - **DirectX‑inspired pipeline** – familiar concepts: device, immediate/deferred contexts, shaders, constant buffers, texture bindings.
 - **Tile‑based rendering** – automatic binning of triangles into screen tiles, enabling efficient parallelization.
 - **Multithreading** – create multiple deferred contexts to record command lists concurrently, then execute them in parallel.
-- **SIMD optimised rasterisers** – scalar, SSE, and AVX backends selected at runtime based on CPU capabilities.
 - **Shader support** – C++ callable objects (std::function) for vertex, geometry and pixel shaders; easy to integrate custom shading logic.
 - **Occlusion query** – hardware‑style asynchronous occlusion queries with per‑draw call visibility results. Backed by a separate SIMD‑optimised query rasteriser that counts visible samples.
+- **Flexible vertex format** – Vertex format with custom attributes.
 - **MIP‑mapped textures** – textures support a full mip chain with automatic generation (`GenerateMips`), bilinear sampling at arbitrary LOD levels, and configurable sampler state (LOD bias, mip filter, clamp/repeat/mirror wrapping).
 - **Hi‑Z depth buffer** – hierarchical depth (Hi‑Z) buffer generation (min/max reduction) for efficient coarse‑grained depth testing and occlusion culling.
 - **Console rendering mode** – present the framebuffer as ASCII art directly to the Windows console. Use a configurable character gradient, automatic downsampling, and proper aspect‑ratio correction for crisp text‑mode output.
@@ -35,32 +35,49 @@ SoftX is designed from the ground up for performance and flexibility:
 
 ## Examples
 
-### A minimal example of setting up a device and clearing the screen
+### A minimal example of setting up a device and output triangle to the screen
 
 ```cpp
 #include <SoftX/SoftX.h>
 
-// Vertex and pixel shaders (lambdas)
-auto vs = [](const Vertex& v, ConstantBuffer, const TextureTable&) -> Interpolant { ... };
-auto ps = [](const Interpolant& v, ConstantBuffer, const TextureTable&) -> float4 { ... };
-
 // Create device
 PresentParameters params = { {800,600}, hwnd, true };
 Device device(params);
+
+// Create vertex buffer
+VertexBuffer myVertexBuffer;
+myVertexBuffer.Reserve(3);
+myVertexBuffer.Add({ float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f) });
+myVertexBuffer.Add({ float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f) });
+myVertexBuffer.Add({ float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f) });
+
+// Vertex and pixel shaders (lambdas)
+auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
+{
+    Interpolant Output;
+    Output.ClipSpacePosition = float4(Input.Position.xyz(), 1.0f);
+    Output.Attributes[0] = Input.Attributes[0];
+    return Output;
+};
+auto ps = [](const Interpolant& Input, ConstantBuffer, const TextureTable&) -> float4
+{
+    return Input.Attributes[0];
+};
 
 // Set shaders and resources
 auto& ctx = device.GetImmediateContext();
 ctx.SetVertexShader(vs);
 ctx.SetPixelShader(ps);
 ctx.SetVertexBuffer(myVertexBuffer);
-ctx.SetIndexBuffer(myIndexBuffer);
 ctx.SetRenderTarget(device.GetBackBuffer());
 
 // Draw
-ctx.Clear(float4(0,0,0,1));
-ctx.DrawIndexed();
+ctx.Clear(ClearFlags::All, float4(0,0,0,1), 1.0);
+ctx.Draw();
 device.Present();
 ```
+<img width="1320" height="802" alt="image" src="https://github.com/user-attachments/assets/e6308fd0-3f6d-484b-98e9-d1c153c353af" />
+
 
 ### Headless rendering
 Create a device without a window and save the result to a TGA file.
@@ -93,7 +110,7 @@ ctx.SetRenderTarget(device.GetBackBuffer(), true);
 ctx.SetViewport(Viewport(0, 0, 160, 80, 0.0f, 1.0f));
 
 while (running) {
-    ctx.ClearColorAndDepth(float4(0,0,0,1), 1.0f);
+    ctx.Clear(ClearFlags::All, float4(0,0,0,1), 1.0f);
     // ... draw ...
     device.Present();   // outputs ASCII art to the console
 }
