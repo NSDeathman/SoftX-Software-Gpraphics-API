@@ -47,7 +47,7 @@ Device device(params);
 // Create vertex buffer
 VertexBuffer myVertexBuffer;
 myVertexBuffer.Reserve(3);
-myVertexBuffer.Add({ float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f) }); // Setup NDC pos and color attribute
+myVertexBuffer.Add({ float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f) });
 myVertexBuffer.Add({ float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f) });
 myVertexBuffer.Add({ float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f) });
 
