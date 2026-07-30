@@ -76,7 +76,8 @@ ctx.Clear(ClearFlags::All, float4(0,0,0,1), 1.0);
 ctx.Draw();
 device.Present();
 ```
-<img width="1921" height="855" alt="image" src="https://github.com/user-attachments/assets/cf887f5b-c3cc-4a9b-b2eb-dd6bb80ecd9a" />
+<img width="1320" height="802" alt="image" src="https://github.com/user-attachments/assets/e6308fd0-3f6d-484b-98e9-d1c153c353af" />
+
 
 ### Headless rendering
 Create a device without a window and save the result to a TGA file.
