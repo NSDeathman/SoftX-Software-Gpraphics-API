@@ -61,19 +61,19 @@ namespace QueryRasterizer
                 {
                     Interpolant fragment;
 
-                    float weight0 = alpha * setup.v0.Position.w;
-                    float weight1 = beta  * setup.v1.Position.w;
-                    float weight2 = gamma * setup.v2.Position.w;
+                    float weight0 = alpha * setup.v0.ClipSpacePosition.w;
+                    float weight1 = beta  * setup.v1.ClipSpacePosition.w;
+                    float weight2 = gamma * setup.v2.ClipSpacePosition.w;
 
                     float totalWeight = weight0 + weight1 + weight2;
                     float inverseTotalWeight = (std::abs(totalWeight) > 1e-10f) ? (1.0f / totalWeight) : 0.0f;
 
                     // Perspective‑correct depth interpolation
-                    fragment.Position.z = (weight0 * setup.v0.Position.z + weight1 * setup.v1.Position.z + weight2 * setup.v2.Position.z) * inverseTotalWeight;
+                    fragment.ClipSpacePosition.z = (weight0 * setup.v0.ClipSpacePosition.z + weight1 * setup.v1.ClipSpacePosition.z + weight2 * setup.v2.ClipSpacePosition.z) * inverseTotalWeight;
                     // Linear interpolation for w (to reconstruct view‑space depth)
-                    fragment.Position.w = alpha * setup.v0.Position.w + beta * setup.v1.Position.w + gamma * setup.v2.Position.w;
+                    fragment.ClipSpacePosition.w = alpha * setup.v0.ClipSpacePosition.w + beta * setup.v1.ClipSpacePosition.w + gamma * setup.v2.ClipSpacePosition.w;
 
-                    float depth = RasterizerCommon::ComputeDepth(fragment.Position.z, fragment.Position.w, viewport);
+                    float depth = RasterizerCommon::ComputeDepth(fragment.ClipSpacePosition.z, fragment.ClipSpacePosition.w, viewport);
                     float storedDepth = depthBuffer.At(int2(x, y));
 
                     if (RasterizerCommon::DepthTest(depth, storedDepth, rasterizerState.depthFunc))

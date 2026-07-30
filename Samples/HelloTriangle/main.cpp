@@ -87,20 +87,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 
     VertexBuffer vb;
     vb.Reserve(3);
-    vb.Add(float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f));
-    vb.Add(float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f));
-    vb.Add(float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f));
+    vb.Add({ float3(-1.0f, -1.0f, 0.0f), float4(1.0f, 0.0f, 0.0f, 0.0f) });
+    vb.Add({ float3(0.0f, 1.0f, 0.0f), float4(0.0f, 1.0f, 0.0f, 0.0f) });
+    vb.Add({ float3(1.0f, -1.0f, 0.0f), float4(0.0f, 0.0f, 1.0f, 0.0f) });
 
     auto vs = [](const Vertex& Input, ConstantBuffer, const TextureTable&) -> Interpolant
     {
         Interpolant Output;
-        Output.Position = float4(Input.Position, 1.0f);
-        Output.Color = Input.Color;
+        Output.ClipSpacePosition = float4(Input.Position.xyz(), 1.0f);
+        Output.Attributes[0] = Input.Attributes[0];
         return Output;
     };
     auto ps = [](const Interpolant& Input, ConstantBuffer, const TextureTable&) -> float4
     {
-        return Input.Color;
+        return Input.Attributes[0];
     };
 
     ctx.SetRenderTarget(device.GetBackBuffer(), false);

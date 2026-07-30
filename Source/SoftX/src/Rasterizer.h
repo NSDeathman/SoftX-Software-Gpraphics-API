@@ -71,21 +71,21 @@ namespace Rasterizer
                 if ((edge01 | edge12 | edge20) >= 0)
                 {
                     // ---- 1. Compute depth only (minimal interpolation) ----
-                    float weight0 = alpha * setup.v0.Position.w;
-                    float weight1 = beta  * setup.v1.Position.w;
-                    float weight2 = gamma * setup.v2.Position.w;
+                    float weight0 = alpha * setup.v0.ClipSpacePosition.w;
+                    float weight1 = beta  * setup.v1.ClipSpacePosition.w;
+                    float weight2 = gamma * setup.v2.ClipSpacePosition.w;
 
                     float totalWeight = weight0 + weight1 + weight2;
                     float inverseTotalWeight = (std::abs(totalWeight) > 1e-10f) ? (1.0f / totalWeight) : 0.0f;
 
                     // Perspective-correct interpolation of clip‑space z
-                    float interpolatedZ = (weight0 * setup.v0.Position.z +
-                                           weight1 * setup.v1.Position.z +
-                                           weight2 * setup.v2.Position.z) * inverseTotalWeight;
+                    float interpolatedZ = (weight0 * setup.v0.ClipSpacePosition.z +
+                                           weight1 * setup.v1.ClipSpacePosition.z +
+                                           weight2 * setup.v2.ClipSpacePosition.z) * inverseTotalWeight;
                     // Linear interpolation of w (needed for view‑space depth)
-                    float interpolatedW = alpha * setup.v0.Position.w +
-                                          beta  * setup.v1.Position.w +
-                                          gamma * setup.v2.Position.w;
+                    float interpolatedW = alpha * setup.v0.ClipSpacePosition.w +
+                                          beta  * setup.v1.ClipSpacePosition.w +
+                                          gamma * setup.v2.ClipSpacePosition.w;
 
                     float depth = RasterizerCommon::ComputeDepth(interpolatedZ, interpolatedW, viewport);
                     float storedDepth = depthBuffer.At(int2(x, y));
@@ -103,15 +103,16 @@ namespace Rasterizer
                             Interpolant fragment;
 
                             // Perspective‑correct attributes
-                            fragment.Color     = (weight0 * setup.v0.Color + weight1 * setup.v1.Color + weight2 * setup.v2.Color) * inverseTotalWeight;
-                            fragment.Normal    = (weight0 * setup.v0.Normal + weight1 * setup.v1.Normal + weight2 * setup.v2.Normal) * inverseTotalWeight;
-                            fragment.UV        = (weight0 * setup.v0.UV + weight1 * setup.v1.UV + weight2 * setup.v2.UV) * inverseTotalWeight;
-                            fragment.Position.z = interpolatedZ;  // already computed
+                            for(int attr = 0; attr < SOFT_MAX_ATTRIBUTES_COUNT; ++attr)
+                                fragment.Attributes[attr] = (weight0 * setup.v0.Attributes[attr] + 
+                                                             weight1 * setup.v1.Attributes[attr] + 
+                                                             weight2 * setup.v2.Attributes[attr]) * inverseTotalWeight;
 
                             // Screen‑space linear interpolation
-                            fragment.Position.x = alpha * setup.v0.Position.x + beta * setup.v1.Position.x + gamma * setup.v2.Position.x;
-                            fragment.Position.y = alpha * setup.v0.Position.y + beta * setup.v1.Position.y + gamma * setup.v2.Position.y;
-                            fragment.Position.w = interpolatedW;
+                            fragment.ClipSpacePosition.x = alpha * setup.v0.ClipSpacePosition.x + beta * setup.v1.ClipSpacePosition.x + gamma * setup.v2.ClipSpacePosition.x;
+                            fragment.ClipSpacePosition.y = alpha * setup.v0.ClipSpacePosition.y + beta * setup.v1.ClipSpacePosition.y + gamma * setup.v2.ClipSpacePosition.y;
+                            fragment.ClipSpacePosition.z = interpolatedZ;  // already computed
+                            fragment.ClipSpacePosition.w = interpolatedW;
 
                             // Execute pixel shader and write to render target
                             renderTarget->StreamWrite(uint2(x, y), pixelShader(fragment, constantBuffer, *textureTable).simd_);

@@ -77,12 +77,12 @@ public:
             const auto& v1 = setup.v1;
             const auto& v2 = setup.v2;
 
-            float clampedX0 = AfterMath::clamp(v0.Position.x, 0.0f, renderTargetWidthFloat);
-            float clampedY0 = AfterMath::clamp(v0.Position.y, 0.0f, renderTargetHeightFloat);
-            float clampedX1 = AfterMath::clamp(v1.Position.x, 0.0f, renderTargetWidthFloat);
-            float clampedY1 = AfterMath::clamp(v1.Position.y, 0.0f, renderTargetHeightFloat);
-            float clampedX2 = AfterMath::clamp(v2.Position.x, 0.0f, renderTargetWidthFloat);
-            float clampedY2 = AfterMath::clamp(v2.Position.y, 0.0f, renderTargetHeightFloat);
+            float clampedX0 = AfterMath::clamp(v0.ClipSpacePosition.x, 0.0f, renderTargetWidthFloat);
+            float clampedY0 = AfterMath::clamp(v0.ClipSpacePosition.y, 0.0f, renderTargetHeightFloat);
+            float clampedX1 = AfterMath::clamp(v1.ClipSpacePosition.x, 0.0f, renderTargetWidthFloat);
+            float clampedY1 = AfterMath::clamp(v1.ClipSpacePosition.y, 0.0f, renderTargetHeightFloat);
+            float clampedX2 = AfterMath::clamp(v2.ClipSpacePosition.x, 0.0f, renderTargetWidthFloat);
+            float clampedY2 = AfterMath::clamp(v2.ClipSpacePosition.y, 0.0f, renderTargetHeightFloat);
 
             float minX = std::min({ clampedX0, clampedX1, clampedX2 });
             float maxX = std::max({ clampedX0, clampedX1, clampedX2 });

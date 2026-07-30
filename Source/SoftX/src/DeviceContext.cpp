@@ -243,7 +243,7 @@ struct DeviceContext::Impl
                         for (int i = 0; i < 4; ++i)
                         {
                             Interpolant input;
-                            input.UV = float2(u + i * invW, v);
+                            input.Attributes[0] = float2(u + i * invW, v);
                             float4 c = ps(input, cb, tt);
                             _mm_stream_ps(reinterpret_cast<float*>(row + x + i), _mm_set_ps(c.w, c.z, c.y, c.x));
                         }
@@ -252,7 +252,7 @@ struct DeviceContext::Impl
                     for (; x <= endX; ++x, u += invW)
                     {
                         Interpolant input;
-                        input.UV = float2(u, v);
+                        input.Attributes[0] = float2(u, v);
                         float4 c = ps(input, cb, tt);
                         _mm_stream_ps(reinterpret_cast<float*>(row + x), _mm_set_ps(c.w, c.z, c.y, c.x));
                     }
@@ -675,17 +675,17 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
             const auto& v0 = finalVerts[tri.x];
             const auto& v1 = finalVerts[tri.y];
             const auto& v2 = finalVerts[tri.z];
-            float depth0 = RasterizerCommon::ComputeDepth(v0.Position.z, v0.Position.w, state.viewport);
-            float depth1 = RasterizerCommon::ComputeDepth(v1.Position.z, v1.Position.w, state.viewport);
-            float depth2 = RasterizerCommon::ComputeDepth(v2.Position.z, v2.Position.w, state.viewport);
+            float depth0 = RasterizerCommon::ComputeDepth(v0.ClipSpacePosition.z, v0.ClipSpacePosition.w, state.viewport);
+            float depth1 = RasterizerCommon::ComputeDepth(v1.ClipSpacePosition.z, v1.ClipSpacePosition.w, state.viewport);
+            float depth2 = RasterizerCommon::ComputeDepth(v2.ClipSpacePosition.z, v2.ClipSpacePosition.w, state.viewport);
 
             DrawLine(*rt, 
                      *db, 
                      fullRasterState,
-                     (int)round(v0.Position.x), 
-                     (int)round(v0.Position.y),
-                     (int)round(v1.Position.x), 
-                     (int)round(v1.Position.y),
+                     (int)round(v0.ClipSpacePosition.x),
+                     (int)round(v0.ClipSpacePosition.y),
+                     (int)round(v1.ClipSpacePosition.x),
+                     (int)round(v1.ClipSpacePosition.y),
                      depth0, 
                      depth1, 
                      wireColor);
@@ -693,10 +693,10 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
             DrawLine(*rt, 
                      *db, 
                      fullRasterState, 
-                     (int)round(v1.Position.x), 
-                     (int)round(v1.Position.y),
-                     (int)round(v2.Position.x), 
-                     (int)round(v2.Position.y),
+                     (int)round(v1.ClipSpacePosition.x),
+                     (int)round(v1.ClipSpacePosition.y),
+                     (int)round(v2.ClipSpacePosition.x),
+                     (int)round(v2.ClipSpacePosition.y),
                      depth1, 
                      depth2, 
                      wireColor);
@@ -704,10 +704,10 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
             DrawLine(*rt, 
                      *db, 
                      fullRasterState, 
-                     (int)round(v2.Position.x), 
-                     (int)round(v2.Position.y), 
-                     (int)round(v0.Position.x), 
-                     (int)round(v0.Position.y), 
+                     (int)round(v2.ClipSpacePosition.x),
+                     (int)round(v2.ClipSpacePosition.y),
+                     (int)round(v0.ClipSpacePosition.x),
+                     (int)round(v0.ClipSpacePosition.y),
                      depth2, 
                      depth0, 
                      wireColor);
@@ -725,8 +725,8 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                 {
                     drawn[idx] = true;
                     const auto& v = finalVerts[idx];
-                    float depth = RasterizerCommon::ComputeDepth(v.Position.z, v.Position.w, state.viewport);
-                    DrawPoint(*rt, *db, fullRasterState, (int)round(v.Position.x), (int)round(v.Position.y), depth, v.Color);
+                    float depth = RasterizerCommon::ComputeDepth(v.ClipSpacePosition.z, v.ClipSpacePosition.w, state.viewport);
+                    DrawPoint(*rt, *db, fullRasterState, (int)round(v.ClipSpacePosition.x), (int)round(v.ClipSpacePosition.y), depth, float4(1.0f));
                 }
             }
         }

@@ -13,6 +13,7 @@
 
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
+#include "Exceptions.h"
 /////////////////////////////////////////////////////////////////
 class SOFTX_API SoftX::DepthBuffer;
 struct HWND__; typedef HWND__* HWND;
@@ -67,28 +68,18 @@ struct PresentParameters
 };
 
 // ── Geometry data ───────────────────────────────────────────
+#define SOFT_MAX_ATTRIBUTES_COUNT 8
 struct Vertex
 {
-    float4 Color;
-    float3 Position;
-    float3 Normal;
-    float2 UV;
-
-    Vertex() : Color(0, 0, 0, 0), Position(0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
-    Vertex(float3 pos, float4 col = float4(0, 0, 0, 0), float3 norm = float3(0, 0, 0), float2 uv = float2(0, 0)) : Color(col), Position(pos), Normal(norm), UV(uv) {}
+    float4 Position;
+    float4 Attributes[SOFT_MAX_ATTRIBUTES_COUNT];
 };
 
 struct Interpolant
 {
-    float4 Position;
-    float4 Color;
-    float3 Normal;
-    float2 UV;
-
-    Interpolant() : Position(0, 0, 0, 0), Color(0, 0, 0, 0), Normal(0, 0, 0), UV(0, 0) {}
-    Interpolant(float4 pos, float3 norm, float4 col, float2 uv = float2(0, 0)) : Position(pos), Color(col), Normal(norm), UV(uv) {}
+    float4 ClipSpacePosition;
+    float4 Attributes[SOFT_MAX_ATTRIBUTES_COUNT];
 };
-using VertexOutput = Interpolant;
 
 // ── Buffers ──────────────────────────────────────────────────
 class VertexBuffer
@@ -120,13 +111,6 @@ public:
     {
         PrepareWrite();
         data->emplace_back(std::move(vertex));
-    }
-
-    template <typename... Args>
-    void Add(Args&&... args)
-    {
-        PrepareWrite();
-        data->emplace_back(std::forward<Args>(args)...);
     }
 
     void Reserve(size_t capacity)

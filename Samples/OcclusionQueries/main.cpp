@@ -89,7 +89,11 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color = float4(
         uint base = vb.Size();
         for (int idx : face.i)
         {
-            vb.Add(positions[idx], color, face.normal);
+            Vertex v;
+            v.Position = positions[idx];
+            v.Attributes[0] = color;
+            v.Attributes[1] = face.normal;
+            vb.Add(v);
         }
 
         // Two triangles: 0-1-2 and 2-3-0 (CCW)
@@ -103,10 +107,7 @@ Interpolant MainVS(const Vertex& input, const ConstantBuffer& cb, const TextureT
     (void)tex;
     const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
     Interpolant output;
-    output.Position = float4(input.Position, 1.0f) * data->modelViewProjection;
-    output.Color = input.Color;
-    output.Normal = input.Normal;
-    output.UV = input.UV;
+    output.ClipSpacePosition = float4(input.Position.xyz(), 1.0f) * data->modelViewProjection;
     return output;
 }
 
@@ -114,7 +115,6 @@ float4 MainPS(const Interpolant& input, const ConstantBuffer& cb, const TextureT
 {
     (void)tex;
     const CbData* data = reinterpret_cast<const CbData*>(cb.Data());
-
     return data->objectTypeColor;
 }
 
@@ -122,10 +122,7 @@ Interpolant OcclusionVS(const Vertex& input, const ConstantBuffer& cb)
 {
     const CbDataQuery* data = reinterpret_cast<const CbDataQuery*>(cb.Data());
     Interpolant output;
-    output.Position = float4(input.Position, 1.0f) * data->modelViewProjection;
-    output.Color = float4(0, 0, 0, 0);
-    output.Normal = float3(0, 0, 0);
-    output.UV = float2(0, 0);
+    output.ClipSpacePosition = float4(input.Position.xyz(), 1.0f) * data->modelViewProjection;
     return output;
 }
 
