@@ -8,9 +8,9 @@ It provides a DirectX‑style programming model with full support for **vertex**
 - **DirectX‑inspired pipeline** – familiar concepts: device, immediate/deferred contexts, shaders, constant buffers, texture bindings.
 - **Tile‑based rendering** – automatic binning of triangles into screen tiles, enabling efficient parallelization.
 - **Multithreading** – create multiple deferred contexts to record command lists concurrently, then execute them in parallel.
-- **SIMD optimised rasterisers** – scalar, SSE, and AVX backends selected at runtime based on CPU capabilities.
 - **Shader support** – C++ callable objects (std::function) for vertex, geometry and pixel shaders; easy to integrate custom shading logic.
 - **Occlusion query** – hardware‑style asynchronous occlusion queries with per‑draw call visibility results. Backed by a separate SIMD‑optimised query rasteriser that counts visible samples.
+- **Flexible vertex format** – Vertex format with custom attributes.
 - **MIP‑mapped textures** – textures support a full mip chain with automatic generation (`GenerateMips`), bilinear sampling at arbitrary LOD levels, and configurable sampler state (LOD bias, mip filter, clamp/repeat/mirror wrapping).
 - **Hi‑Z depth buffer** – hierarchical depth (Hi‑Z) buffer generation (min/max reduction) for efficient coarse‑grained depth testing and occlusion culling.
 - **Console rendering mode** – present the framebuffer as ASCII art directly to the Windows console. Use a configurable character gradient, automatic downsampling, and proper aspect‑ratio correction for crisp text‑mode output.
@@ -57,7 +57,7 @@ ctx.SetIndexBuffer(myIndexBuffer);
 ctx.SetRenderTarget(device.GetBackBuffer());
 
 // Draw
-ctx.Clear(float4(0,0,0,1));
+ctx.Clear(ClearFlags::All, float4(0,0,0,1), 1.0);
 ctx.DrawIndexed();
 device.Present();
 ```
@@ -93,7 +93,7 @@ ctx.SetRenderTarget(device.GetBackBuffer(), true);
 ctx.SetViewport(Viewport(0, 0, 160, 80, 0.0f, 1.0f));
 
 while (running) {
-    ctx.ClearColorAndDepth(float4(0,0,0,1), 1.0f);
+    ctx.Clear(ClearFlags::All, float4(0,0,0,1), 1.0f);
     // ... draw ...
     device.Present();   // outputs ASCII art to the console
 }
