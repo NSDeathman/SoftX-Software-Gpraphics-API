@@ -71,7 +71,7 @@ struct PresentParameters
 #define SOFT_MAX_ATTRIBUTES_COUNT 8
 struct Vertex
 {
-    float4 Position;
+    float3 Position;
     float4 Attributes[SOFT_MAX_ATTRIBUTES_COUNT];
 };
 
