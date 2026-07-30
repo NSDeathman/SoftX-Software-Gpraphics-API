@@ -3,11 +3,8 @@
 // Copyright (c) 2026 NSDeathman
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <chrono>
-
+#include <conio.h>
 #include <SoftX.h>
 #include <AfterMath.h>
 /////////////////////////////////////////////////////////////////
@@ -15,7 +12,6 @@ using namespace SoftX;
 using namespace AfterMath;
 /////////////////////////////////////////////////////////////////
 Device* g_device = nullptr;
-uint2 g_windowSize = uint2(512, 512);
 /////////////////////////////////////////////////////////////////
 struct CbData
 {
@@ -76,70 +72,12 @@ void CreateCube(VertexBuffer& vb, IndexBuffer& ib, const float4& color = float4(
     }
 }
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+int main()
 {
-    switch (msg)
-    {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE)
-            DestroyWindow(hWnd);
-        return 0;
-
-    case WM_SIZE:
-    {
-        if (g_device && wParam != SIZE_MINIMIZED)
-        {
-            int newWidth = LOWORD(lParam);
-            int newHeight = HIWORD(lParam);
-
-            if (newWidth > 0 && newHeight > 0)
-            {
-                PresentParameters newParams = g_device->GetPresentParams();
-                g_windowSize = uint2(newWidth, newHeight);
-                newParams.BackBufferSize = g_windowSize;
-                g_device->Reset(newParams);
-
-                DeviceContext& ctx = g_device->GetImmediateContext();
-                ctx.SetViewport(Viewport(0.0f, 0.0f, newWidth, newHeight, 0.0f, 1.0f));
-            }
-        }
-        return 0;
-    }
-    }
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
-{
-    WNDCLASSEX wc = {};
-    wc.cbSize = sizeof(WNDCLASSEX);
-    wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
-    wc.lpszClassName = "Hello Triangle";
-    RegisterClassEx(&wc);
-
-    RECT rc = { 0, 0, (LONG)g_windowSize.x, (LONG)g_windowSize.y };
-    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-    HWND Wnd = CreateWindowEx(0, "Hello Triangle", "SoftX Triangle Demo",
-                              WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                              rc.right - rc.left, rc.bottom - rc.top,
-                              nullptr, nullptr, hInstance, nullptr);
-    if (!Wnd) return -1;
-
-    ShowWindow(Wnd, nCmdShow);
-    UpdateWindow(Wnd);
-
     PresentParameters params;
-    params.BackBufferSize = g_windowSize;
-    params.hDeviceWindow = Wnd;
-    params.Windowed = true;
+    params.Output = PresentationMode::Console;
+    params.ConsoleSize = uint2(100, 40);
+    params.BackBufferSize = uint2(320, 240);
 
     Device device(params);
     g_device = &device;
@@ -170,7 +108,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     };
 
     ctx.SetRenderTarget(device.GetBackBuffer(), false);
-    ctx.SetViewport(Viewport(0.0f, 0.0f, g_windowSize.x, g_windowSize.y, 0.0f, 1.0f));
+    ctx.SetViewport(Viewport(0.0f, 0.0f, params.BackBufferSize.x, params.BackBufferSize.y, 0.0f, 1.0f));
     ctx.SetCullMode(CullMode::None);
     ctx.SetDepthFunc(ComparisonFunc::Less);
     ctx.SetFillMode(FillMode::Solid);
@@ -181,20 +119,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     ctx.SetTileSize(128);
 
     auto lastTime = std::chrono::steady_clock::now();
-    MSG msg = {};
-    while (msg.message != WM_QUIT)
+    while (true)
     {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+        if (_kbhit() && _getch() == 27) // 27 = Esc
+            break;
 
         auto currentTime = std::chrono::steady_clock::now();
         float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
         lastTime = currentTime;
 
-        const float aspect = float(g_windowSize.x) / float(g_windowSize.y);
+        const float aspect = float(params.BackBufferSize.x) / float(params.BackBufferSize.y);
         float4x4 proj = perspective(Constants::degrees_to_radians(60.0f), aspect);
         float3 eye(0.0f, 0.0f, -2.0f);
         float3 target(0.0f, 0.0f, 0.0f);
@@ -210,7 +144,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         cData.world = cubeWorld;
         ConstantBuffer cbuf(&cData, sizeof(cData));
 
-        ctx.Clear(ClearFlags::All, float4(0.10f, 0.05f, 0.12f, 1.0f), 1.0f);
+        ctx.Clear(ClearFlags::All, float4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f);
         ctx.SetConstantBuffer(cbuf);
         ctx.DrawIndexed();
         g_device->Present();

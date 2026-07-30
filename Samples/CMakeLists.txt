@@ -1,3 +1,4 @@
 add_subdirectory(HelloTriangle)
 add_subdirectory(OcclusionQueries)
 add_subdirectory(CBuffers)
+add_subdirectory(ASCIIRendering)
