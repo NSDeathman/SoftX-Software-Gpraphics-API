@@ -6,7 +6,7 @@
  * Authors:   NSDeathman (Architecture & Core)
  *            DeepSeek (Mathematics & HLSL Integration)
  *            Gemini 3 (Optimization & Fast Math)
- *	      Nikolay Partas (Half precision data type prototype)
+ *			  Nikolay Partas (Half precision data type prototype)
  * License:   MIT License with Attribution — see LICENSE.md for details.
  *
  * https://github.com/Presence-Collaboratory/AfterMath-CPP-Open-Math-Library
@@ -24,12 +24,12 @@
 #include <smmintrin.h>
 
 #include "AfterMathInternal.h"
+#include "math_float2.h"
+#include "math_float3.h"
 
 AFTERMATH_BEGIN
 
 // Forward declarations
-class float2;
-class float3;
 class float4;
 
 // ============================================================================
@@ -69,18 +69,14 @@ public:
     float4(float x, float y, float z, float w) noexcept :
         simd_(_mm_set_ps(w, z, y, x)) {}
 
-    float4(float2 xy, float z, float w) noexcept :
-        simd_(_mm_set_ps(w, z, xy.y, xy.x)) {}
-        
-    float4(float3 xyz, float w) noexcept :
-        simd_(_mm_set_ps(w, xyz.z, xyz.y, xyz.x)) {}
-
     explicit float4(float scalar) noexcept :
         simd_(_mm_set1_ps(scalar)) {}
 
-    // Note: float2 and float3 constructors would require their headers
-    // float4(const float2& vec, float z = 0.0f, float w = 0.0f) noexcept;
-    // float4(const float3& vec, float w = 0.0f) noexcept;
+    float4(const float2& xy, float z = 0.0f, float w = 0.0f) noexcept
+        : simd_(_mm_set_ps(w, z, xy.y, xy.x)) {}
+
+    float4(const float3& xyz, float w = 0.0f) noexcept
+        : simd_(_mm_set_ps(w, xyz.z, xyz.y, xyz.x)) {}
 
     float4(const float4&) noexcept = default;
 
@@ -100,8 +96,15 @@ public:
         return *this;
     }
 
-    // Note: float3 assignment would require float3 header
-    // float4& operator=(const float3& xyz) noexcept;
+    float4& operator=(const float3& xyz) noexcept {
+        simd_ = _mm_set_ps(0.0f, xyz.z, xyz.y, xyz.x);  // w = 0
+        return *this;
+    }
+
+    float4& operator=(const float2& xy) noexcept {
+        simd_ = _mm_set_ps(0.0f, 0.0f, xy.y, xy.x);     // z = 0, w = 0
+        return *this;
+    }
 
     // ============================================================================
     // Compound Assignment Operators
@@ -339,29 +342,29 @@ public:
 // ============================================================================
 
 // Vector operations
-inline float4 operator*(float4 lhs, const float4& rhs) noexcept {
+inline float4 operator*(const float4& lhs, const float4& rhs) noexcept {
     return float4(_mm_mul_ps(lhs.get_simd(), rhs.get_simd()));
 }
 
-inline float4 operator/(float4 lhs, const float4& rhs) noexcept {
+inline float4 operator/(const float4& lhs, const float4& rhs) noexcept {
     return float4(_mm_div_ps(lhs.get_simd(), rhs.get_simd()));
 }
 
-inline float4 operator*(float4 vec, float scalar) noexcept {
+inline float4 operator*(const float4& vec, float scalar) noexcept {
     __m128 scalar_vec = _mm_set1_ps(scalar);
     return float4(_mm_mul_ps(vec.get_simd(), scalar_vec));
 }
 
-inline float4 operator*(float scalar, float4 vec) noexcept {
+inline float4 operator*(float scalar, const float4& vec) noexcept {
     return vec * scalar;
 }
 
-inline float4 operator/(float4 vec, float scalar) noexcept {
+inline float4 operator/(const float4& vec, float scalar) noexcept {
     __m128 inv_scalar = _mm_set1_ps(1.0f / scalar);
     return float4(_mm_mul_ps(vec.get_simd(), inv_scalar));
 }
 
-inline float4 operator/(float scalar, float4 vec) noexcept {
+inline float4 operator/(float scalar, const float4& vec) noexcept {
     return float4(scalar / vec.x, scalar / vec.y, scalar / vec.z, scalar / vec.w);
 }
 

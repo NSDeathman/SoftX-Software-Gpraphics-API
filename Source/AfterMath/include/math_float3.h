@@ -6,7 +6,7 @@
  * Authors:   NSDeathman (Architecture & Core)
  *            DeepSeek (Mathematics & HLSL Integration)
  *            Gemini 3 (Optimization & Fast Math)
- *	      Nikolay Partas (Half precision data type prototype)
+ *			  Nikolay Partas (Half precision data type prototype)
  * License:   MIT License with Attribution — see LICENSE.md for details.
  *
  * https://github.com/Presence-Collaboratory/AfterMath-CPP-Open-Math-Library
@@ -64,8 +64,7 @@ public:
 
     explicit constexpr float3(float scalar) noexcept : x(scalar), y(scalar), z(scalar) {}
 
-    // Note: float2 declaration would be needed here
-    // float3(const float2& vec, float z = 0.0f) noexcept : x(vec.x), y(vec.y), z(z) {}
+    float3(const float2& vec, float z = 0.0f) noexcept : x(vec.x), y(vec.y), z(z) {}
 
     constexpr float3(const float3&) noexcept = default;
 
@@ -89,6 +88,13 @@ public:
         x = scalar;
         y = scalar;
         z = scalar;
+        return *this;
+    }
+
+    float3& operator=(const float2& vec) noexcept {
+        x = vec.x;
+        y = vec.y;
+        z = 0.0f;
         return *this;
     }
 

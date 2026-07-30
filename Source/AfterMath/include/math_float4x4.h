@@ -6,7 +6,7 @@
  * Authors:   NSDeathman (Architecture & Core)
  *            DeepSeek (Mathematics & HLSL Integration)
  *            Gemini 3 (Optimization & Fast Math)
- *	      Nikolay Partas (Half precision data type prototype)
+ *			  Nikolay Partas (Half precision data type prototype)
  * License:   MIT License with Attribution — see LICENSE.md for details.
  *
  * https://github.com/Presence-Collaboratory/AfterMath-CPP-Open-Math-Library
@@ -118,6 +118,10 @@ public:
 
     float4x4(const float4x4&) noexcept = default;
 
+    explicit float4x4(const float3x3& m) noexcept;
+
+    explicit float4x4(const quaternion& q) noexcept;
+
     // ============================================================================
     // Assignment Operators
     // ============================================================================
@@ -131,6 +135,10 @@ public:
         row3 = float4(0.0f, 0.0f, 0.0f, scalar);
         return *this;
     }
+
+    float4x4& operator=(const float3x3& m) noexcept;
+
+    float4x4& operator=(const quaternion& q) noexcept;
 
     // ============================================================================
     // Compound Assignment Operators

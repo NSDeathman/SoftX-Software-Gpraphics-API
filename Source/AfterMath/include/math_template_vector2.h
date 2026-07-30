@@ -6,7 +6,7 @@
  * Authors:   NSDeathman (Architecture & Core)
  *            DeepSeek (Mathematics & HLSL Integration)
  *            Gemini 3 (Optimization & Fast Math)
- *	      Nikolay Partas (Half precision data type prototype)
+ *			  Nikolay Partas (Half precision data type prototype)
  * License:   MIT License with Attribution — see LICENSE.md for details.
  *
  * https://github.com/Presence-Collaboratory/AfterMath-CPP-Open-Math-Library
@@ -92,9 +92,27 @@ TemplateVector2<T> operator*(T scalar, const TemplateVector2<T>& v)
 }
 
 template<typename T>
+TemplateVector2<T> operator*(const TemplateVector2<T>& v, int scalar)
+{
+    return v * static_cast<T>(scalar);
+}
+
+template<typename T>
+TemplateVector2<T> operator*(int scalar, const TemplateVector2<T>& v)
+{
+    return v * static_cast<T>(scalar);
+}
+
+template<typename T>
 TemplateVector2<T> operator/(const TemplateVector2<T>& v, T scalar)
 {
     return TemplateVector2<T>(v.x / scalar, v.y / scalar);
+}
+
+template<typename T>
+TemplateVector2<T> operator/(const TemplateVector2<T>& v, int scalar)
+{
+    return v / static_cast<T>(scalar);
 }
 
 AFTERMATH_END
