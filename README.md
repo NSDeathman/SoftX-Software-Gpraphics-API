@@ -1,6 +1,7 @@
 ﻿# SoftX – Software Graphics API
 ![C++](https://img.shields.io/badge/C%2B%2B-23-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
 SoftX is a modern, high-performance software graphics API designed for x86/x64 platforms.  
 It provides a DirectX‑style programming model with full support for **vertex**, **geometry**, and **pixel shaders**, while leveraging **tile‑based multithreaded rendering** and **SIMD acceleration** for maximum efficiency.
 
