@@ -1,11 +1,10 @@
 ﻿# SoftX – Software Graphics API
 
-<p align="center">
+<p align="left">
     <a href="https://discord.gg/XXvxtnDbBP">
         <img src="https://img.shields.io/discord/308323056592486420?logo=discord&logoColor=white"
             alt="Chat on Discord"></a>
 </p>
- 
 ![C++](https://img.shields.io/badge/C%2B%2B-23-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Build](https://img.shields.io/badge/cmake-green?logo=cmake)
