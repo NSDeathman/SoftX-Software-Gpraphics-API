@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
-  <img src="https://img.shields.io/badge/C%2B%2B-20-blue" alt="C++ Standard">
+  <img src="https://img.shields.io/badge/C%2B%2B-23-blue" alt="C++ Standard">
   <a href="https://github.com/NSDeathman/SoftX-Software-Graphics-API/actions/workflows/build.yml">
     <img src="https://github.com/NSDeathman/SoftX-Software-Graphics-API/actions/workflows/build.yml/badge.svg" alt="Build Status">
   </a>
