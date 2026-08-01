@@ -1,0 +1,55 @@
+name: Build SoftX
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  # Корневой каталог решения
+  SOLUTION_DIR: ${{ github.workspace }}
+  # Каталог сборки
+  BUILD_DIR: ${{ github.workspace }}/build
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+        platform: [x64, Win32]   # Win32 = x86
+    runs-on: windows-latest      # Visual Studio 2022, Windows Server 2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: >
+          cmake -S "${{ env.SOLUTION_DIR }}" 
+                -B "${{ env.BUILD_DIR }}"
+                -G "Visual Studio 17 2022"
+                -A "${{ matrix.platform }}"
+                -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+
+      - name: Build
+        run: >
+          cmake --build "${{ env.BUILD_DIR }}"
+                --config ${{ matrix.configuration }}
+                --parallel
+
+      # - name: Test
+      #   working-directory: ${{ env.BUILD_DIR }}
+      #   run: ctest -C ${{ matrix.configuration }} --output-on-failure
+
+      # Cохранить артефакты (библиотеку и примеры)
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoftX-${{ matrix.platform }}-${{ matrix.configuration }}
+          path: |
+            ${{ env.BUILD_DIR }}/bin/${{ matrix.configuration }}/*.exe
+            ${{ env.BUILD_DIR }}/bin/${{ matrix.configuration }}/*.dll
+            ${{ env.BUILD_DIR }}/Source/SoftX/lib/${{ matrix.platform == 'x64' && 'x64' || 'x86' }}/${{ matrix.configuration }}/*.lib
+          if-no-files-found: ignore
