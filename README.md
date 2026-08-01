@@ -3,8 +3,8 @@
 <p align="left">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-23-blue" alt="C++">
-  <a href="https://github.com/ВАШ_АККАУНТ/SoftX-Software-Graphics-API/actions/workflows/build.yml">
-    <img src="https://github.com/ВАШ_АККАУНТ/SoftX-Software-Graphics-API/actions/workflows/build.yml/badge.svg" alt="Build">
+  <a href="https://github.com/NSDeathman/SoftX-Software-Graphics-API/blob/main/.github/workflows/cmake-single-platform.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/badges/shields/daily-tests.yml" alt="Build">
   </a>
   <a href="https://discord.gg/XXvxtnDbBP">
     <img src="https://img.shields.io/discord/308323056592486420?logo=discord&logoColor=white" alt="Chat on Discord">
