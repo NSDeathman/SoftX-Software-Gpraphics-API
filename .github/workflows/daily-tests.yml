@@ -1,0 +1,27 @@
+name: Daily Tests
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+        platform: [x64, Win32]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S "${{ github.workspace }}" -B "${{ github.workspace }}/build" -G "Visual Studio 18 2026" -A "${{ matrix.platform }}"
+
+      - name: Build
+        run: cmake --build "${{ github.workspace }}/build" --config ${{ matrix.configuration }} --parallel
