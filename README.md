@@ -7,7 +7,7 @@
     <img src="https://github.com/NSDeathman/SoftX-Software-Graphics-API/actions/workflows/build.yml/badge.svg" alt="Build Status">
   </a>
   <a href="https://github.com/NSDeathman/SoftX-Software-Graphics-API/actions/workflows/daily-tests.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/NSDeathman/SoftX-Software-Graphics-API/daily-tests.yml?branch=main&label=daily%20tests" alt="Daily Tests Status">
+    <img src="https://github.com/NSDeathman/SoftX-Software-Graphics-API/actions/workflows/daily-tests.yml/badge.svg" alt="Build Status">
   </a>
   <a href="https://github.com/NSDeathman/SoftX-Software-Graphics-API/stargazers">
     <img src="https://img.shields.io/github/stars/NSDeathman/SoftX-Software-Graphics-API?style=social" alt="Stars">
