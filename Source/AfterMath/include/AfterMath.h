@@ -58,6 +58,7 @@
 // Advanced Types
 // ============================================================================
 #include "math_quaternion.h"
+#include "math_rect.h"
 
 // ============================================================================
 // Cross type operations and conversions
@@ -114,6 +115,8 @@ using float3x3 = AfterMath::float3x3;
 using float4x4 = AfterMath::float4x4;
 
 using quaternion = AfterMath::quaternion;
+
+using Rect = AfterMath::Rect;
 
 using uint = unsigned int;
 
