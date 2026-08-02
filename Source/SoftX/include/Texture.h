@@ -87,7 +87,7 @@ public:
         mipCount = 0;
     }
 
-    SOFTX_FORCE_INLINE void Clear(float4 color, uint level = 0);
+    void Clear(float4 color, uint level = 0);
 
     SOFTX_FORCE_INLINE __m128* GetRawPixels(uint level = 0)
     {

@@ -9,8 +9,9 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-struct Device::Impl
+class Device::Impl
 {
+public:
     std::unique_ptr<DeviceContext> immediateContext;
     std::shared_ptr<Texture> backBuffer;
     std::shared_ptr<Texture> frontBuffer;
@@ -174,9 +175,9 @@ struct Device::Impl
         const __m128* src = tex->GetRawPixels();
         const __m128 scale = _mm_set1_ps(255.0f);
         const __m128i shuffleMask = _mm_setr_epi8(8, 4, 0, 12,
-                                                  (char)0x80, (char)0x80, (char)0x80, (char)0x80,
-                                                  (char)0x80, (char)0x80, (char)0x80, (char)0x80,
-                                                  (char)0x80, (char)0x80, (char)0x80, (char)0x80);
+                                                  -128, -128, -128, -128,
+                                                  -128, -128, -128, -128,
+                                                  -128, -128, -128, -128);
 
         std::atomic<uint32_t> nextRow(0);
         auto convertRow = [&]()

@@ -49,7 +49,7 @@ struct OcclusionPipelineState
     bool depthWriteEnable = false;
     uint tileSize = 64;
 
-    Rect scissorRect = Rect(0.0f, 0.0f, 0.0f, 0.0f);
+    Rect scissorRect;
     bool scissorEnable = false;
 
     void Validate(uint32_t requiredResourcesMask) const

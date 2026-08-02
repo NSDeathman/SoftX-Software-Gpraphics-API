@@ -14,8 +14,9 @@
 /////////////////////////////////////////////////////////////////
 SOFTX_BEGIN
 
-struct DeviceContext::Impl
+class DeviceContext::Impl
 {
+public:
     PipelineStateObject frontState;
     PipelineStateObject backState;
     mutable std::mutex stateMutex;
@@ -358,7 +359,7 @@ void DeviceContext::Impl::DrawLine(Texture& rt, DepthBuffer& db,
 }
 
 void DeviceContext::Impl::DrawDebugLine(Texture& rt,
-                                        const RasterizerState& rasterState,
+                                        const RasterizerState&,
                                         int x0, int y0, int x1, int y1,
                                         const float4& color)
 {
@@ -633,8 +634,8 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                 TileGrid tileGrid;
                 {
                     PROFILE_SCOPE("Tile binning");
-                    uint width  = rt->Width();
-                    uint height = rt->Height();
+                    uint width  = (rt) ? rt->Width() : db->Width();
+                    uint height = (rt) ? rt->Height() : db->Height();
                     tileGrid.Build(width, height, state.tileSize, rasterState.scissorEnable, rasterState.scissorRect);
                     tileGrid.BinTriangles(setups);
                 }
