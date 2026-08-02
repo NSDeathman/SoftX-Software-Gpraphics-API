@@ -34,6 +34,9 @@ public:
     void SetDepthFunc(ComparisonFunc func);
     void SetDepthWriteEnable(bool enable);
     void SetTileSize(uint size);
+    void SetScissorRect(int left, int top, int right, int bottom);
+    void SetScissorRect(const Rect& rect);
+    void SetScissorEnable(bool enable);
 
     bool IsReady() const;
 

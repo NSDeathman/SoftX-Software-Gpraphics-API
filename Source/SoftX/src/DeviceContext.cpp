@@ -111,6 +111,18 @@ struct DeviceContext::Impl
         return frontState.tileSize;
     }
 
+    bool GetScissorEnable() const 
+    { 
+        std::lock_guard<std::mutex> lock(stateMutex);
+        return frontState.scissorEnable;
+    };
+
+    Rect GetScissorRect() const 
+    { 
+        std::lock_guard<std::mutex> lock(stateMutex);
+        return frontState.scissorRect;
+    };
+
     void CommitState()
     {
         std::lock_guard<std::mutex> lock(stateMutex);
@@ -215,7 +227,7 @@ struct DeviceContext::Impl
 
         const uint ts = state.tileSize;
         TileGrid tileGrid;
-        tileGrid.Build(w, h, ts);
+        tileGrid.Build(w, h, ts, state.scissorEnable, state.scissorRect);
         const auto& tiles = tileGrid.GetTiles();
         uint numTiles = static_cast<uint>(tiles.size());
         std::atomic<uint> tileIndex(0);
@@ -559,17 +571,17 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
     Texture* rt = state.renderTarget.get();
     DepthBuffer* db = state.depthBuffer.get();
 
-    RasterizerState fullRasterState;
-    fullRasterState.cullMode = state.cullMode;
-    fullRasterState.fillMode = state.fillMode;
-    fullRasterState.depthFunc = state.depthFunc;
-    fullRasterState.depthWriteEnable = state.depthWriteEnable;
+    RasterizerState rasterState;
+    rasterState.cullMode = state.cullMode;
+    rasterState.fillMode = state.fillMode;
+    rasterState.depthFunc = state.depthFunc;
+    rasterState.depthWriteEnable = state.depthWriteEnable;
+    rasterState.scissorEnable = state.scissorEnable;
+    rasterState.scissorRect = state.scissorRect;
 
     if (state.fillMode == FillMode::Solid)
     {
         PROFILE_SCOPE("Create TriangleSetups");
-        RasterizerState cullRasterState;
-        cullRasterState.cullMode = state.cullMode;
 
         std::vector<RasterizerCommon::TriangleSetup> setups;
         setups.reserve(finalTriangles.size());
@@ -579,7 +591,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
 
         for (const auto& tri : finalTriangles)
         {
-            auto optSetup = RasterizerCommon::CreateTriangleSetup(finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z], cullRasterState);
+            auto optSetup = RasterizerCommon::CreateTriangleSetup(finalVerts[tri.x], finalVerts[tri.y], finalVerts[tri.z], rasterState);
             if (optSetup)
             {
                 const auto& s = *optSetup;
@@ -605,7 +617,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                     if (minX >= maxX || minY >= maxY) continue;
 
                     Rasterizer::RasterizeTriangle(s,
-                                                  fullRasterState,
+                                                  rasterState,
                                                   *db,
                                                   rt,
                                                   state.viewport,
@@ -623,7 +635,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                     PROFILE_SCOPE("Tile binning");
                     uint width  = rt->Width();
                     uint height = rt->Height();
-                    tileGrid.Build(width, height, state.tileSize);
+                    tileGrid.Build(width, height, state.tileSize, rasterState.scissorEnable, rasterState.scissorRect);
                     tileGrid.BinTriangles(setups);
                 }
 
@@ -646,7 +658,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                             for (int triIdx : tile.triangleIndices)
                             {
                                 Rasterizer::RasterizeTriangle(setups[triIdx],
-                                                              fullRasterState,
+                                                              rasterState,
                                                               *db,
                                                               rt,
                                                               state.viewport,
@@ -660,9 +672,9 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                     };
                     ThreadUtils::DispatchWorkers(Task);
                 }
-#ifdef DEBUG_TILING
-                DrawActiveTileBorders(*rt, fullRasterState, state.tileSize, tiles);
-#endif
+                #ifdef DEBUG_TILING
+                DrawActiveTileBorders(*rt, rasterState, state.tileSize, tileGrid.GetTiles());
+                #endif
             }
         }
     }
@@ -681,7 +693,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
 
             DrawLine(*rt, 
                      *db, 
-                     fullRasterState,
+                     rasterState,
                      (int)round(v0.ClipSpacePosition.x),
                      (int)round(v0.ClipSpacePosition.y),
                      (int)round(v1.ClipSpacePosition.x),
@@ -692,7 +704,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
 
             DrawLine(*rt, 
                      *db, 
-                     fullRasterState, 
+                     rasterState, 
                      (int)round(v1.ClipSpacePosition.x),
                      (int)round(v1.ClipSpacePosition.y),
                      (int)round(v2.ClipSpacePosition.x),
@@ -703,7 +715,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
 
             DrawLine(*rt, 
                      *db, 
-                     fullRasterState, 
+                     rasterState, 
                      (int)round(v2.ClipSpacePosition.x),
                      (int)round(v2.ClipSpacePosition.y),
                      (int)round(v0.ClipSpacePosition.x),
@@ -726,7 +738,7 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
                     drawn[idx] = true;
                     const auto& v = finalVerts[idx];
                     float depth = RasterizerCommon::ComputeDepth(v.ClipSpacePosition.z, v.ClipSpacePosition.w, state.viewport);
-                    DrawPoint(*rt, *db, fullRasterState, (int)round(v.ClipSpacePosition.x), (int)round(v.ClipSpacePosition.y), depth, float4(1.0f));
+                    DrawPoint(*rt, *db, rasterState, (int)round(v.ClipSpacePosition.x), (int)round(v.ClipSpacePosition.y), depth, float4(1.0f));
                 }
             }
         }
@@ -848,6 +860,32 @@ void DeviceContext::SetDepthFunc(ComparisonFunc func)
     pImpl->backState.depthFunc = func;
 }
 
+void DeviceContext::SetScissorRect(int left, int top, int right, int bottom)
+{
+    uint l = static_cast<uint>(std::max(0, left));
+    uint t = static_cast<uint>(std::max(0, top));
+    uint r = static_cast<uint>(std::max(0, right));
+    uint b = static_cast<uint>(std::max(0, bottom));
+
+    if (r <= l || b <= t)
+        l = t = r = b = 0;
+
+    std::lock_guard<std::mutex> lock(pImpl->stateMutex);
+    pImpl->backState.scissorRect = Rect(l, t, r - l, b - t);
+}
+
+void DeviceContext::SetScissorRect(const Rect& rect)
+{
+    std::lock_guard<std::mutex> lock(pImpl->stateMutex);
+    pImpl->backState.scissorRect = rect;
+}
+
+void DeviceContext::SetScissorEnable(bool enable)
+{
+    std::lock_guard<std::mutex> lock(pImpl->stateMutex);
+    pImpl->backState.scissorEnable = enable;
+}
+
 VertexShader DeviceContext::GetVertexShader() const { return pImpl->GetVertexShader(); }
 GeometryShader DeviceContext::GetGeometryShader() const { return pImpl->GetGeometryShader(); }
 PixelShader DeviceContext::GetPixelShader() const { return pImpl->GetPixelShader(); }
@@ -862,6 +900,8 @@ FillMode DeviceContext::GetFillMode() const { return pImpl->GetFillMode(); }
 ComparisonFunc DeviceContext::GetDepthFunc() const { return pImpl->GetDepthFunc(); }
 Viewport DeviceContext::GetViewport() const { return pImpl->GetViewport(); }
 uint DeviceContext::GetTileSize() const { return pImpl->GetTileSize(); }
+bool DeviceContext::GetScissorEnable() const { return pImpl->GetScissorEnable();  };
+Rect DeviceContext::GetScissorRect() const { return pImpl->GetScissorRect(); };
 
 void DeviceContext::Clear(ClearFlags flags, const float4& color, float depth)
 {

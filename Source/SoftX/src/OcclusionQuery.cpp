@@ -186,6 +186,8 @@ private:
         rasterState.cullMode = pso.cullMode;
         rasterState.depthFunc = pso.depthFunc;
         rasterState.depthWriteEnable = pso.depthWriteEnable;
+        rasterState.scissorEnable = pso.scissorEnable;
+        rasterState.scissorRect = pso.scissorRect;
 
         const auto& vbData = *dc.vb;
         const auto& ibData = dc.ib;
@@ -251,11 +253,12 @@ private:
         // Tile binning
         const uint tileSize = pso.tileSize;
         TileGrid tileGrid;
-        tileGrid.Build(db.Width(), db.Height(), tileSize);
+        tileGrid.Build(db.Width(), db.Height(), tileSize, rasterState.scissorEnable, rasterState.scissorRect);
         tileGrid.BinTriangles(setups);
 
-        uint32_t localVisible = 0;
         const auto& tiles = tileGrid.GetTiles();
+
+        uint32_t localVisible = 0;
 
         // Rasterise all triangles tile by tile
         for (const auto& tile : tiles)
@@ -334,6 +337,33 @@ void OcclusionQuery::SetTileSize(uint size)
 {
     std::lock_guard<std::mutex> lock(*pImpl->stateMutex);
     pImpl->state.tileSize = size;
+}
+
+void OcclusionQuery::SetScissorRect(int left, int top, int right, int bottom)
+{
+    assert(right >= left && bottom >= top);
+    uint l = static_cast<uint>(std::max(0, left));
+    uint t = static_cast<uint>(std::max(0, top));
+    uint r = static_cast<uint>(std::max(0, right));
+    uint b = static_cast<uint>(std::max(0, bottom));
+
+    if (r <= l || b <= t)
+        l = t = r = b = 0;
+
+    std::lock_guard<std::mutex> lock(*pImpl->stateMutex);
+    pImpl->state.scissorRect = Rect(l, t, r - l, b - t);
+}
+
+void OcclusionQuery::SetScissorRect(const Rect& rect)
+{
+    std::lock_guard<std::mutex> lock(*pImpl->stateMutex);
+    pImpl->state.scissorRect = rect;
+}
+
+void OcclusionQuery::SetScissorEnable(bool enable)
+{
+    std::lock_guard<std::mutex> lock(*pImpl->stateMutex);
+    pImpl->state.scissorEnable = enable;
 }
 
 bool OcclusionQuery::IsReady() const

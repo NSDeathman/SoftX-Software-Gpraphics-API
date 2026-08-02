@@ -28,6 +28,8 @@ struct RasterizerState
     FillMode fillMode = FillMode::Solid;
     ComparisonFunc depthFunc = ComparisonFunc::Less;
     bool depthWriteEnable = true;
+    Rect scissorRect;
+    bool scissorEnable = false;
 };
 
 // ── Occlusion pipeline state ─────────────────────────────────
@@ -46,6 +48,9 @@ struct OcclusionPipelineState
     ComparisonFunc depthFunc = ComparisonFunc::Less;
     bool depthWriteEnable = false;
     uint tileSize = 64;
+
+    Rect scissorRect = Rect(0.0f, 0.0f, 0.0f, 0.0f);
+    bool scissorEnable = false;
 
     void Validate(uint32_t requiredResourcesMask) const
     {

@@ -67,6 +67,13 @@ public:
     void SetTileSize(uint size);
     uint GetTileSize() const;
 
+    void SetScissorRect(int left, int top, int right, int bottom);
+    void SetScissorRect(const Rect& rect);
+    void SetScissorEnable(bool enable);
+
+    bool GetScissorEnable() const;
+    Rect GetScissorRect() const;
+
     void Clear(ClearFlags flags = ClearFlags::All, const float4& color = {0.0f, 0.0f, 0.0f, 0.0f}, float depth = 1.0f);
 
     // Drawing

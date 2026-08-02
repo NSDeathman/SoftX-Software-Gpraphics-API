@@ -383,6 +383,9 @@ struct PipelineStateObject
     Viewport viewport;
     uint tileSize = 64;
 
+    Rect scissorRect;
+    bool scissorEnable = false;
+
     void Validate(uint32_t requiredResourcesMask) const 
     {
         std::string errors;
