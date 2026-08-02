@@ -13,8 +13,8 @@
  */
 #pragma once
 
-#define AFTERMATH_VERSION 0.8f
-#define AFTERMATH_VERSION_TEXT "AfterMath In-Dev v0.8"
+#define AFTERMATH_VERSION 0.81f
+#define AFTERMATH_VERSION_TEXT "AfterMath In-Dev v0.81"
 
 #include "AfterMathInternal.h"
 
@@ -116,8 +116,6 @@ using float4x4 = AfterMath::float4x4;
 
 using quaternion = AfterMath::quaternion;
 
-using Rect = AfterMath::Rect;
-
 using uint = unsigned int;
 
 using int2 = AfterMath::TemplateVector2<int>;
@@ -131,6 +129,10 @@ using double3 = AfterMath::TemplateVector3<double>;
 using int4 = AfterMath::TemplateVector4<int>;
 using uint4 = AfterMath::TemplateVector4<unsigned int>;
 using double4 = AfterMath::TemplateVector4<double>;
+
+using fRect = AfterMath::TemplateRect<float>;
+using iRect = AfterMath::TemplateRect<float>;
+using Rect = AfterMath::TemplateRect<uint>;
 
 // ============================================================================
 // Common Global Constants
