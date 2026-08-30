@@ -272,6 +272,9 @@ public:
     /// Default look_at: left-handed
     static float4x4 look_at(const float3& eye, const float3& target, const float3& up);
 
+    /// Builds a view matrix from spherical coordinates around a target point.
+    static float4x4 look_at_spherical(const float3& target, float radius, float theta, float phi, const float3& up = float3(0.0f, 1.0f, 0.0f)) noexcept;
+
     // ============================================================================
     // Utility Methods
     // ============================================================================
@@ -675,9 +678,9 @@ inline float3 get_scale(const float4x4& mat) noexcept {
 
 inline bool is_identity(const float4x4& mat, float epsilon = 1e-6f) noexcept {
     return  approximately(mat.row0, float4(1.0f, 0.0f, 0.0f, 0.0f), epsilon) &&
-        approximately(mat.row1, float4(0.0f, 1.0f, 0.0f, 0.0f), epsilon) &&
-        approximately(mat.row2, float4(0.0f, 0.0f, 1.0f, 0.0f), epsilon) &&
-        approximately(mat.row3, float4(0.0f, 0.0f, 0.0f, 1.0f), epsilon);
+            approximately(mat.row1, float4(0.0f, 1.0f, 0.0f, 0.0f), epsilon) &&
+            approximately(mat.row2, float4(0.0f, 0.0f, 1.0f, 0.0f), epsilon) &&
+            approximately(mat.row3, float4(0.0f, 0.0f, 0.0f, 1.0f), epsilon);
 }
 
 inline bool is_orthogonal(const float4x4& mat, float epsilon = 1e-6f) noexcept {
@@ -692,15 +695,15 @@ inline bool is_orthogonal(const float4x4& mat, float epsilon = 1e-6f) noexcept {
     if (std::abs(dot(r1, r2)) > epsilon) return false;
 
     return  approximately(length_sq(r0), 1.0f, epsilon) &&
-        approximately(length_sq(r1), 1.0f, epsilon) &&
-        approximately(length_sq(r2), 1.0f, epsilon);
+            approximately(length_sq(r1), 1.0f, epsilon) &&
+            approximately(length_sq(r2), 1.0f, epsilon);
 }
 
 inline bool approximately(const float4x4& a, const float4x4& b, float epsilon = 1e-6f) noexcept {
     return  approximately(a.row0, b.row0, epsilon) &&
-        approximately(a.row1, b.row1, epsilon) &&
-        approximately(a.row2, b.row2, epsilon) &&
-        approximately(a.row3, b.row3, epsilon);
+            approximately(a.row1, b.row1, epsilon) &&
+            approximately(a.row2, b.row2, epsilon) &&
+            approximately(a.row3, b.row3, epsilon);
 }
 
 inline bool approximately_zero(const float4x4& mat, float epsilon = 1e-6f) noexcept {
@@ -773,6 +776,36 @@ inline float4x4 float4x4::rotation_z(float angle) noexcept {
 /// Combined matrix = Rx * Ry * Rz  (applied left to right in vec*mat convention)
 inline float4x4 float4x4::rotation_euler(const float3& angles) noexcept {
     return rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
+}
+
+// ============================================================================
+// Spherical Coordinate Helpers
+// ============================================================================
+
+/// Converts spherical coordinates to Cartesian in left-handed space with +Z forward, +Y up, +X right.
+/// Theta (azimuth/yaw) is measured from +Z axis towards +X (counter-clockwise from above).
+/// Phi (elevation/pitch) is measured from the horizontal plane, positive towards +Y.
+inline float3 spherical_to_cartesian(float radius, float theta, float phi) noexcept {
+    float cos_phi = std::cos(phi);
+    return float3(
+        radius * cos_phi * std::sin(theta),  // x
+        radius * std::sin(phi),              // y
+        -radius * cos_phi * std::cos(theta)  // z (negative because forward is +Z)
+    );
+}
+
+/// Converts Cartesian coordinates to spherical (radius, theta, phi).
+/// The input is assumed to be in left-handed space with +Z forward, +Y up, +X right.
+/// Theta is returned in range [-π, π]. Phi is in [-π/2, π/2].
+inline void cartesian_to_spherical(const float3& p, float& radius, float& theta, float& phi) noexcept {
+    radius = length(p);
+    if (radius < 1e-8f) {
+        theta = 0.0f;
+        phi = 0.0f;
+        return;
+    }
+    phi = std::asin(p.y / radius);
+    theta = std::atan2(p.x, -p.z);
 }
 
 // ============================================================================
@@ -878,6 +911,14 @@ inline float4x4 float4x4::look_at(const float3& eye, const float3& target, const
     return look_at_lh(eye, target, up);
 }
 
+/// Left-handed look_at built from spherical coordinates.
+/// The camera position is computed as target + spherical_to_cartesian(radius, theta, phi).
+inline float4x4 float4x4::look_at_spherical(const float3& target, float radius, float theta, float phi, const float3& up) noexcept {
+    float3 offset = spherical_to_cartesian(radius, theta, phi);
+    float3 eye = target + offset;
+    return look_at_lh(eye, target, up);
+}
+
 // ============================================================================
 // Global Transformation Functions (HLSL style free functions)
 // ============================================================================
@@ -939,6 +980,11 @@ inline float4x4 look_at(
     const float3& up = float3(0.0f, 1.0f, 0.0f)) noexcept
 {
     return float4x4::look_at(eye, target, up);
+}
+
+inline float4x4 look_at_spherical(const float3& target = float3(0.0f, 0.0f, 0.0f), float radius = 1.0f, float theta = 0.0f, float phi = 0.0f, const float3& up = float3(0.0f, 1.0f, 0.0f)) noexcept
+{
+    return float4x4::look_at_spherical(target, radius, theta, phi, up);
 }
 
 /// Rotation around an arbitrary axis (Rodrigues' formula)
