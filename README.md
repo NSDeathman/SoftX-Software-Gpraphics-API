@@ -171,16 +171,11 @@ if (visible1) { /* draw sphere */ }
 ```
 <img width="1282" height="800" alt="image" src="https://github.com/user-attachments/assets/ee863aa1-eefe-4806-813e-041c063a0dc2" />
 
-## Building
-SoftX is provided as a Visual Studio 2019 solution.
-
-The library builds as SoftX.lib + SoftX.dll (dynamic CRT).
-
 ## The solution includes the AfterMath math library (header‑only).
 
 Supported platforms: x86 and x64.
 
-## C++ standard: C++14 (minimum), also tested with C++17 and C++20.
+## C++ standard: C++14 (minimum), recommended C++17 or C++20.
 
 ## License
 SoftX is open‑source software released under the MIT License. See LICENSE for details.
