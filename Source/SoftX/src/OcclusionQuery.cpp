@@ -4,7 +4,7 @@
 // Licensed under the MIT License.
 /////////////////////////////////////////////////////////////////
 #include "../include/SoftX.h"
-#include "QueryRasterizer.h"
+#include "DepthRasterizer.h"
 #include "ThreadPoolManager.h"
 #include "TileGrid.h"
 #include "InternalTypes.h"
@@ -266,7 +266,7 @@ private:
             for (int setupIndex : tile.triangleIndices)
             {
                 const RasterizerCommon::TriangleSetup& s = setups[setupIndex];
-                localVisible += QueryRasterizer::RasterizeTriangle(s, rasterState, db, pso.viewport, tile.min, tile.max);
+                localVisible += DepthRasterizer::RasterizeTriangle(s, rasterState, db, pso.viewport, tile.min, tile.max);
             }
         }
 

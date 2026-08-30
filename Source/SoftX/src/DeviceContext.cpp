@@ -9,6 +9,7 @@
 #include "ThreadPoolManager.h"
 #include "ThreadUtils.h"
 #include "InternalTypes.h"
+#include <DepthRasterizer.h>
 /////////////////////////////////////////////////////////////////
 //#define DEBUG_TILING
 /////////////////////////////////////////////////////////////////
@@ -617,16 +618,24 @@ void DeviceContext::Impl::ClipAndRasterize(const PipelineStateObject& state,
 
                     if (minX >= maxX || minY >= maxY) continue;
 
-                    Rasterizer::RasterizeTriangle(s,
-                                                  rasterState,
-                                                  *db,
-                                                  rt,
-                                                  state.viewport,
-                                                  state.pixelShader,
-                                                  state.constantBuffer,
-                                                  &state.textureTable,
-                                                  uint2(minX, minY),
-                                                  uint2(maxX, maxY));
+                    if(state.renderTarget)
+                        Rasterizer::RasterizeTriangle(s,
+                                                      rasterState,
+                                                      *db,
+                                                      rt,
+                                                      state.viewport,
+                                                      state.pixelShader,
+                                                      state.constantBuffer,
+                                                      &state.textureTable,
+                                                      uint2(minX, minY),
+                                                      uint2(maxX, maxY));
+                    else
+                        DepthRasterizer::RasterizeTriangle(s,
+                                                           rasterState,
+                                                           *db,
+                                                           state.viewport,
+                                                           uint2(minX, minY),
+                                                           uint2(maxX, maxY));
                 }
             }
             else

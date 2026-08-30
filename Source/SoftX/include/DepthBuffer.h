@@ -9,7 +9,7 @@
 #include <cassert>
 #include <limits>
 #include <vector>
-#include <xmmintrin.h>
+#include <intrin.h>
 
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"

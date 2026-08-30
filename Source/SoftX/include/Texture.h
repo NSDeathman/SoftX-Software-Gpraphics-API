@@ -7,7 +7,7 @@
 /////////////////////////////////////////////////////////////////
 #include <algorithm>
 #include <cassert>
-#include <xmmintrin.h>
+#include <intrin.h>
 
 #include "LibInternal.h"
 #include "ThirdPartyIncluding.h"
@@ -51,7 +51,7 @@ public:
 
     Texture(Texture&& other) noexcept
         : pixels(other.pixels), pixelCount(other.pixelCount),
-        levels(other.levels), mipCount(other.mipCount)
+          levels(other.levels), mipCount(other.mipCount)
     {
         other.pixels = nullptr;
         other.levels = nullptr;
