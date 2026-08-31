@@ -16,8 +16,8 @@ set(SOFTX_SOURCES
 
 set(SOFTX_PRIVATE_HEADERS
     src/CPUDetector.h
-    src/QueryRasterizer.h
     src/RasterizerCommon.h
+    src/DepthRasterizer.h
     src/Rasterizer.h
     src/TileGrid.h
     src/ThreadPool.h
@@ -93,7 +93,7 @@ source_group("Source Files\\Resources"     			FILES 	src/InternalTypes.h src/Tex
 
 source_group("Source Files\\Rastization"     			FILES 	src/RasterizerCommon.h
 									src/Rasterizer.h
-									src/QueryRasterizer.h)
+									src/DepthRasterizer.h)
 
 source_group("Header Files\\API"           			FILES 	include/SoftX.h
 									include/Device.h
