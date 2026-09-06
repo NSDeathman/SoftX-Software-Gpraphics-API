@@ -35,17 +35,8 @@
 
 AFTERMATH_BEGIN
 
-// Forward declarations
-class quaternion;
-
-extern const AfterMath::float3 float3_UnitX;
-extern const AfterMath::float3 float3_UnitY;
-extern const AfterMath::float3 float3_UnitZ;
-
-inline quaternion normalize(const quaternion& q) noexcept;
-
 // ============================================================================
-// Quaternion Class (Data Only)
+// Quaternion Class
 // ============================================================================
 
 class quaternion
@@ -370,17 +361,6 @@ inline quaternion operator-(const quaternion& q) noexcept {
 }
 
 // ============================================================================
-// Vector Transformation
-// ============================================================================
-
-inline float3 operator*(const quaternion& q, const float3& vec) noexcept {
-    quaternion n = normalize(q);
-    float3 q_xyz(n.x, n.y, n.z);
-    float3 t = cross(q_xyz, vec) * 2.0f;
-    return vec + n.w * t + cross(q_xyz, t);
-}
-
-// ============================================================================
 // Mathematical Functions
 // ============================================================================
 
@@ -412,6 +392,17 @@ inline quaternion inverse(const quaternion& q) noexcept {
 
 inline float dot(const quaternion& a, const quaternion& b) noexcept {
     return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
+// ============================================================================
+// Vector Transformation
+// ============================================================================
+
+inline float3 operator*(const quaternion& q, const float3& vec) noexcept {
+    quaternion n = normalize(q);
+    float3 q_xyz(n.x, n.y, n.z);
+    float3 t = cross(q_xyz, vec) * 2.0f;
+    return vec + n.w * t + cross(q_xyz, t);
 }
 
 // ============================================================================
